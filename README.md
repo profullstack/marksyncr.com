@@ -57,6 +57,9 @@ cd marksyncr
 # Install dependencies
 pnpm install
 
+# Set up git hooks (runs build and tests before each commit)
+./scripts/setup-hooks.sh
+
 # Start development
 pnpm dev
 
