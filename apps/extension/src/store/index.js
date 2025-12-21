@@ -395,6 +395,8 @@ export const useStore = create(
       triggerSync: async () => {
         const { selectedSource, sources } = get();
 
+        console.log('[MarkSyncr Store] triggerSync called, selectedSource:', selectedSource);
+
         if (!selectedSource) {
           set({ error: 'No sync source selected' });
           return;
@@ -410,12 +412,16 @@ export const useStore = create(
 
         try {
           const browserAPI = getBrowserAPI();
+          console.log('[MarkSyncr Store] Browser API available:', !!browserAPI.runtime?.sendMessage);
 
           // Send message to background script to perform sync
+          console.log('[MarkSyncr Store] Sending SYNC_BOOKMARKS message...');
           const result = await browserAPI.runtime.sendMessage({
             type: 'SYNC_BOOKMARKS',
             payload: { sourceId: selectedSource },
           });
+
+          console.log('[MarkSyncr Store] Sync result:', result);
 
           if (result?.success) {
             const lastSync = new Date().toISOString();
@@ -428,10 +434,10 @@ export const useStore = create(
             // Persist last sync time
             await browserAPI.storage.local.set({ lastSync });
           } else {
-            throw new Error(result?.error || 'Sync failed');
+            throw new Error(result?.error || 'Sync failed - no result from background');
           }
         } catch (err) {
-          console.error('Sync failed:', err);
+          console.error('[MarkSyncr Store] Sync failed:', err);
           set({
             status: 'error',
             error: err.message || 'Sync failed',
