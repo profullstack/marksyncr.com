@@ -74,7 +74,13 @@ describe('Bookmarks API Routes', () => {
   });
 
   describe('GET /api/bookmarks', () => {
-    it('should return 401 when no authorization header is provided', async () => {
+    it('should return 401 when no auth (no header and no session)', async () => {
+      // Mock both Bearer token and session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'GET',
         headers: {},
@@ -84,10 +90,16 @@ describe('Bookmarks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 when authorization header is invalid format', async () => {
+    it('should return 401 when authorization header is invalid format and no session', async () => {
+      // Mock session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'GET',
         headers: { authorization: 'InvalidFormat token123' },
@@ -97,10 +109,11 @@ describe('Bookmarks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 when token is invalid', async () => {
+    it('should return 401 when token is invalid and no session', async () => {
+      // Mock both Bearer token and session cookie auth to fail
       mockGetUser.mockResolvedValue({
         data: { user: null },
         error: { message: 'Invalid token' },
@@ -115,7 +128,7 @@ describe('Bookmarks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Invalid or expired token');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return bookmarks for authenticated user', async () => {
@@ -196,7 +209,13 @@ describe('Bookmarks API Routes', () => {
   });
 
   describe('POST /api/bookmarks', () => {
-    it('should return 401 when no authorization header is provided', async () => {
+    it('should return 401 when no auth (no header and no session)', async () => {
+      // Mock both Bearer token and session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'POST',
         headers: {},
@@ -207,7 +226,7 @@ describe('Bookmarks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return 400 when bookmarks is not an array', async () => {
@@ -397,7 +416,13 @@ describe('Bookmarks API Routes', () => {
   });
 
   describe('DELETE /api/bookmarks', () => {
-    it('should return 401 when no authorization header is provided', async () => {
+    it('should return 401 when no auth (no header and no session)', async () => {
+      // Mock both Bearer token and session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'DELETE',
         headers: {},
@@ -408,7 +433,7 @@ describe('Bookmarks API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return 400 when neither url nor id is provided', async () => {

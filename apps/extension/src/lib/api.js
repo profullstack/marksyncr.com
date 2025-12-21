@@ -1,6 +1,10 @@
 /**
  * API client for MarkSyncr extension
  * All communication with the backend goes through web API calls
+ *
+ * Authentication: Session cookies only (credentials: 'include')
+ * The server sets HttpOnly cookies on login, which are automatically
+ * sent with all subsequent requests.
  */
 
 const APP_URL = import.meta.env.VITE_APP_URL || 'https://marksyncr.com';
@@ -19,71 +23,47 @@ const getBrowserAPI = () => {
 };
 
 /**
- * Get stored auth token
+ * Clear local user data (called on logout)
  */
-async function getAuthToken() {
+async function clearUserData() {
   const browserAPI = getBrowserAPI();
-  if (!browserAPI) return null;
+  if (!browserAPI) return;
   
-  const { authToken } = await browserAPI.storage.local.get('authToken');
-  return authToken;
+  await browserAPI.storage.local.remove(['user', 'isLoggedIn']);
 }
 
 /**
- * Store auth tokens
+ * Store user data locally (for quick access)
  */
-async function storeTokens(accessToken, refreshToken) {
+async function storeUserData(user) {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return;
   
   await browserAPI.storage.local.set({
-    authToken: accessToken,
-    refreshToken: refreshToken,
+    user,
+    isLoggedIn: true,
   });
 }
 
 /**
- * Clear auth tokens
- */
-async function clearTokens() {
-  const browserAPI = getBrowserAPI();
-  if (!browserAPI) return;
-  
-  await browserAPI.storage.local.remove(['authToken', 'refreshToken', 'user']);
-}
-
-/**
  * Make an authenticated API request
+ * Uses credentials: 'include' to send session cookies
  */
 async function apiRequest(endpoint, options = {}) {
-  const token = await getAuthToken();
-  
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
   
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
   const response = await fetch(`${APP_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include', // Send cookies with request
   });
   
-  // Handle 401 - try to refresh token
-  if (response.status === 401 && token) {
-    const refreshed = await refreshSession();
-    if (refreshed) {
-      // Retry the request with new token
-      const newToken = await getAuthToken();
-      headers['Authorization'] = `Bearer ${newToken}`;
-      return fetch(`${APP_URL}${endpoint}`, {
-        ...options,
-        headers,
-      });
-    }
+  // Handle 401 - session expired, clear local data
+  if (response.status === 401) {
+    await clearUserData();
   }
   
   return response;
@@ -91,6 +71,7 @@ async function apiRequest(endpoint, options = {}) {
 
 /**
  * Sign in with email and password
+ * The server sets session cookies on successful login
  */
 export async function signInWithEmail(email, password) {
   const response = await fetch(`${APP_URL}/api/auth/login`, {
@@ -98,6 +79,7 @@ export async function signInWithEmail(email, password) {
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // Receive and store cookies
     body: JSON.stringify({ email, password }),
   });
   
@@ -107,15 +89,9 @@ export async function signInWithEmail(email, password) {
     throw new Error(data.error || 'Login failed');
   }
   
-  // Store tokens
-  if (data.session) {
-    await storeTokens(data.session.access_token, data.session.refresh_token);
-    
-    // Store user info
-    const browserAPI = getBrowserAPI();
-    if (browserAPI && data.user) {
-      await browserAPI.storage.local.set({ user: data.user });
-    }
+  // Store user info locally for quick access
+  if (data.user) {
+    await storeUserData(data.user);
   }
   
   return data;
@@ -130,6 +106,7 @@ export async function signUpWithEmail(email, password) {
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include',
     body: JSON.stringify({ email, password }),
   });
   
@@ -144,6 +121,7 @@ export async function signUpWithEmail(email, password) {
 
 /**
  * Sign out the current user
+ * The server clears session cookies on logout
  */
 export async function signOut() {
   try {
@@ -152,17 +130,14 @@ export async function signOut() {
     console.warn('Logout API call failed:', err);
   }
   
-  // Always clear local tokens
-  await clearTokens();
+  // Always clear local user data
+  await clearUserData();
 }
 
 /**
  * Get the current session
  */
 export async function getSession() {
-  const token = await getAuthToken();
-  if (!token) return null;
-  
   try {
     const response = await apiRequest('/api/auth/session');
     
@@ -185,13 +160,13 @@ export async function getUser() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return null;
   
-  // First check local storage
-  const { user } = await browserAPI.storage.local.get('user');
-  if (user) return user;
+  // First check local storage for cached user
+  const { user, isLoggedIn } = await browserAPI.storage.local.get(['user', 'isLoggedIn']);
+  if (user && isLoggedIn) return user;
   
-  // Fetch from API
+  // Fetch from API (will use session cookie)
   try {
-    const response = await apiRequest('/api/auth/user');
+    const response = await apiRequest('/api/auth/session');
     
     if (!response.ok) {
       return null;
@@ -201,7 +176,7 @@ export async function getUser() {
     
     // Cache user info
     if (data.user) {
-      await browserAPI.storage.local.set({ user: data.user });
+      await storeUserData(data.user);
     }
     
     return data.user;
@@ -212,40 +187,21 @@ export async function getUser() {
 }
 
 /**
- * Refresh the session
+ * Check if user is logged in
  */
-export async function refreshSession() {
+export async function isLoggedIn() {
   const browserAPI = getBrowserAPI();
-  if (!browserAPI) return null;
+  if (!browserAPI) return false;
   
-  const { refreshToken } = await browserAPI.storage.local.get('refreshToken');
-  if (!refreshToken) return null;
+  const { isLoggedIn } = await browserAPI.storage.local.get('isLoggedIn');
+  if (!isLoggedIn) return false;
   
+  // Verify with server
   try {
-    const response = await fetch(`${APP_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    
-    if (!response.ok) {
-      await clearTokens();
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    if (data.session) {
-      await storeTokens(data.session.access_token, data.session.refresh_token);
-    }
-    
-    return data.session;
-  } catch (err) {
-    console.error('Failed to refresh session:', err);
-    await clearTokens();
-    return null;
+    const response = await apiRequest('/api/auth/session');
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -476,7 +432,7 @@ export default {
   signOut,
   getSession,
   getUser,
-  refreshSession,
+  isLoggedIn,
   fetchSubscription,
   fetchCloudSettings,
   saveCloudSettings,

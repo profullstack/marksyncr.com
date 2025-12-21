@@ -1,43 +1,58 @@
 /**
  * GET /api/settings - Get user settings
  * PUT /api/settings - Update user settings
+ *
+ * Authentication: Session cookie only (both web and extension use cookies)
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Allowed origins for CORS (extension and web app)
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'https://marksyncr.com',
+  'https://www.marksyncr.com',
+  'chrome-extension://',
+  'moz-extension://',
+  'safari-extension://',
+];
+
 /**
- * Handle CORS preflight requests
+ * Get CORS origin from request
  */
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
+function getCorsOrigin(request) {
+  const origin = request.headers.get('origin');
+  if (!origin) return null;
+  
+  // Check if origin matches allowed patterns
+  if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
+    return origin;
+  }
+  return null;
 }
 
 /**
- * Helper to get user from authorization header
+ * Create CORS headers for response
  */
-async function getUserFromAuth(request, supabase) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { user: null, error: 'Authorization header required' };
-  }
+function corsHeaders(request) {
+  const origin = getCorsOrigin(request);
+  return {
+    'Access-Control-Allow-Origin': origin || 'null',
+    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
-  const accessToken = authHeader.substring(7);
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-
-  if (error || !user) {
-    return { user: null, error: 'Invalid or expired token' };
-  }
-
-  return { user, error: null };
+/**
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders(request),
+  });
 }
 
 /**
@@ -58,14 +73,18 @@ const DEFAULT_SETTINGS = {
 };
 
 export async function GET(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: authError },
-        { status: 401 }
+        { error: 'Authentication required' },
+        { status: 401, headers }
       );
     }
 
@@ -83,25 +102,29 @@ export async function GET(request) {
     // Return settings or defaults
     return NextResponse.json({
       settings: settings?.settings || DEFAULT_SETTINGS,
-    });
+    }, { headers });
   } catch (error) {
     console.error('Settings GET error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }
 
 export async function PUT(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: authError },
-        { status: 401 }
+        { error: 'Authentication required' },
+        { status: 401, headers }
       );
     }
 
@@ -110,7 +133,7 @@ export async function PUT(request) {
     if (!settings || typeof settings !== 'object') {
       return NextResponse.json(
         { error: 'Settings object is required' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
@@ -141,19 +164,19 @@ export async function PUT(request) {
       console.error('Settings upsert error:', upsertError);
       return NextResponse.json(
         { error: 'Failed to save settings' },
-        { status: 500 }
+        { status: 500, headers }
       );
     }
 
     return NextResponse.json({
       settings: data.settings,
       message: 'Settings saved successfully',
-    });
+    }, { headers });
   } catch (error) {
     console.error('Settings PUT error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }

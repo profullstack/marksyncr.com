@@ -56,17 +56,29 @@ describe('Versions API', () => {
 
   describe('OPTIONS', () => {
     it('should return CORS headers', async () => {
-      const response = await OPTIONS();
+      const request = createMockRequest({
+        method: 'OPTIONS',
+        headers: { origin: 'http://localhost:3000' },
+      });
+      
+      const response = await OPTIONS(request);
       
       expect(response.status).toBe(204);
-      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
       expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET, POST, OPTIONS');
-      expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization');
+      expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
+      expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     });
   });
 
   describe('GET /api/versions', () => {
-    it('should return 401 if no authorization header', async () => {
+    it('should return 401 if no auth (no header and no session)', async () => {
+      // Mock both Bearer token and session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'GET',
         headers: {},
@@ -76,10 +88,16 @@ describe('Versions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 if authorization header is invalid format', async () => {
+    it('should return 401 if authorization header is invalid format and no session', async () => {
+      // Mock session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'GET',
         headers: { authorization: 'InvalidToken' },
@@ -89,10 +107,11 @@ describe('Versions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 if token is invalid', async () => {
+    it('should return 401 if token is invalid and no session', async () => {
+      // Mock both Bearer token and session cookie auth to fail
       mockGetUser.mockResolvedValue({
         data: { user: null },
         error: { message: 'Invalid token' },
@@ -107,7 +126,7 @@ describe('Versions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Invalid or expired token');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return version history for authenticated user', async () => {
@@ -302,7 +321,13 @@ describe('Versions API', () => {
   });
 
   describe('POST /api/versions', () => {
-    it('should return 401 if no authorization header', async () => {
+    it('should return 401 if no auth (no header and no session)', async () => {
+      // Mock both Bearer token and session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'POST',
         headers: {},
@@ -313,10 +338,11 @@ describe('Versions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 if token is invalid', async () => {
+    it('should return 401 if token is invalid and no session', async () => {
+      // Mock both Bearer token and session cookie auth to fail
       mockGetUser.mockResolvedValue({
         data: { user: null },
         error: { message: 'Invalid token' },
@@ -332,7 +358,7 @@ describe('Versions API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Invalid or expired token');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return 400 if bookmarkData is missing', async () => {

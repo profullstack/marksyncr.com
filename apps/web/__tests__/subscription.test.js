@@ -58,7 +58,13 @@ describe('Subscription API Route', () => {
   });
 
   describe('GET /api/subscription', () => {
-    it('should return 401 when no authorization header is provided', async () => {
+    it('should return 401 when no session cookie (not authenticated)', async () => {
+      // Mock session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         headers: {},
       });
@@ -67,36 +73,25 @@ describe('Subscription API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 when authorization header format is invalid', async () => {
-      const request = createMockRequest({
-        headers: { authorization: 'InvalidFormat token' },
-      });
-
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
-    });
-
-    it('should return 401 when token is invalid', async () => {
+    it('should return 401 when session is invalid', async () => {
+      // Mock session cookie auth to fail
       mockGetUser.mockResolvedValue({
         data: { user: null },
-        error: { message: 'Invalid token' },
+        error: { message: 'Invalid session' },
       });
 
       const request = createMockRequest({
-        headers: { authorization: 'Bearer invalid-token' },
+        headers: {},
       });
 
       const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Invalid or expired token');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return free tier for user with no subscription', async () => {
@@ -391,20 +386,21 @@ describe('Subscription API Error Handling', () => {
     expect(data.subscription.tier).toBe('free');
   });
 
-  it('should handle expired tokens', async () => {
+  it('should handle expired session', async () => {
+    // Mock session cookie auth to fail
     mockGetUser.mockResolvedValue({
       data: { user: null },
-      error: { message: 'Token has expired' },
+      error: { message: 'Session has expired' },
     });
 
     const request = createMockRequest({
-      headers: { authorization: 'Bearer expired-token' },
+      headers: {},
     });
 
     const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data.error).toBe('Invalid or expired token');
+    expect(data.error).toBe('Authentication required');
   });
 });

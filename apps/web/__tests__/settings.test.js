@@ -60,7 +60,13 @@ describe('Settings API Routes', () => {
   });
 
   describe('GET /api/settings', () => {
-    it('should return 401 when no authorization header is provided', async () => {
+    it('should return 401 when no session cookie (not authenticated)', async () => {
+      // Mock session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'GET',
         headers: {},
@@ -70,38 +76,26 @@ describe('Settings API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
-    it('should return 401 when authorization header format is invalid', async () => {
-      const request = createMockRequest({
-        method: 'GET',
-        headers: { authorization: 'Basic token123' },
-      });
-
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
-    });
-
-    it('should return 401 when token is invalid', async () => {
+    it('should return 401 when session is invalid', async () => {
+      // Mock session cookie auth to fail
       mockGetUser.mockResolvedValue({
         data: { user: null },
-        error: { message: 'Invalid token' },
+        error: { message: 'Invalid session' },
       });
 
       const request = createMockRequest({
         method: 'GET',
-        headers: { authorization: 'Bearer invalid-token' },
+        headers: {},
       });
 
       const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Invalid or expired token');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return user settings when found', async () => {
@@ -203,7 +197,13 @@ describe('Settings API Routes', () => {
   });
 
   describe('PUT /api/settings', () => {
-    it('should return 401 when no authorization header is provided', async () => {
+    it('should return 401 when no session cookie (not authenticated)', async () => {
+      // Mock session cookie auth to fail
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'No session' },
+      });
+
       const request = createMockRequest({
         method: 'PUT',
         headers: {},
@@ -214,7 +214,7 @@ describe('Settings API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data.error).toBe('Authorization header required');
+      expect(data.error).toBe('Authentication required');
     });
 
     it('should return 400 when settings is missing', async () => {

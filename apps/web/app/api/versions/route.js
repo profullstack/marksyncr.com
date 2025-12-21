@@ -2,43 +2,58 @@
  * Version History API Routes
  * GET /api/versions - Get version history
  * POST /api/versions - Save a new version
+ *
+ * Authentication: Session cookie only (both web and extension use cookies)
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Allowed origins for CORS (extension and web app)
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'https://marksyncr.com',
+  'https://www.marksyncr.com',
+  'chrome-extension://',
+  'moz-extension://',
+  'safari-extension://',
+];
+
 /**
- * Handle CORS preflight requests
+ * Get CORS origin from request
  */
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
+function getCorsOrigin(request) {
+  const origin = request.headers.get('origin');
+  if (!origin) return null;
+  
+  // Check if origin matches allowed patterns
+  if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
+    return origin;
+  }
+  return null;
 }
 
 /**
- * Helper to get user from authorization header
+ * Create CORS headers for response
  */
-async function getUserFromAuth(request, supabase) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { user: null, error: 'Authorization header required' };
-  }
+function corsHeaders(request) {
+  const origin = getCorsOrigin(request);
+  return {
+    'Access-Control-Allow-Origin': origin || 'null',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
-  const accessToken = authHeader.substring(7);
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-
-  if (error || !user) {
-    return { user: null, error: 'Invalid or expired token' };
-  }
-
-  return { user, error: null };
+/**
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders(request),
+  });
 }
 
 /**
@@ -46,12 +61,16 @@ async function getUserFromAuth(request, supabase) {
  * Get version history for the authenticated user
  */
 export async function GET(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
-      return NextResponse.json({ error: authError }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     const { searchParams } = new URL(request.url);
@@ -66,7 +85,7 @@ export async function GET(request) {
 
     if (error) {
       console.error('Failed to get version history:', error);
-      return NextResponse.json({ error: 'Failed to get version history' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to get version history' }, { status: 500, headers });
     }
 
     // Get retention limit for the user
@@ -88,10 +107,10 @@ export async function GET(request) {
         folderCount: v.folder_count,
       })),
       retentionLimit: retentionLimit || 5,
-    });
+    }, { headers });
   } catch (error) {
     console.error('Version history error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }
 
@@ -100,12 +119,16 @@ export async function GET(request) {
  * Save a new version (called after sync)
  */
 export async function POST(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
-      return NextResponse.json({ error: authError }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     const body = await request.json();
@@ -114,7 +137,7 @@ export async function POST(request) {
     if (!bookmarkData || !sourceType) {
       return NextResponse.json(
         { error: 'Missing required fields: bookmarkData, sourceType' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
@@ -135,7 +158,7 @@ export async function POST(request) {
 
     if (error) {
       console.error('Failed to save version:', error);
-      return NextResponse.json({ error: 'Failed to save version' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to save version' }, { status: 500, headers });
     }
 
     return NextResponse.json({
@@ -145,9 +168,9 @@ export async function POST(request) {
         checksum: data?.checksum,
         createdAt: data?.created_at,
       },
-    });
+    }, { headers });
   } catch (error) {
     console.error('Save version error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }

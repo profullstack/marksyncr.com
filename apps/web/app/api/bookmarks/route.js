@@ -1,60 +1,79 @@
 /**
  * GET /api/bookmarks - Get user's bookmarks
  * POST /api/bookmarks - Sync bookmarks from extension
+ *
+ * Authentication: Session cookie only (both web and extension use cookies)
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Allowed origins for CORS (extension and web app)
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'https://marksyncr.com',
+  'https://www.marksyncr.com',
+  'chrome-extension://',
+  'moz-extension://',
+  'safari-extension://',
+];
+
+/**
+ * Get CORS origin from request
+ */
+function getCorsOrigin(request) {
+  const origin = request.headers.get('origin');
+  if (!origin) return null;
+  
+  // Check if origin matches allowed patterns
+  if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
+    return origin;
+  }
+  return null;
+}
+
+/**
+ * Create CORS headers for response
+ */
+function corsHeaders(request) {
+  const origin = getCorsOrigin(request);
+  return {
+    'Access-Control-Allow-Origin': origin || 'null',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
+
 /**
  * Handle CORS preflight requests
  */
-export async function OPTIONS() {
+export async function OPTIONS(request) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
+    headers: corsHeaders(request),
   });
 }
 
-/**
- * Helper to get user from authorization header
- */
-async function getUserFromAuth(request, supabase) {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { user: null, error: 'Authorization header required' };
-  }
-
-  const accessToken = authHeader.substring(7);
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-
-  if (error || !user) {
-    return { user: null, error: 'Invalid or expired token' };
-  }
-
-  return { user, error: null };
-}
-
 export async function GET(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: authError },
-        { status: 401 }
+        { error: 'Authentication required' },
+        { status: 401, headers }
       );
     }
 
     // Get bookmarks from database
     const { data: bookmarks, error: bookmarksError } = await supabase
-      .from('bookmarks')
+      .from('cloud_bookmarks')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
@@ -63,32 +82,36 @@ export async function GET(request) {
       console.error('Bookmarks fetch error:', bookmarksError);
       return NextResponse.json(
         { error: 'Failed to fetch bookmarks' },
-        { status: 500 }
+        { status: 500, headers }
       );
     }
 
     return NextResponse.json({
       bookmarks: bookmarks || [],
       count: bookmarks?.length || 0,
-    });
+    }, { headers });
   } catch (error) {
     console.error('Bookmarks GET error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }
 
 export async function POST(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: authError },
-        { status: 401 }
+        { error: 'Authentication required' },
+        { status: 401, headers }
       );
     }
 
@@ -97,7 +120,7 @@ export async function POST(request) {
     if (!Array.isArray(bookmarks)) {
       return NextResponse.json(
         { error: 'Bookmarks array is required' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
@@ -118,7 +141,7 @@ export async function POST(request) {
 
     // Upsert bookmarks (update if URL exists for user, insert if not)
     const { data, error: upsertError } = await supabase
-      .from('bookmarks')
+      .from('cloud_bookmarks')
       .upsert(processedBookmarks, {
         onConflict: 'user_id,url',
         ignoreDuplicates: false,
@@ -129,7 +152,7 @@ export async function POST(request) {
       console.error('Bookmarks upsert error:', upsertError);
       return NextResponse.json(
         { error: 'Failed to sync bookmarks' },
-        { status: 500 }
+        { status: 500, headers }
       );
     }
 
@@ -153,25 +176,29 @@ export async function POST(request) {
       synced: data?.length || 0,
       total: processedBookmarks.length,
       message: 'Bookmarks synced successfully',
-    });
+    }, { headers });
   } catch (error) {
     console.error('Bookmarks POST error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }
 
 export async function DELETE(request) {
+  const headers = corsHeaders(request);
+  
   try {
     const supabase = await createClient();
-    const { user, error: authError } = await getUserFromAuth(request, supabase);
+    
+    // Session cookie authentication only
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: authError },
-        { status: 401 }
+        { error: 'Authentication required' },
+        { status: 401, headers }
       );
     }
 
@@ -180,12 +207,12 @@ export async function DELETE(request) {
     if (!url && !id) {
       return NextResponse.json(
         { error: 'URL or ID is required' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
     let query = supabase
-      .from('bookmarks')
+      .from('cloud_bookmarks')
       .delete()
       .eq('user_id', user.id);
 
@@ -201,18 +228,18 @@ export async function DELETE(request) {
       console.error('Bookmark delete error:', deleteError);
       return NextResponse.json(
         { error: 'Failed to delete bookmark' },
-        { status: 500 }
+        { status: 500, headers }
       );
     }
 
     return NextResponse.json({
       message: 'Bookmark deleted successfully',
-    });
+    }, { headers });
   } catch (error) {
     console.error('Bookmarks DELETE error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }
