@@ -5,7 +5,7 @@
  * Handles Chrome, Firefox, and Safari bookmark structures.
  */
 
-import { generateBookmarkId, generateChecksum } from './hash-utils.js';
+import { generateBookmarkIdSync, generateChecksumSync } from './hash-utils.js';
 
 /**
  * @typedef {import('@marksyncr/types').BookmarkItem} BookmarkItem
@@ -125,7 +125,7 @@ function convertNode(node, parentPath = '') {
   if (node.url) {
     // It's a bookmark
     const bookmark = {
-      id: generateBookmarkId(node.url, node.title || ''),
+      id: generateBookmarkIdSync(node.url, node.title || ''),
       type: 'bookmark',
       title: node.title || '',
       url: node.url,
@@ -142,7 +142,7 @@ function convertNode(node, parentPath = '') {
 
   // It's a folder
   const folder = {
-    id: generateBookmarkId(currentPath, 'folder'),
+    id: generateBookmarkIdSync(currentPath, 'folder'),
     type: 'folder',
     title: node.title || '',
     children: [],
@@ -228,7 +228,7 @@ export function parseBrowserBookmarks(browserTree, options = {}) {
   }
 
   // Generate checksum
-  result.checksum = generateChecksum(result.roots);
+  result.checksum = generateChecksumSync(result.roots);
 
   return result;
 }

@@ -177,28 +177,25 @@ describe('hash-utils', () => {
     });
 
     it('should generate different checksums for different data', async () => {
-      const file1 = {
-        bookmarks: {
-          toolbar: { id: 'toolbar', title: 'Toolbar', children: [] },
-          menu: { id: 'menu', title: 'Menu', children: [] },
-          other: { id: 'other', title: 'Other', children: [] },
-        },
+      // Use raw bookmark data (not wrapped in bookmarks property)
+      const data1 = {
+        toolbar: { id: 'toolbar', title: 'Toolbar', children: [] },
+        menu: { id: 'menu', title: 'Menu', children: [] },
+        other: { id: 'other', title: 'Other', children: [] },
       };
 
-      const file2 = {
-        bookmarks: {
-          toolbar: {
-            id: 'toolbar',
-            title: 'Toolbar',
-            children: [{ id: 'b1', title: 'Bookmark', url: 'https://example.com' }],
-          },
-          menu: { id: 'menu', title: 'Menu', children: [] },
-          other: { id: 'other', title: 'Other', children: [] },
+      const data2 = {
+        toolbar: {
+          id: 'toolbar',
+          title: 'Toolbar',
+          children: [{ id: 'b1', title: 'Bookmark', url: 'https://example.com' }],
         },
+        menu: { id: 'menu', title: 'Menu', children: [] },
+        other: { id: 'other', title: 'Other', children: [] },
       };
 
-      const checksum1 = await generateChecksum(file1);
-      const checksum2 = await generateChecksum(file2);
+      const checksum1 = await generateChecksum(data1);
+      const checksum2 = await generateChecksum(data2);
 
       expect(checksum1).not.toBe(checksum2);
     });

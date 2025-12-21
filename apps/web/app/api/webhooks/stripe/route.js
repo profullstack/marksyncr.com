@@ -6,18 +6,24 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
+import Stripe from 'stripe';
 
-// Initialize Supabase admin client
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+/**
+ * Create Supabase admin client for server-side operations
+ * Uses service role key to bypass RLS
+ */
+function createAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
 
 /**
  * POST /api/webhooks/stripe
@@ -35,8 +41,7 @@ export async function POST(request) {
   let event;
 
   try {
-    // Dynamically import Stripe
-    const Stripe = (await import('stripe')).default;
+    // Initialize Stripe
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16',
     });
@@ -53,7 +58,8 @@ export async function POST(request) {
   }
 
   try {
-    const result = await handleStripeEvent(event);
+    const supabaseAdmin = createAdminClient();
+    const result = await handleStripeEvent(event, supabaseAdmin);
     console.log(`Stripe webhook handled: ${event.type}`, result);
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -61,41 +67,44 @@ export async function POST(request) {
     });
   } catch (err) {
     console.error('Error handling webhook:', err);
-    return new Response(`Webhook handler error: ${err.message}`, { status: 500 });
+    return new Response(`Webhook handler error: ${err.message}`, {
+      status: 500,
+    });
   }
 }
 
 /**
  * Handle Stripe webhook events
  * @param {object} event - Stripe event
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabaseAdmin - Admin client
  * @returns {Promise<{handled: boolean, action?: string}>}
  */
-async function handleStripeEvent(event) {
+async function handleStripeEvent(event, supabaseAdmin) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object;
-      return handleCheckoutCompleted(session);
+      return handleCheckoutCompleted(session, supabaseAdmin);
     }
 
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const subscription = event.data.object;
-      return handleSubscriptionUpdated(subscription);
+      return handleSubscriptionUpdated(subscription, supabaseAdmin);
     }
 
     case 'customer.subscription.deleted': {
       const subscription = event.data.object;
-      return handleSubscriptionDeleted(subscription);
+      return handleSubscriptionDeleted(subscription, supabaseAdmin);
     }
 
     case 'invoice.payment_failed': {
       const invoice = event.data.object;
-      return handlePaymentFailed(invoice);
+      return handlePaymentFailed(invoice, supabaseAdmin);
     }
 
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object;
-      return handlePaymentSucceeded(invoice);
+      return handlePaymentSucceeded(invoice, supabaseAdmin);
     }
 
     default:
@@ -107,7 +116,7 @@ async function handleStripeEvent(event) {
 /**
  * Handle checkout.session.completed event
  */
-async function handleCheckoutCompleted(session) {
+async function handleCheckoutCompleted(session, supabaseAdmin) {
   const userId = session.client_reference_id || session.metadata?.userId;
   const customerId = session.customer;
   const subscriptionId = session.subscription;
@@ -140,7 +149,7 @@ async function handleCheckoutCompleted(session) {
 /**
  * Handle subscription updated event
  */
-async function handleSubscriptionUpdated(subscription) {
+async function handleSubscriptionUpdated(subscription, supabaseAdmin) {
   const customerId = subscription.customer;
 
   // Find user by customer ID
@@ -169,8 +178,12 @@ async function handleSubscriptionUpdated(subscription) {
       status: subscription.status,
       plan,
       cancel_at_period_end: subscription.cancel_at_period_end,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      current_period_start: new Date(
+        subscription.current_period_start * 1000
+      ).toISOString(),
+      current_period_end: new Date(
+        subscription.current_period_end * 1000
+      ).toISOString(),
     })
     .eq('user_id', sub.user_id);
 
@@ -185,7 +198,7 @@ async function handleSubscriptionUpdated(subscription) {
 /**
  * Handle subscription deleted event
  */
-async function handleSubscriptionDeleted(subscription) {
+async function handleSubscriptionDeleted(subscription, supabaseAdmin) {
   const customerId = subscription.customer;
 
   // Find user by customer ID
@@ -222,7 +235,7 @@ async function handleSubscriptionDeleted(subscription) {
 /**
  * Handle payment failed event
  */
-async function handlePaymentFailed(invoice) {
+async function handlePaymentFailed(invoice, supabaseAdmin) {
   const customerId = invoice.customer;
 
   // Find user by customer ID
@@ -257,7 +270,7 @@ async function handlePaymentFailed(invoice) {
 /**
  * Handle payment succeeded event
  */
-async function handlePaymentSucceeded(invoice) {
+async function handlePaymentSucceeded(invoice, supabaseAdmin) {
   const customerId = invoice.customer;
 
   // Find user by customer ID

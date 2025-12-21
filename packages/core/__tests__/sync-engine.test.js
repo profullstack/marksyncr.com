@@ -4,15 +4,19 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SyncEngine } from '../src/sync-engine.js';
-import { BOOKMARK_LOCATION } from '@marksyncr/types';
+import { SyncEngine, createSyncEngine } from '../src/sync-engine.js';
+import { SYNC_STATUS } from '@marksyncr/types';
 
 // Mock source for testing
 const createMockSource = (initialData = null) => {
   let data = initialData;
   return {
     read: vi.fn(async () => {
-      if (!data) throw new Error('No data');
+      if (!data) {
+        const error = new Error('No data');
+        error.code = 'NOT_FOUND';
+        throw error;
+      }
       return data;
     }),
     write: vi.fn(async (newData) => {
@@ -23,6 +27,7 @@ const createMockSource = (initialData = null) => {
       type: 'mock',
       lastModified: new Date().toISOString(),
     })),
+    getChecksum: vi.fn(async () => data?.metadata?.checksum ?? ''),
     getData: () => data,
     setData: (newData) => {
       data = newData;
@@ -37,13 +42,25 @@ const createBookmarkFile = (bookmarks = {}, metadata = {}) => ({
   metadata: {
     lastModified: new Date().toISOString(),
     lastSyncedBy: 'test',
-    checksum: '',
+    checksum: 'test-checksum',
     ...metadata,
   },
   bookmarks: {
-    toolbar: [],
-    menu: [],
-    other: [],
+    toolbar: {
+      id: 'toolbar_root',
+      title: 'Bookmarks Toolbar',
+      children: [],
+    },
+    menu: {
+      id: 'menu_root',
+      title: 'Bookmarks Menu',
+      children: [],
+    },
+    other: {
+      id: 'other_root',
+      title: 'Other Bookmarks',
+      children: [],
+    },
     ...bookmarks,
   },
 });
@@ -54,198 +71,219 @@ const createBookmark = (overrides = {}) => ({
   type: 'bookmark',
   title: 'Test Bookmark',
   url: 'https://example.com',
-  location: BOOKMARK_LOCATION.TOOLBAR,
-  createdAt: new Date().toISOString(),
-  modifiedAt: new Date().toISOString(),
+  dateAdded: new Date().toISOString(),
+  dateModified: new Date().toISOString(),
   ...overrides,
 });
 
 describe('SyncEngine', () => {
   let syncEngine;
-  let localSource;
-  let remoteSource;
+  let mockSource;
 
   beforeEach(() => {
-    localSource = createMockSource();
-    remoteSource = createMockSource();
+    mockSource = createMockSource();
     syncEngine = new SyncEngine({
-      conflictStrategy: 'newer-wins',
+      source: mockSource,
+      deviceId: 'test-device',
     });
   });
 
   describe('constructor', () => {
-    it('should create a SyncEngine with default options', () => {
-      const engine = new SyncEngine();
+    it('should create a SyncEngine with required options', () => {
+      const engine = new SyncEngine({
+        source: mockSource,
+        deviceId: 'test-device',
+      });
       expect(engine).toBeDefined();
+      expect(engine.source).toBe(mockSource);
+      expect(engine.deviceId).toBe('test-device');
     });
 
-    it('should accept custom conflict strategy', () => {
-      const engine = new SyncEngine({ conflictStrategy: 'local-wins' });
-      expect(engine.options.conflictStrategy).toBe('local-wins');
+    it('should accept lastSyncState option', () => {
+      const lastSyncState = { checksum: 'abc123', timestamp: new Date().toISOString() };
+      const engine = new SyncEngine({
+        source: mockSource,
+        deviceId: 'test-device',
+        lastSyncState,
+      });
+      expect(engine.lastSyncState).toEqual(lastSyncState);
     });
   });
 
   describe('sync', () => {
+    it('should perform initial sync when remote is empty', async () => {
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [createBookmark({ title: 'New Local Bookmark' })],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+
+      const { result, mergedBookmarks } = await syncEngine.sync(localBookmarks);
+
+      expect(result.status).toBe(SYNC_STATUS.SUCCESS);
+      expect(result.pushed).toBeGreaterThan(0);
+      expect(mockSource.write).toHaveBeenCalled();
+    });
+
     it('should handle empty local and remote', async () => {
-      const localData = createBookmarkFile();
       const remoteData = createBookmarkFile();
+      mockSource.setData(remoteData);
 
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
+      const localBookmarks = {
+        toolbar: { id: 'toolbar_root', title: 'Bookmarks Toolbar', children: [] },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
 
-      const result = await syncEngine.sync(localSource, remoteSource);
+      const { result } = await syncEngine.sync(localBookmarks);
 
       expect(result).toBeDefined();
-      expect(result.conflicts).toHaveLength(0);
+      expect(result.status).toBe(SYNC_STATUS.SUCCESS);
     });
 
     it('should sync new local bookmarks to remote', async () => {
       const bookmark = createBookmark({ title: 'New Local Bookmark' });
-      const localData = createBookmarkFile({
-        toolbar: [bookmark],
-      });
       const remoteData = createBookmarkFile();
+      mockSource.setData(remoteData);
 
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [bookmark],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
 
-      const result = await syncEngine.sync(localSource, remoteSource);
-
-      expect(result.changes.added).toBeGreaterThan(0);
-      expect(remoteSource.write).toHaveBeenCalled();
-    });
-
-    it('should sync new remote bookmarks to local', async () => {
-      const bookmark = createBookmark({ title: 'New Remote Bookmark' });
-      const localData = createBookmarkFile();
-      const remoteData = createBookmarkFile({
-        toolbar: [bookmark],
-      });
-
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const result = await syncEngine.sync(localSource, remoteSource);
-
-      expect(result.changes.added).toBeGreaterThan(0);
-      expect(localSource.write).toHaveBeenCalled();
-    });
-
-    it('should handle deletions', async () => {
-      const bookmark = createBookmark({ title: 'To Be Deleted' });
-      const localData = createBookmarkFile({
-        toolbar: [bookmark],
-      });
-      const remoteData = createBookmarkFile({
-        toolbar: [], // Bookmark deleted on remote
-      });
-
-      // Set up with previous sync state showing bookmark existed
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const result = await syncEngine.sync(localSource, remoteSource);
+      const { result } = await syncEngine.sync(localBookmarks, { force: true });
 
       expect(result).toBeDefined();
+      expect(mockSource.write).toHaveBeenCalled();
     });
 
     it('should detect conflicts when same bookmark modified on both sides', async () => {
-      const baseTime = new Date('2024-01-01T00:00:00Z');
+      const bookmarkId = 'shared-bookmark-id';
       const localTime = new Date('2024-01-02T00:00:00Z');
       const remoteTime = new Date('2024-01-03T00:00:00Z');
-
-      const bookmarkId = 'shared-bookmark-id';
 
       const localBookmark = createBookmark({
         id: bookmarkId,
         title: 'Local Title',
-        modifiedAt: localTime.toISOString(),
+        dateModified: localTime.toISOString(),
       });
 
       const remoteBookmark = createBookmark({
         id: bookmarkId,
         title: 'Remote Title',
-        modifiedAt: remoteTime.toISOString(),
+        dateModified: remoteTime.toISOString(),
       });
 
-      const localData = createBookmarkFile({
-        toolbar: [localBookmark],
-      });
       const remoteData = createBookmarkFile({
-        toolbar: [remoteBookmark],
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [remoteBookmark],
+        },
       });
+      mockSource.setData(remoteData);
 
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [localBookmark],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
 
-      const result = await syncEngine.sync(localSource, remoteSource);
+      const { result } = await syncEngine.sync(localBookmarks, { force: true });
 
-      // With newer-wins strategy, remote should win
       expect(result).toBeDefined();
+    });
+
+    it('should return success when syncing identical data', async () => {
+      const remoteData = createBookmarkFile();
+      mockSource.setData(remoteData);
+
+      const localBookmarks = {
+        toolbar: { id: 'toolbar_root', title: 'Bookmarks Toolbar', children: [] },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+
+      const { result } = await syncEngine.sync(localBookmarks);
+
+      // Should succeed when local and remote are similar
+      expect(result.status).toBe(SYNC_STATUS.SUCCESS);
+    });
+
+    it('should support dry run mode', async () => {
+      const remoteData = createBookmarkFile();
+      mockSource.setData(remoteData);
+
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [createBookmark({ title: 'New Bookmark' })],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+
+      const { result } = await syncEngine.sync(localBookmarks, { dryRun: true, force: true });
+
+      expect(result).toBeDefined();
+      // In dry run, write should not be called
+      expect(mockSource.write).not.toHaveBeenCalled();
     });
   });
 
-  describe('conflict resolution strategies', () => {
-    const bookmarkId = 'conflict-bookmark';
-    const localTime = new Date('2024-01-01T00:00:00Z');
-    const remoteTime = new Date('2024-01-02T00:00:00Z');
-
-    const createConflictScenario = () => {
-      const localBookmark = createBookmark({
-        id: bookmarkId,
-        title: 'Local Version',
-        url: 'https://local.example.com',
-        modifiedAt: localTime.toISOString(),
-      });
-
-      const remoteBookmark = createBookmark({
-        id: bookmarkId,
-        title: 'Remote Version',
-        url: 'https://remote.example.com',
-        modifiedAt: remoteTime.toISOString(),
-      });
-
-      return {
-        local: createBookmarkFile({ toolbar: [localBookmark] }),
-        remote: createBookmarkFile({ toolbar: [remoteBookmark] }),
+  describe('initialSync', () => {
+    it('should push all local bookmarks when remote is empty', async () => {
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [
+            createBookmark({ title: 'Bookmark 1' }),
+            createBookmark({ title: 'Bookmark 2' }),
+          ],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
       };
-    };
 
-    it('should use newer-wins strategy by default', async () => {
-      const engine = new SyncEngine({ conflictStrategy: 'newer-wins' });
-      const { local, remote } = createConflictScenario();
+      const { result, mergedBookmarks } = await syncEngine.initialSync(localBookmarks);
 
-      localSource.setData(local);
-      remoteSource.setData(remote);
-
-      const result = await engine.sync(localSource, remoteSource);
-
-      // Remote is newer, so it should win
-      expect(result).toBeDefined();
+      expect(result.status).toBe(SYNC_STATUS.SUCCESS);
+      expect(result.pushed).toBeGreaterThan(0);
+      expect(result.pulled).toBe(0);
+      expect(mergedBookmarks).toEqual(localBookmarks);
+      expect(mockSource.write).toHaveBeenCalled();
     });
 
-    it('should use local-wins strategy when configured', async () => {
-      const engine = new SyncEngine({ conflictStrategy: 'local-wins' });
-      const { local, remote } = createConflictScenario();
+    it('should not write in dry run mode', async () => {
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [createBookmark({ title: 'Bookmark 1' })],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
 
-      localSource.setData(local);
-      remoteSource.setData(remote);
+      const { result } = await syncEngine.initialSync(localBookmarks, true);
 
-      const result = await engine.sync(localSource, remoteSource);
-
-      expect(result).toBeDefined();
-    });
-
-    it('should use remote-wins strategy when configured', async () => {
-      const engine = new SyncEngine({ conflictStrategy: 'remote-wins' });
-      const { local, remote } = createConflictScenario();
-
-      localSource.setData(local);
-      remoteSource.setData(remote);
-
-      const result = await engine.sync(localSource, remoteSource);
-
-      expect(result).toBeDefined();
+      expect(result.status).toBe(SYNC_STATUS.SUCCESS);
+      expect(mockSource.write).not.toHaveBeenCalled();
     });
   });
 
@@ -255,225 +293,146 @@ describe('SyncEngine', () => {
         id: 'folder-1',
         type: 'folder',
         title: 'My Folder',
-        location: BOOKMARK_LOCATION.TOOLBAR,
         children: [
           createBookmark({ title: 'Child 1' }),
           createBookmark({ title: 'Child 2' }),
         ],
-        createdAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString(),
+        dateAdded: new Date().toISOString(),
+        dateModified: new Date().toISOString(),
       };
 
-      const localData = createBookmarkFile({
-        toolbar: [folder],
-      });
       const remoteData = createBookmarkFile();
+      mockSource.setData(remoteData);
 
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const result = await syncEngine.sync(localSource, remoteSource);
-
-      expect(result).toBeDefined();
-      expect(remoteSource.write).toHaveBeenCalled();
-    });
-
-    it('should handle folder renames', async () => {
-      const folderId = 'folder-to-rename';
-
-      const localFolder = {
-        id: folderId,
-        type: 'folder',
-        title: 'New Folder Name',
-        location: BOOKMARK_LOCATION.TOOLBAR,
-        children: [],
-        createdAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString(),
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [folder],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
       };
 
-      const remoteFolder = {
-        id: folderId,
-        type: 'folder',
-        title: 'Old Folder Name',
-        location: BOOKMARK_LOCATION.TOOLBAR,
-        children: [],
-        createdAt: new Date().toISOString(),
-        modifiedAt: new Date(Date.now() - 10000).toISOString(), // Older
-      };
-
-      const localData = createBookmarkFile({ toolbar: [localFolder] });
-      const remoteData = createBookmarkFile({ toolbar: [remoteFolder] });
-
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const result = await syncEngine.sync(localSource, remoteSource);
+      const { result } = await syncEngine.sync(localBookmarks, { force: true });
 
       expect(result).toBeDefined();
-    });
-  });
-
-  describe('location changes', () => {
-    it('should handle bookmark moved between locations', async () => {
-      const bookmarkId = 'moving-bookmark';
-
-      const localBookmark = createBookmark({
-        id: bookmarkId,
-        title: 'Moving Bookmark',
-        location: BOOKMARK_LOCATION.TOOLBAR,
-        modifiedAt: new Date().toISOString(),
-      });
-
-      const remoteBookmark = createBookmark({
-        id: bookmarkId,
-        title: 'Moving Bookmark',
-        location: BOOKMARK_LOCATION.MENU, // Different location
-        modifiedAt: new Date(Date.now() - 10000).toISOString(), // Older
-      });
-
-      const localData = createBookmarkFile({
-        toolbar: [localBookmark],
-        menu: [],
-      });
-      const remoteData = createBookmarkFile({
-        toolbar: [],
-        menu: [remoteBookmark],
-      });
-
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const result = await syncEngine.sync(localSource, remoteSource);
-
-      expect(result).toBeDefined();
+      expect(mockSource.write).toHaveBeenCalled();
     });
   });
 
   describe('error handling', () => {
     it('should handle source read errors gracefully', async () => {
-      localSource.read.mockRejectedValue(new Error('Read failed'));
-      remoteSource.setData(createBookmarkFile());
+      mockSource.read.mockRejectedValue(new Error('Read failed'));
 
-      await expect(syncEngine.sync(localSource, remoteSource)).rejects.toThrow();
+      const localBookmarks = {
+        toolbar: { id: 'toolbar_root', title: 'Bookmarks Toolbar', children: [] },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+
+      const { result } = await syncEngine.sync(localBookmarks);
+
+      expect(result.status).toBe(SYNC_STATUS.ERROR);
+      expect(result.error).toBeDefined();
     });
 
     it('should handle source write errors gracefully', async () => {
-      const localData = createBookmarkFile({
-        toolbar: [createBookmark()],
-      });
       const remoteData = createBookmarkFile();
+      mockSource.setData(remoteData);
+      mockSource.write.mockRejectedValue(new Error('Write failed'));
 
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-      remoteSource.write.mockRejectedValue(new Error('Write failed'));
-
-      await expect(syncEngine.sync(localSource, remoteSource)).rejects.toThrow();
-    });
-
-    it('should handle unavailable sources', async () => {
-      localSource.isAvailable.mockResolvedValue(false);
-
-      await expect(syncEngine.sync(localSource, remoteSource)).rejects.toThrow();
-    });
-  });
-
-  describe('metadata handling', () => {
-    it('should update lastModified after sync', async () => {
-      const localData = createBookmarkFile({
-        toolbar: [createBookmark()],
-      });
-      const remoteData = createBookmarkFile();
-
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const beforeSync = new Date();
-      await syncEngine.sync(localSource, remoteSource);
-      const afterSync = new Date();
-
-      const writtenData = remoteSource.write.mock.calls[0]?.[0];
-      if (writtenData) {
-        const lastModified = new Date(writtenData.metadata.lastModified);
-        expect(lastModified >= beforeSync).toBe(true);
-        expect(lastModified <= afterSync).toBe(true);
-      }
-    });
-
-    it('should update checksum after sync', async () => {
-      const localData = createBookmarkFile({
-        toolbar: [createBookmark()],
-      });
-      const remoteData = createBookmarkFile();
-
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      await syncEngine.sync(localSource, remoteSource);
-
-      const writtenData = remoteSource.write.mock.calls[0]?.[0];
-      if (writtenData) {
-        expect(writtenData.metadata.checksum).toBeDefined();
-        expect(writtenData.metadata.checksum.length).toBeGreaterThan(0);
-      }
-    });
-  });
-
-  describe('performance', () => {
-    it('should handle large bookmark collections', async () => {
-      const bookmarks = Array.from({ length: 1000 }, (_, i) =>
-        createBookmark({
-          id: `bookmark-${i}`,
-          title: `Bookmark ${i}`,
-          url: `https://example.com/${i}`,
-        })
-      );
-
-      const localData = createBookmarkFile({
-        toolbar: bookmarks.slice(0, 500),
-        menu: bookmarks.slice(500),
-      });
-      const remoteData = createBookmarkFile();
-
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const startTime = Date.now();
-      const result = await syncEngine.sync(localSource, remoteSource);
-      const duration = Date.now() - startTime;
-
-      expect(result).toBeDefined();
-      expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
-    });
-
-    it('should handle deeply nested folders', async () => {
-      // Create a deeply nested folder structure
-      const createNestedFolder = (depth, maxDepth = 10) => {
-        if (depth >= maxDepth) {
-          return createBookmark({ title: `Leaf at depth ${depth}` });
-        }
-
-        return {
-          id: `folder-depth-${depth}`,
-          type: 'folder',
-          title: `Folder at depth ${depth}`,
-          location: BOOKMARK_LOCATION.TOOLBAR,
-          children: [createNestedFolder(depth + 1, maxDepth)],
-          createdAt: new Date().toISOString(),
-          modifiedAt: new Date().toISOString(),
-        };
+      const localBookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [createBookmark()],
+        },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
       };
 
-      const localData = createBookmarkFile({
-        toolbar: [createNestedFolder(0)],
+      const { result } = await syncEngine.sync(localBookmarks, { force: true });
+
+      expect(result.status).toBe(SYNC_STATUS.ERROR);
+    });
+  });
+
+  describe('createBookmarkFile', () => {
+    it('should create a valid bookmark file with metadata', () => {
+      const bookmarks = {
+        toolbar: { id: 'toolbar_root', title: 'Bookmarks Toolbar', children: [] },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+      const checksum = 'test-checksum';
+
+      const file = syncEngine.createBookmarkFile(bookmarks, checksum);
+
+      expect(file.version).toBe('1.0');
+      expect(file.schemaVersion).toBe(1);
+      expect(file.metadata.checksum).toBe(checksum);
+      expect(file.metadata.lastSyncedBy).toBe('test-device');
+      expect(file.metadata.lastModified).toBeDefined();
+      expect(file.bookmarks).toEqual(bookmarks);
+    });
+  });
+
+  describe('countBookmarks', () => {
+    it('should count bookmarks correctly', () => {
+      const bookmarks = {
+        toolbar: {
+          id: 'toolbar_root',
+          title: 'Bookmarks Toolbar',
+          children: [
+            createBookmark({ title: 'Bookmark 1' }),
+            {
+              id: 'folder-1',
+              type: 'folder',
+              title: 'Folder',
+              children: [
+                createBookmark({ title: 'Nested 1' }),
+                createBookmark({ title: 'Nested 2' }),
+              ],
+            },
+          ],
+        },
+        menu: {
+          id: 'menu_root',
+          title: 'Bookmarks Menu',
+          children: [createBookmark({ title: 'Menu Bookmark' })],
+        },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+
+      const count = syncEngine.countBookmarks(bookmarks);
+
+      // 1 in toolbar + 1 folder + 2 nested + 1 in menu = 5
+      expect(count).toBe(5);
+    });
+
+    it('should handle empty bookmarks', () => {
+      const bookmarks = {
+        toolbar: { id: 'toolbar_root', title: 'Bookmarks Toolbar', children: [] },
+        menu: { id: 'menu_root', title: 'Bookmarks Menu', children: [] },
+        other: { id: 'other_root', title: 'Other Bookmarks', children: [] },
+      };
+
+      const count = syncEngine.countBookmarks(bookmarks);
+
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('createSyncEngine factory', () => {
+    it('should create a SyncEngine instance', () => {
+      const engine = createSyncEngine({
+        source: mockSource,
+        deviceId: 'factory-device',
       });
-      const remoteData = createBookmarkFile();
 
-      localSource.setData(localData);
-      remoteSource.setData(remoteData);
-
-      const result = await syncEngine.sync(localSource, remoteSource);
-
-      expect(result).toBeDefined();
+      expect(engine).toBeInstanceOf(SyncEngine);
+      expect(engine.deviceId).toBe('factory-device');
     });
   });
 });

@@ -1,0 +1,121 @@
+/**
+ * Version History API Routes
+ * GET /api/versions - Get version history
+ * POST /api/versions - Save a new version
+ */
+
+import { NextResponse } from 'next/server';
+import { createClient, getUser } from '@/lib/supabase/server';
+
+/**
+ * GET /api/versions
+ * Get version history for the authenticated user
+ */
+export async function GET(request) {
+  try {
+    const user = await getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
+
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc('get_version_history', {
+      p_user_id: user.id,
+      p_limit: limit,
+      p_offset: offset,
+    });
+
+    if (error) {
+      console.error('Failed to get version history:', error);
+      return NextResponse.json({ error: 'Failed to get version history' }, { status: 500 });
+    }
+
+    // Get retention limit for the user
+    const { data: retentionLimit } = await supabase.rpc('get_version_retention_limit', {
+      p_user_id: user.id,
+    });
+
+    return NextResponse.json({
+      versions: data.map((v) => ({
+        id: v.id,
+        version: v.version,
+        checksum: v.checksum,
+        sourceType: v.source_type,
+        sourceName: v.source_name,
+        deviceName: v.device_name,
+        changeSummary: v.change_summary,
+        createdAt: v.created_at,
+        bookmarkCount: v.bookmark_count,
+        folderCount: v.folder_count,
+      })),
+      retentionLimit: retentionLimit || 5,
+    });
+  } catch (error) {
+    console.error('Version history error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/versions
+ * Save a new version (called after sync)
+ */
+export async function POST(request) {
+  try {
+    const user = await getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { bookmarkData, sourceType, sourceName, deviceId, deviceName, changeSummary } = body;
+
+    if (!bookmarkData || !sourceType) {
+      return NextResponse.json(
+        { error: 'Missing required fields: bookmarkData, sourceType' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // Compute checksum
+    const { computeChecksum } = await import('@marksyncr/core');
+    const checksum = computeChecksum(bookmarkData);
+
+    const { data, error } = await supabase.rpc('save_bookmark_version', {
+      p_user_id: user.id,
+      p_bookmark_data: bookmarkData,
+      p_checksum: checksum,
+      p_source_type: sourceType,
+      p_source_name: sourceName || null,
+      p_device_id: deviceId || null,
+      p_device_name: deviceName || null,
+      p_change_summary: changeSummary || {},
+    });
+
+    if (error) {
+      console.error('Failed to save version:', error);
+      return NextResponse.json({ error: 'Failed to save version' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      version: {
+        id: data.id,
+        version: data.version,
+        checksum: data.checksum,
+        createdAt: data.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Save version error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

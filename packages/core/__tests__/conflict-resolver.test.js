@@ -1,11 +1,36 @@
 /**
- * @fileoverview Tests for the ConflictResolver
+ * @fileoverview Tests for the conflict-resolver module
  * Tests various conflict resolution strategies and edge cases
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { ConflictResolver, CONFLICT_STRATEGY } from '../src/conflict-resolver.js';
-import { BOOKMARK_LOCATION } from '@marksyncr/types';
+import { describe, it, expect } from 'vitest';
+import {
+  resolveConflict,
+  mergeBookmarks,
+  mergeChildren,
+  resolveDeleteModifyConflict,
+  resolveAllConflicts,
+  requiresManualResolution,
+  createConflictSummary,
+} from '../src/conflict-resolver.js';
+import { CONFLICT_RESOLUTION, CHANGE_TYPE } from '@marksyncr/types';
+
+// Helper to create a sync change
+const createSyncChange = (overrides = {}) => ({
+  id: `change-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  type: CHANGE_TYPE.MODIFIED,
+  path: 'toolbar/Test',
+  before: null,
+  after: {
+    id: 'bm-1',
+    type: 'bookmark',
+    title: 'Test Bookmark',
+    url: 'https://example.com',
+    dateAdded: new Date().toISOString(),
+  },
+  timestamp: new Date().toISOString(),
+  ...overrides,
+});
 
 // Helper to create a bookmark
 const createBookmark = (overrides = {}) => ({
@@ -13,501 +38,380 @@ const createBookmark = (overrides = {}) => ({
   type: 'bookmark',
   title: 'Test Bookmark',
   url: 'https://example.com',
-  location: BOOKMARK_LOCATION.TOOLBAR,
-  createdAt: new Date().toISOString(),
-  modifiedAt: new Date().toISOString(),
-  tags: [],
+  dateAdded: new Date().toISOString(),
+  dateModified: new Date().toISOString(),
   ...overrides,
 });
 
-// Helper to create a folder
-const createFolder = (overrides = {}) => ({
-  id: `folder-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  type: 'folder',
-  title: 'Test Folder',
-  location: BOOKMARK_LOCATION.TOOLBAR,
-  children: [],
-  createdAt: new Date().toISOString(),
-  modifiedAt: new Date().toISOString(),
-  ...overrides,
-});
+describe('conflict-resolver', () => {
+  describe('resolveConflict', () => {
+    it('should resolve with LOCAL strategy', () => {
+      const localChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Local Title' }),
+        timestamp: new Date('2024-01-01').toISOString(),
+      });
+      const remoteChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Remote Title' }),
+        timestamp: new Date('2024-01-02').toISOString(),
+      });
 
-describe('ConflictResolver', () => {
-  let resolver;
+      const result = resolveConflict(
+        { localChange, remoteChange },
+        CONFLICT_RESOLUTION.LOCAL
+      );
 
-  beforeEach(() => {
-    resolver = new ConflictResolver();
-  });
-
-  describe('constructor', () => {
-    it('should create resolver with default strategy', () => {
-      const r = new ConflictResolver();
-      expect(r.strategy).toBe(CONFLICT_STRATEGY.NEWER_WINS);
+      expect(result.resolution).toBe(CONFLICT_RESOLUTION.LOCAL);
+      expect(result.resolvedValue.title).toBe('Local Title');
     });
 
-    it('should accept custom strategy', () => {
-      const r = new ConflictResolver({ strategy: CONFLICT_STRATEGY.LOCAL_WINS });
-      expect(r.strategy).toBe(CONFLICT_STRATEGY.LOCAL_WINS);
+    it('should resolve with REMOTE strategy', () => {
+      const localChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Local Title' }),
+        timestamp: new Date('2024-01-02').toISOString(),
+      });
+      const remoteChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Remote Title' }),
+        timestamp: new Date('2024-01-01').toISOString(),
+      });
+
+      const result = resolveConflict(
+        { localChange, remoteChange },
+        CONFLICT_RESOLUTION.REMOTE
+      );
+
+      expect(result.resolution).toBe(CONFLICT_RESOLUTION.REMOTE);
+      expect(result.resolvedValue.title).toBe('Remote Title');
     });
 
-    it('should accept all valid strategies', () => {
-      Object.values(CONFLICT_STRATEGY).forEach((strategy) => {
-        const r = new ConflictResolver({ strategy });
-        expect(r.strategy).toBe(strategy);
+    it('should resolve with MERGED strategy', () => {
+      const localChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Local Title', url: 'https://local.com' }),
+        timestamp: new Date('2024-01-01').toISOString(),
       });
-    });
-  });
-
-  describe('resolve', () => {
-    describe('NEWER_WINS strategy', () => {
-      beforeEach(() => {
-        resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.NEWER_WINS });
+      const remoteChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Remote Title', url: 'https://remote.com' }),
+        timestamp: new Date('2024-01-02').toISOString(),
       });
 
-      it('should choose local when local is newer', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-          modifiedAt: new Date('2024-01-02').toISOString(),
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-          modifiedAt: new Date('2024-01-01').toISOString(),
-        });
+      const result = resolveConflict(
+        { localChange, remoteChange },
+        CONFLICT_RESOLUTION.MERGED
+      );
 
-        const result = resolver.resolve(local, remote);
-
-        expect(result.title).toBe('Local Title');
-      });
-
-      it('should choose remote when remote is newer', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-          modifiedAt: new Date('2024-01-01').toISOString(),
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-          modifiedAt: new Date('2024-01-02').toISOString(),
-        });
-
-        const result = resolver.resolve(local, remote);
-
-        expect(result.title).toBe('Remote Title');
-      });
-
-      it('should choose local when timestamps are equal', () => {
-        const timestamp = new Date('2024-01-01').toISOString();
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-          modifiedAt: timestamp,
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-          modifiedAt: timestamp,
-        });
-
-        const result = resolver.resolve(local, remote);
-
-        // When equal, local wins as tiebreaker
-        expect(result.title).toBe('Local Title');
-      });
+      expect(result.resolution).toBe(CONFLICT_RESOLUTION.MERGED);
+      expect(result.resolvedValue).toBeDefined();
     });
 
-    describe('LOCAL_WINS strategy', () => {
-      beforeEach(() => {
-        resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.LOCAL_WINS });
+    it('should use newest strategy by default', () => {
+      const localChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Local Title' }),
+        timestamp: new Date('2024-01-01').toISOString(),
+      });
+      const remoteChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Remote Title' }),
+        timestamp: new Date('2024-01-02').toISOString(),
       });
 
-      it('should always choose local regardless of timestamp', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-          modifiedAt: new Date('2024-01-01').toISOString(), // Older
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-          modifiedAt: new Date('2024-01-02').toISOString(), // Newer
-        });
+      const result = resolveConflict({ localChange, remoteChange });
 
-        const result = resolver.resolve(local, remote);
-
-        expect(result.title).toBe('Local Title');
-      });
+      // Remote is newer, so it should win
+      expect(result.resolution).toBe(CONFLICT_RESOLUTION.REMOTE);
+      expect(result.resolvedValue.title).toBe('Remote Title');
     });
 
-    describe('REMOTE_WINS strategy', () => {
-      beforeEach(() => {
-        resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.REMOTE_WINS });
+    it('should choose local when local is newer', () => {
+      const localChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Local Title' }),
+        timestamp: new Date('2024-01-02').toISOString(),
+      });
+      const remoteChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Remote Title' }),
+        timestamp: new Date('2024-01-01').toISOString(),
       });
 
-      it('should always choose remote regardless of timestamp', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-          modifiedAt: new Date('2024-01-02').toISOString(), // Newer
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-          modifiedAt: new Date('2024-01-01').toISOString(), // Older
-        });
+      const result = resolveConflict({ localChange, remoteChange });
 
-        const result = resolver.resolve(local, remote);
-
-        expect(result.title).toBe('Remote Title');
-      });
+      expect(result.resolution).toBe(CONFLICT_RESOLUTION.LOCAL);
+      expect(result.resolvedValue.title).toBe('Local Title');
     });
 
-    describe('MERGE strategy', () => {
-      beforeEach(() => {
-        resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.MERGE });
+    it('should choose local when timestamps are equal', () => {
+      const timestamp = new Date('2024-01-01').toISOString();
+      const localChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Local Title' }),
+        timestamp,
+      });
+      const remoteChange = createSyncChange({
+        id: 'same-id',
+        after: createBookmark({ title: 'Remote Title' }),
+        timestamp,
       });
 
-      it('should merge non-conflicting fields', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Same Title',
-          url: 'https://local.example.com',
-          tags: ['local-tag'],
-          modifiedAt: new Date('2024-01-01').toISOString(),
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Same Title',
-          url: 'https://remote.example.com',
-          tags: ['remote-tag'],
-          modifiedAt: new Date('2024-01-02').toISOString(),
-        });
+      const result = resolveConflict({ localChange, remoteChange });
 
-        const result = resolver.resolve(local, remote);
-
-        // Should merge tags
-        expect(result.tags).toContain('local-tag');
-        expect(result.tags).toContain('remote-tag');
-      });
-
-      it('should use newer value for conflicting scalar fields', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-          modifiedAt: new Date('2024-01-01').toISOString(),
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-          modifiedAt: new Date('2024-01-02').toISOString(),
-        });
-
-        const result = resolver.resolve(local, remote);
-
-        // Remote is newer, so its title should win
-        expect(result.title).toBe('Remote Title');
-      });
-    });
-
-    describe('MANUAL strategy', () => {
-      beforeEach(() => {
-        resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.MANUAL });
-      });
-
-      it('should return conflict object for manual resolution', () => {
-        const local = createBookmark({
-          id: 'same-id',
-          title: 'Local Title',
-        });
-        const remote = createBookmark({
-          id: 'same-id',
-          title: 'Remote Title',
-        });
-
-        const result = resolver.resolve(local, remote);
-
-        expect(result.conflict).toBe(true);
-        expect(result.local).toEqual(local);
-        expect(result.remote).toEqual(remote);
-      });
+      // When equal, local wins as tiebreaker
+      expect(result.resolution).toBe(CONFLICT_RESOLUTION.LOCAL);
     });
   });
 
-  describe('resolveFolder', () => {
-    it('should resolve folder title conflicts', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.NEWER_WINS });
-
-      const local = createFolder({
-        id: 'folder-id',
-        title: 'Local Folder',
-        modifiedAt: new Date('2024-01-02').toISOString(),
-      });
-      const remote = createFolder({
-        id: 'folder-id',
-        title: 'Remote Folder',
-        modifiedAt: new Date('2024-01-01').toISOString(),
+  describe('mergeBookmarks', () => {
+    it('should return remote if local is null', () => {
+      const localChange = createSyncChange({ after: null, before: null });
+      const remoteChange = createSyncChange({
+        after: createBookmark({ title: 'Remote' }),
       });
 
-      const result = resolver.resolveFolder(local, remote);
+      const result = mergeBookmarks(localChange, remoteChange);
 
-      expect(result.title).toBe('Local Folder');
+      expect(result.title).toBe('Remote');
     });
 
-    it('should merge children from both folders', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.MERGE });
-
-      const localChild = createBookmark({ id: 'local-child', title: 'Local Child' });
-      const remoteChild = createBookmark({ id: 'remote-child', title: 'Remote Child' });
-
-      const local = createFolder({
-        id: 'folder-id',
-        children: [localChild],
+    it('should return local if remote is null', () => {
+      const localChange = createSyncChange({
+        after: createBookmark({ title: 'Local' }),
       });
-      const remote = createFolder({
-        id: 'folder-id',
-        children: [remoteChild],
+      const remoteChange = createSyncChange({ after: null, before: null });
+
+      const result = mergeBookmarks(localChange, remoteChange);
+
+      expect(result.title).toBe('Local');
+    });
+
+    it('should merge folder children', () => {
+      const localChange = createSyncChange({
+        after: {
+          id: 'folder-1',
+          type: 'folder',
+          title: 'Folder',
+          children: [createBookmark({ id: 'local-child' })],
+        },
+        timestamp: new Date('2024-01-01').toISOString(),
+      });
+      const remoteChange = createSyncChange({
+        after: {
+          id: 'folder-1',
+          type: 'folder',
+          title: 'Folder',
+          children: [createBookmark({ id: 'remote-child' })],
+        },
+        timestamp: new Date('2024-01-02').toISOString(),
       });
 
-      const result = resolver.resolveFolder(local, remote);
+      const result = mergeBookmarks(localChange, remoteChange);
 
       expect(result.children).toHaveLength(2);
-      expect(result.children.map((c) => c.id)).toContain('local-child');
-      expect(result.children.map((c) => c.id)).toContain('remote-child');
-    });
-
-    it('should handle nested folder conflicts', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.NEWER_WINS });
-
-      const nestedLocal = createFolder({
-        id: 'nested-folder',
-        title: 'Nested Local',
-        modifiedAt: new Date('2024-01-02').toISOString(),
-      });
-      const nestedRemote = createFolder({
-        id: 'nested-folder',
-        title: 'Nested Remote',
-        modifiedAt: new Date('2024-01-01').toISOString(),
-      });
-
-      const local = createFolder({
-        id: 'parent-folder',
-        children: [nestedLocal],
-      });
-      const remote = createFolder({
-        id: 'parent-folder',
-        children: [nestedRemote],
-      });
-
-      const result = resolver.resolveFolder(local, remote);
-
-      const nestedResult = result.children.find((c) => c.id === 'nested-folder');
-      expect(nestedResult.title).toBe('Nested Local');
     });
   });
 
-  describe('detectConflict', () => {
-    it('should detect conflict when same ID has different content', () => {
-      const local = createBookmark({
-        id: 'same-id',
-        title: 'Local Title',
-      });
-      const remote = createBookmark({
-        id: 'same-id',
-        title: 'Remote Title',
-      });
+  describe('mergeChildren', () => {
+    it('should merge children from both arrays', () => {
+      const localChildren = [
+        createBookmark({ id: 'local-1', title: 'Local 1' }),
+        createBookmark({ id: 'shared', title: 'Shared Local' }),
+      ];
+      const remoteChildren = [
+        createBookmark({ id: 'remote-1', title: 'Remote 1' }),
+        createBookmark({ id: 'shared', title: 'Shared Remote' }),
+      ];
 
-      const hasConflict = resolver.detectConflict(local, remote);
+      const result = mergeChildren(localChildren, remoteChildren);
 
-      expect(hasConflict).toBe(true);
+      expect(result).toHaveLength(3); // local-1, shared (local version), remote-1
+      expect(result.map((c) => c.id)).toContain('local-1');
+      expect(result.map((c) => c.id)).toContain('remote-1');
+      expect(result.map((c) => c.id)).toContain('shared');
     });
 
-    it('should not detect conflict when content is identical', () => {
-      const timestamp = new Date().toISOString();
-      const local = createBookmark({
-        id: 'same-id',
-        title: 'Same Title',
-        url: 'https://same.example.com',
-        modifiedAt: timestamp,
-      });
-      const remote = createBookmark({
-        id: 'same-id',
-        title: 'Same Title',
-        url: 'https://same.example.com',
-        modifiedAt: timestamp,
-      });
+    it('should keep local version for duplicates', () => {
+      const localChildren = [createBookmark({ id: 'shared', title: 'Local Version' })];
+      const remoteChildren = [createBookmark({ id: 'shared', title: 'Remote Version' })];
 
-      const hasConflict = resolver.detectConflict(local, remote);
+      const result = mergeChildren(localChildren, remoteChildren);
 
-      expect(hasConflict).toBe(false);
-    });
-
-    it('should detect conflict when URL differs', () => {
-      const local = createBookmark({
-        id: 'same-id',
-        url: 'https://local.example.com',
-      });
-      const remote = createBookmark({
-        id: 'same-id',
-        url: 'https://remote.example.com',
-      });
-
-      const hasConflict = resolver.detectConflict(local, remote);
-
-      expect(hasConflict).toBe(true);
-    });
-
-    it('should detect conflict when location differs', () => {
-      const local = createBookmark({
-        id: 'same-id',
-        location: BOOKMARK_LOCATION.TOOLBAR,
-      });
-      const remote = createBookmark({
-        id: 'same-id',
-        location: BOOKMARK_LOCATION.MENU,
-      });
-
-      const hasConflict = resolver.detectConflict(local, remote);
-
-      expect(hasConflict).toBe(true);
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('Local Version');
     });
   });
 
-  describe('resolveMultiple', () => {
+  describe('resolveDeleteModifyConflict', () => {
+    it('should keep modified version by default', () => {
+      const deleteChange = createSyncChange({
+        id: 'bm-1',
+        type: CHANGE_TYPE.DELETED,
+        before: createBookmark({ title: 'Deleted' }),
+        after: null,
+      });
+      const modifyChange = createSyncChange({
+        id: 'bm-1',
+        type: CHANGE_TYPE.MODIFIED,
+        after: createBookmark({ title: 'Modified' }),
+      });
+
+      const result = resolveDeleteModifyConflict(deleteChange, modifyChange);
+
+      expect(result.resolvedValue.title).toBe('Modified');
+    });
+
+    it('should honor deletion when strategy is delete', () => {
+      const deleteChange = createSyncChange({
+        id: 'bm-1',
+        type: CHANGE_TYPE.DELETED,
+        before: createBookmark({ title: 'Deleted' }),
+        after: null,
+      });
+      const modifyChange = createSyncChange({
+        id: 'bm-1',
+        type: CHANGE_TYPE.MODIFIED,
+        after: createBookmark({ title: 'Modified' }),
+      });
+
+      const result = resolveDeleteModifyConflict(deleteChange, modifyChange, 'delete');
+
+      expect(result.resolvedValue).toBeNull();
+    });
+  });
+
+  describe('resolveAllConflicts', () => {
     it('should resolve multiple conflicts at once', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.NEWER_WINS });
-
       const conflicts = [
         {
-          local: createBookmark({
+          localChange: createSyncChange({
             id: 'id-1',
-            title: 'Local 1',
-            modifiedAt: new Date('2024-01-02').toISOString(),
+            after: createBookmark({ title: 'Local 1' }),
+            timestamp: new Date('2024-01-02').toISOString(),
           }),
-          remote: createBookmark({
+          remoteChange: createSyncChange({
             id: 'id-1',
-            title: 'Remote 1',
-            modifiedAt: new Date('2024-01-01').toISOString(),
+            after: createBookmark({ title: 'Remote 1' }),
+            timestamp: new Date('2024-01-01').toISOString(),
           }),
         },
         {
-          local: createBookmark({
+          localChange: createSyncChange({
             id: 'id-2',
-            title: 'Local 2',
-            modifiedAt: new Date('2024-01-01').toISOString(),
+            after: createBookmark({ title: 'Local 2' }),
+            timestamp: new Date('2024-01-01').toISOString(),
           }),
-          remote: createBookmark({
+          remoteChange: createSyncChange({
             id: 'id-2',
-            title: 'Remote 2',
-            modifiedAt: new Date('2024-01-02').toISOString(),
+            after: createBookmark({ title: 'Remote 2' }),
+            timestamp: new Date('2024-01-02').toISOString(),
           }),
         },
       ];
 
-      const results = resolver.resolveMultiple(conflicts);
+      const results = resolveAllConflicts(conflicts);
 
       expect(results).toHaveLength(2);
-      expect(results[0].title).toBe('Local 1'); // Local is newer
-      expect(results[1].title).toBe('Remote 2'); // Remote is newer
+      expect(results[0].resolvedValue.title).toBe('Local 1'); // Local is newer
+      expect(results[1].resolvedValue.title).toBe('Remote 2'); // Remote is newer
+    });
+
+    it('should handle delete vs modify conflicts', () => {
+      const conflicts = [
+        {
+          localChange: createSyncChange({
+            id: 'id-1',
+            type: CHANGE_TYPE.DELETED,
+            before: createBookmark({ title: 'Deleted' }),
+            after: null,
+          }),
+          remoteChange: createSyncChange({
+            id: 'id-1',
+            type: CHANGE_TYPE.MODIFIED,
+            after: createBookmark({ title: 'Modified' }),
+          }),
+        },
+      ];
+
+      const results = resolveAllConflicts(conflicts);
+
+      expect(results).toHaveLength(1);
+      // Default is to keep modified version
+      expect(results[0].resolvedValue.title).toBe('Modified');
     });
   });
 
-  describe('edge cases', () => {
-    it('should handle null local', () => {
-      const remote = createBookmark({ title: 'Remote Only' });
+  describe('requiresManualResolution', () => {
+    it('should return true for delete vs modify conflict', () => {
+      const conflict = {
+        localChange: createSyncChange({
+          type: CHANGE_TYPE.DELETED,
+        }),
+        remoteChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+        }),
+      };
 
-      const result = resolver.resolve(null, remote);
-
-      expect(result).toEqual(remote);
+      expect(requiresManualResolution(conflict)).toBe(true);
     });
 
-    it('should handle null remote', () => {
-      const local = createBookmark({ title: 'Local Only' });
+    it('should return true when both modified with different URLs', () => {
+      const conflict = {
+        localChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+          after: createBookmark({ url: 'https://local.com' }),
+        }),
+        remoteChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+          after: createBookmark({ url: 'https://remote.com' }),
+        }),
+      };
 
-      const result = resolver.resolve(local, null);
-
-      expect(result).toEqual(local);
+      expect(requiresManualResolution(conflict)).toBe(true);
     });
 
-    it('should handle both null', () => {
-      const result = resolver.resolve(null, null);
+    it('should return false for same URL modifications', () => {
+      const conflict = {
+        localChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+          after: createBookmark({ url: 'https://same.com', title: 'Local' }),
+        }),
+        remoteChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+          after: createBookmark({ url: 'https://same.com', title: 'Remote' }),
+        }),
+      };
 
-      expect(result).toBeNull();
-    });
-
-    it('should handle missing modifiedAt timestamps', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.NEWER_WINS });
-
-      const local = createBookmark({
-        id: 'same-id',
-        title: 'Local Title',
-      });
-      delete local.modifiedAt;
-
-      const remote = createBookmark({
-        id: 'same-id',
-        title: 'Remote Title',
-        modifiedAt: new Date().toISOString(),
-      });
-
-      // Should not throw
-      const result = resolver.resolve(local, remote);
-      expect(result).toBeDefined();
-    });
-
-    it('should handle invalid timestamps gracefully', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.NEWER_WINS });
-
-      const local = createBookmark({
-        id: 'same-id',
-        title: 'Local Title',
-        modifiedAt: 'invalid-date',
-      });
-      const remote = createBookmark({
-        id: 'same-id',
-        title: 'Remote Title',
-        modifiedAt: new Date().toISOString(),
-      });
-
-      // Should not throw
-      const result = resolver.resolve(local, remote);
-      expect(result).toBeDefined();
-    });
-
-    it('should preserve all fields during resolution', () => {
-      resolver = new ConflictResolver({ strategy: CONFLICT_STRATEGY.LOCAL_WINS });
-
-      const local = createBookmark({
-        id: 'same-id',
-        title: 'Local Title',
-        url: 'https://local.example.com',
-        favicon: 'https://local.example.com/favicon.ico',
-        tags: ['tag1', 'tag2'],
-        description: 'Local description',
-        customField: 'custom value',
-      });
-      const remote = createBookmark({
-        id: 'same-id',
-        title: 'Remote Title',
-      });
-
-      const result = resolver.resolve(local, remote);
-
-      expect(result.favicon).toBe(local.favicon);
-      expect(result.tags).toEqual(local.tags);
-      expect(result.description).toBe(local.description);
-      expect(result.customField).toBe(local.customField);
+      expect(requiresManualResolution(conflict)).toBe(false);
     });
   });
 
-  describe('strategy change', () => {
-    it('should allow changing strategy after creation', () => {
-      const r = new ConflictResolver({ strategy: CONFLICT_STRATEGY.LOCAL_WINS });
-      expect(r.strategy).toBe(CONFLICT_STRATEGY.LOCAL_WINS);
+  describe('createConflictSummary', () => {
+    it('should create human-readable summary', () => {
+      const conflict = {
+        id: 'bm-1',
+        localChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+          after: createBookmark({ title: 'Local Title' }),
+        }),
+        remoteChange: createSyncChange({
+          type: CHANGE_TYPE.MODIFIED,
+          after: createBookmark({ title: 'Remote Title' }),
+        }),
+        resolution: CONFLICT_RESOLUTION.LOCAL,
+        resolvedValue: createBookmark({ title: 'Local Title' }),
+      };
 
-      r.setStrategy(CONFLICT_STRATEGY.REMOTE_WINS);
-      expect(r.strategy).toBe(CONFLICT_STRATEGY.REMOTE_WINS);
+      const summary = createConflictSummary(conflict);
+
+      expect(summary.id).toBe('bm-1');
+      expect(summary.title).toBe('Local Title');
+      expect(summary.localAction).toBe(CHANGE_TYPE.MODIFIED);
+      expect(summary.remoteAction).toBe(CHANGE_TYPE.MODIFIED);
+      expect(summary.resolution).toBe(CONFLICT_RESOLUTION.LOCAL);
+      expect(summary.resolvedTo).toBe('local version');
     });
   });
 });

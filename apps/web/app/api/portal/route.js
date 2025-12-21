@@ -4,28 +4,46 @@
  * Creates portal sessions for subscription management.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import Stripe from 'stripe';
+
+/**
+ * Create Supabase server client
+ */
+async function createSupabaseClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignore errors in route handlers
+          }
+        },
+      },
+    }
+  );
+}
 
 /**
  * POST /api/portal
  * Create a Stripe customer portal session
  */
-export async function POST(request) {
+export async function POST() {
   try {
     // Get authenticated user
-    const cookieStore = await cookies();
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-        },
-      }
-    );
+    const supabase = await createSupabaseClient();
 
     const {
       data: { user },
@@ -54,7 +72,6 @@ export async function POST(request) {
     }
 
     // Initialize Stripe
-    const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16',
     });
@@ -79,11 +96,31 @@ export async function POST(request) {
   } catch (error) {
     console.error('Portal error:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to create portal session' }),
+      JSON.stringify({
+        error: error.message || 'Failed to create portal session',
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       }
     );
   }
+}
+
+/**
+ * GET /api/portal
+ * Redirect to Stripe customer portal
+ */
+export async function GET() {
+  const response = await POST();
+  const data = await response.json();
+
+  if (data.url) {
+    return Response.redirect(data.url);
+  }
+
+  return new Response(JSON.stringify(data), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }

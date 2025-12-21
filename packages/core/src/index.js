@@ -45,3 +45,9 @@ export {
   countBookmarks,
   validateBookmarkFile,
 } from './bookmark-parser.js';
+
+// Version history
+export {
+  VersionHistoryManager,
+  createChangeSummary,
+} from './version-history.js';

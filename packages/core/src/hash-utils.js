@@ -50,15 +50,85 @@ export const generateFolderId = async (path) => {
 };
 
 /**
- * Generates a checksum for a bookmark file to detect changes
- * @param {Object} bookmarkFile - The bookmark file object
+ * Recursively sorts object keys for deterministic JSON serialization
+ * @param {*} obj - Object to sort
+ * @returns {*} Object with sorted keys (recursively)
+ */
+const sortObjectKeys = (obj) => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(sortObjectKeys);
+  }
+
+  const sortedObj = {};
+  const keys = Object.keys(obj).sort();
+  for (const key of keys) {
+    sortedObj[key] = sortObjectKeys(obj[key]);
+  }
+  return sortedObj;
+};
+
+/**
+ * Generates a checksum for a bookmark file to detect changes (async version)
+ * @param {Object} bookmarkFileOrData - The bookmark file object or bookmark data directly
  * @returns {Promise<string>} SHA-256 checksum
  */
-export const generateChecksum = async (bookmarkFile) => {
+export const generateChecksum = async (bookmarkFileOrData) => {
+  // Handle both bookmark file objects and raw bookmark data
+  const bookmarks = bookmarkFileOrData?.bookmarks ?? bookmarkFileOrData;
+
+  if (!bookmarks || typeof bookmarks !== 'object') {
+    return sha256('');
+  }
+
   // Create a deterministic string representation
-  // Sort keys to ensure consistent ordering
-  const content = JSON.stringify(bookmarkFile.bookmarks, Object.keys(bookmarkFile.bookmarks).sort());
+  // Recursively sort keys to ensure consistent ordering
+  const sortedBookmarks = sortObjectKeys(bookmarks);
+  const content = JSON.stringify(sortedBookmarks);
   return sha256(content);
+};
+
+/**
+ * Generates a simple checksum synchronously (for use in sync contexts)
+ * Uses a simple hash algorithm for quick checksums
+ * @param {Object} data - Data to checksum
+ * @returns {string} Simple hash string
+ */
+export const generateChecksumSync = (data) => {
+  if (!data || typeof data !== 'object') {
+    return '';
+  }
+
+  const content = JSON.stringify(data);
+  // Simple hash function for sync use
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
+};
+
+/**
+ * Generates a stable ID synchronously for a bookmark based on its content
+ * @param {string} primary - Primary identifier (URL for bookmarks, path for folders)
+ * @param {string} secondary - Secondary identifier (title or type)
+ * @returns {string} Stable bookmark ID
+ */
+export const generateBookmarkIdSync = (primary, secondary = '') => {
+  const content = `${primary}:${secondary}`;
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).padStart(16, '0').substring(0, 16);
 };
 
 /**

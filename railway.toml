@@ -5,6 +5,9 @@
 builder = "DOCKERFILE"
 dockerfilePath = "apps/web/Dockerfile"
 
+[build.env]
+NODE_VERSION = "24"
+
 [deploy]
 numReplicas = 1
 healthcheckPath = "/api/health"
