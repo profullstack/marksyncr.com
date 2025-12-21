@@ -533,7 +533,9 @@ export default function HomePage() {
                 Docs
               </Link>
               <a
-                href="https://github.com/marksyncr"
+                href="https://github.com/profullstack/marksyncr.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm text-slate-600 hover:text-slate-900"
               >
                 GitHub
