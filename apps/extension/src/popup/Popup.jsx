@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/index.js';
 import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
+import { LoginPanel } from './components/LoginPanel.jsx';
 
 // Icons
 const SyncIcon = ({ className = '', spinning = false }) => (
@@ -186,6 +187,18 @@ function LastSyncInfo({ lastSync }) {
   );
 }
 
+// User icon for account tab
+const UserIcon = ({ className = '' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+    />
+  </svg>
+);
+
 // Main Popup component
 export function Popup() {
   const {
@@ -209,10 +222,19 @@ export function Popup() {
     deleteTag,
     saveBookmarkTags,
     saveBookmarkNotes,
+    // Authentication
+    user,
+    isAuthenticated,
+    isAuthLoading,
+    authError,
+    signupSuccess,
+    login,
+    signup,
+    logout,
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
-  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'pro'
+  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'pro' | 'account'
 
   useEffect(() => {
     const init = async () => {
@@ -305,11 +327,27 @@ export function Popup() {
             )}
           </div>
         </button>
+        <button
+          onClick={() => setActiveTab('account')}
+          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'account'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1">
+            <UserIcon className="h-4 w-4" />
+            Account
+            {isAuthenticated && (
+              <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
+            )}
+          </div>
+        </button>
       </div>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto p-4">
-        {activeTab === 'sync' ? (
+        {activeTab === 'sync' && (
           <div className="space-y-4">
             {/* Status */}
             <div className="flex items-center justify-between">
@@ -378,7 +416,9 @@ export function Popup() {
               <span>View Version History</span>
             </button>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'pro' && (
           <ProFeaturesPanel
             isPro={isPro()}
             tags={tags}
@@ -388,6 +428,19 @@ export function Popup() {
             selectedBookmark={selectedBookmark}
             onSaveBookmarkTags={saveBookmarkTags}
             onSaveBookmarkNotes={saveBookmarkNotes}
+          />
+        )}
+
+        {activeTab === 'account' && (
+          <LoginPanel
+            user={user}
+            subscription={subscription}
+            onLogin={login}
+            onSignup={signup}
+            onLogout={logout}
+            isLoading={isAuthLoading}
+            error={authError}
+            signupSuccess={signupSuccess}
           />
         )}
       </main>

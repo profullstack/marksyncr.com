@@ -1,5 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  signInWithEmail,
+  signUpWithEmail,
+  signOut as supabaseSignOut,
+  getSession,
+  getUser,
+  fetchSubscription,
+  fetchCloudSettings,
+  saveCloudSettings,
+  onAuthStateChange,
+} from '../lib/supabase.js';
 
 /**
  * @typedef {'synced' | 'syncing' | 'error' | 'pending' | 'disconnected'} SyncStatus
@@ -112,11 +123,24 @@ export const useStore = create(
       error: null,
       user: null,
       settings: DEFAULT_SETTINGS,
+      // Authentication state
+      isAuthenticated: false,
+      isAuthLoading: false,
+      authError: null,
+      signupSuccess: false,
       // Pro features state
       subscription: null,
       tags: [],
       selectedBookmark: null,
       isLoadingTags: false,
+      // Bookmarks state for Pro features
+      bookmarks: [],
+      isLoadingBookmarks: false,
+      // Link health scanner state
+      linkScanResults: [],
+      isScanning: false,
+      // Duplicate detector state
+      duplicateGroups: [],
 
       // Actions
       setStatus: (status) => set({ status }),
@@ -133,6 +157,150 @@ export const useStore = create(
       },
 
       setUser: (user) => set({ user }),
+
+      // ==========================================
+      // Authentication Actions
+      // ==========================================
+
+      /**
+       * Sign in with email and password
+       */
+      login: async (email, password) => {
+        set({ isAuthLoading: true, authError: null });
+
+        try {
+          const { user, session } = await signInWithEmail(email, password);
+          
+          // Fetch subscription status
+          const subscription = await fetchSubscription();
+          
+          // Fetch cloud settings
+          const cloudSettings = await fetchCloudSettings();
+          
+          set({
+            user,
+            isAuthenticated: true,
+            isAuthLoading: false,
+            authError: null,
+            subscription,
+            settings: cloudSettings ? { ...get().settings, ...cloudSettings } : get().settings,
+          });
+
+          // Fetch tags if user is Pro
+          if (subscription?.plan && ['pro', 'team'].includes(subscription.plan)) {
+            await get().fetchTags();
+          }
+
+          return { success: true };
+        } catch (err) {
+          console.error('Login failed:', err);
+          set({
+            isAuthLoading: false,
+            authError: err.message || 'Login failed',
+          });
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
+       * Sign up with email and password
+       */
+      signup: async (email, password) => {
+        set({ isAuthLoading: true, authError: null, signupSuccess: false });
+
+        try {
+          await signUpWithEmail(email, password);
+          
+          set({
+            isAuthLoading: false,
+            authError: null,
+            signupSuccess: true,
+          });
+
+          return { success: true };
+        } catch (err) {
+          console.error('Signup failed:', err);
+          set({
+            isAuthLoading: false,
+            authError: err.message || 'Signup failed',
+            signupSuccess: false,
+          });
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
+       * Sign out the current user
+       */
+      logout: async () => {
+        set({ isAuthLoading: true });
+
+        try {
+          await supabaseSignOut();
+          
+          set({
+            user: null,
+            isAuthenticated: false,
+            isAuthLoading: false,
+            authError: null,
+            subscription: null,
+            tags: [],
+          });
+
+          return { success: true };
+        } catch (err) {
+          console.error('Logout failed:', err);
+          set({
+            isAuthLoading: false,
+            authError: err.message || 'Logout failed',
+          });
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
+       * Check and restore authentication session
+       */
+      checkAuth: async () => {
+        try {
+          const session = await getSession();
+          
+          if (session) {
+            const user = await getUser();
+            const subscription = await fetchSubscription();
+            const cloudSettings = await fetchCloudSettings();
+            
+            set({
+              user,
+              isAuthenticated: true,
+              subscription,
+              settings: cloudSettings ? { ...get().settings, ...cloudSettings } : get().settings,
+            });
+
+            // Fetch tags if user is Pro
+            if (subscription?.plan && ['pro', 'team'].includes(subscription.plan)) {
+              await get().fetchTags();
+            }
+
+            return true;
+          }
+          
+          return false;
+        } catch (err) {
+          console.error('Auth check failed:', err);
+          return false;
+        }
+      },
+
+      /**
+       * Clear auth error
+       */
+      clearAuthError: () => set({ authError: null }),
+
+      /**
+       * Reset signup success state
+       */
+      resetSignupSuccess: () => set({ signupSuccess: false }),
 
       updateSettings: (newSettings) => {
         const settings = { ...get().settings, ...newSettings };
@@ -208,6 +376,9 @@ export const useStore = create(
           }
 
           set(updates);
+
+          // Check for existing auth session
+          await get().checkAuth();
         } catch (err) {
           console.error('Failed to initialize store:', err);
           set({ error: 'Failed to initialize extension' });
@@ -550,6 +721,246 @@ export const useStore = create(
           throw err;
         }
       },
+
+      // ==========================================
+      // Bookmarks Actions for Pro Features
+      // ==========================================
+
+      /**
+       * Fetch all bookmarks as a flat array for Pro features
+       */
+      fetchBookmarks: async () => {
+        const browserAPI = getBrowserAPI();
+        set({ isLoadingBookmarks: true });
+
+        try {
+          const tree = await browserAPI.bookmarks.getTree();
+          const bookmarks = flattenBookmarkTree(tree);
+          set({ bookmarks, isLoadingBookmarks: false });
+          return bookmarks;
+        } catch (err) {
+          console.error('Failed to fetch bookmarks:', err);
+          set({ isLoadingBookmarks: false });
+          return [];
+        }
+      },
+
+      /**
+       * Delete a bookmark
+       */
+      deleteBookmark: async (bookmarkId) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          await browserAPI.bookmarks.remove(bookmarkId);
+          // Update local state
+          set({
+            bookmarks: get().bookmarks.filter((b) => b.id !== bookmarkId),
+          });
+        } catch (err) {
+          console.error('Failed to delete bookmark:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Update a bookmark
+       */
+      updateBookmark: async (bookmarkId, updates) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          await browserAPI.bookmarks.update(bookmarkId, updates);
+          // Update local state
+          set({
+            bookmarks: get().bookmarks.map((b) =>
+              b.id === bookmarkId ? { ...b, ...updates } : b
+            ),
+          });
+        } catch (err) {
+          console.error('Failed to update bookmark:', err);
+          throw err;
+        }
+      },
+
+      // ==========================================
+      // Link Health Scanner Actions
+      // ==========================================
+
+      /**
+       * Scan bookmarks for broken links
+       */
+      scanLinks: async (bookmarksToScan, options = {}) => {
+        set({ isScanning: true, linkScanResults: [] });
+        const results = [];
+        const { onProgress } = options;
+
+        try {
+          for (let i = 0; i < bookmarksToScan.length; i++) {
+            const bookmark = bookmarksToScan[i];
+            
+            if (onProgress) {
+              onProgress({
+                completed: i,
+                total: bookmarksToScan.length,
+                current: bookmark,
+              });
+            }
+
+            if (!bookmark.url) continue;
+
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+              const response = await fetch(bookmark.url, {
+                method: 'HEAD',
+                signal: controller.signal,
+                mode: 'no-cors', // Handle CORS issues
+              });
+
+              clearTimeout(timeoutId);
+
+              let status = 'valid';
+              let statusCode = response.status;
+
+              // Check for redirects
+              if (response.redirected) {
+                status = 'redirect';
+              } else if (!response.ok && response.status !== 0) {
+                // status 0 is for no-cors mode
+                status = 'broken';
+              }
+
+              results.push({
+                bookmarkId: bookmark.id,
+                url: bookmark.url,
+                title: bookmark.title,
+                status,
+                statusCode,
+                redirectUrl: response.redirected ? response.url : null,
+                checkedAt: new Date().toISOString(),
+              });
+            } catch (err) {
+              let status = 'broken';
+              let errorMessage = err.message;
+
+              if (err.name === 'AbortError') {
+                status = 'timeout';
+                errorMessage = 'Request timed out';
+              }
+
+              results.push({
+                bookmarkId: bookmark.id,
+                url: bookmark.url,
+                title: bookmark.title,
+                status,
+                errorMessage,
+                checkedAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          set({ linkScanResults: results, isScanning: false });
+          return results;
+        } catch (err) {
+          console.error('Link scan failed:', err);
+          set({ isScanning: false });
+          throw err;
+        }
+      },
+
+      // ==========================================
+      // Duplicate Detector Actions
+      // ==========================================
+
+      /**
+       * Merge duplicate bookmarks
+       */
+      mergeDuplicates: async ({ keepBookmark, deleteBookmarks, mergeTags, mergeNotes }) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          // Collect tags and notes from duplicates if merging
+          let combinedTags = keepBookmark.tags || [];
+          let combinedNotes = keepBookmark.notes || '';
+
+          if (mergeTags) {
+            deleteBookmarks.forEach((b) => {
+              if (b.tags) {
+                b.tags.forEach((tag) => {
+                  if (!combinedTags.find((t) => t.id === tag.id)) {
+                    combinedTags.push(tag);
+                  }
+                });
+              }
+            });
+          }
+
+          if (mergeNotes) {
+            deleteBookmarks.forEach((b) => {
+              if (b.notes && b.notes.trim()) {
+                combinedNotes += `\n\n---\nMerged from: ${b.title}\n${b.notes}`;
+              }
+            });
+          }
+
+          // Update the kept bookmark with merged data
+          if (mergeTags || mergeNotes) {
+            await browserAPI.runtime.sendMessage({
+              type: 'UPDATE_BOOKMARK_TAGS',
+              payload: { bookmarkId: keepBookmark.id, tags: combinedTags },
+            });
+            await browserAPI.runtime.sendMessage({
+              type: 'UPDATE_BOOKMARK_NOTES',
+              payload: { bookmarkId: keepBookmark.id, notes: combinedNotes },
+            });
+          }
+
+          // Delete the duplicate bookmarks
+          for (const bookmark of deleteBookmarks) {
+            await browserAPI.bookmarks.remove(bookmark.id);
+          }
+
+          // Update local state
+          const deletedIds = new Set(deleteBookmarks.map((b) => b.id));
+          set({
+            bookmarks: get().bookmarks.filter((b) => !deletedIds.has(b.id)),
+          });
+        } catch (err) {
+          console.error('Failed to merge duplicates:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Delete multiple bookmarks (for duplicate deletion)
+       */
+      deleteMultipleBookmarks: async (bookmarksToDelete) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          for (const bookmark of bookmarksToDelete) {
+            await browserAPI.bookmarks.remove(bookmark.id);
+          }
+
+          // Update local state
+          const deletedIds = new Set(bookmarksToDelete.map((b) => b.id));
+          set({
+            bookmarks: get().bookmarks.filter((b) => !deletedIds.has(b.id)),
+          });
+        } catch (err) {
+          console.error('Failed to delete bookmarks:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Open upgrade page
+       */
+      openUpgradePage: () => {
+        window.open('https://marksyncr.com/pricing', '_blank');
+      },
     }),
     {
       name: 'marksyncr-storage',
@@ -585,6 +996,40 @@ function countBookmarks(tree) {
   traverse(tree);
 
   return { total, folders, synced: total };
+}
+
+/**
+ * Flatten bookmark tree into a flat array of bookmarks
+ * @param {Array} tree - Bookmark tree from browser API
+ * @param {string} parentPath - Current folder path
+ * @returns {Array} Flat array of bookmarks with parentPath
+ */
+function flattenBookmarkTree(tree, parentPath = '') {
+  const bookmarks = [];
+
+  function traverse(nodes, path) {
+    for (const node of nodes) {
+      if (node.url) {
+        // It's a bookmark
+        bookmarks.push({
+          id: node.id,
+          title: node.title || '',
+          url: node.url,
+          parentPath: path,
+          dateAdded: node.dateAdded,
+          tags: [], // Will be populated from metadata
+          notes: '', // Will be populated from metadata
+        });
+      } else if (node.children) {
+        // It's a folder
+        const folderPath = path ? `${path}/${node.title}` : node.title;
+        traverse(node.children, folderPath);
+      }
+    }
+  }
+
+  traverse(tree, parentPath);
+  return bookmarks;
 }
 
 export default useStore;

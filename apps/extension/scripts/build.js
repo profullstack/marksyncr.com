@@ -91,12 +91,10 @@ function copyDirectorySync(src, dest) {
 function buildChrome() {
   console.log('🌐 Building Chrome extension (MV3)...');
 
-  // Copy built files
-  const viteOutput = join(ROOT_DIR, 'dist-vite');
-  if (existsSync(viteOutput)) {
-    copyDirectorySync(viteOutput, CHROME_DIR);
-  }
-
+  // Vite outputs to dist/chrome by default, so we need to copy from there
+  // The clean() function already created the CHROME_DIR, but Vite may have populated it
+  // We need to ensure the manifest and icons are correct
+  
   // Copy Chrome manifest as manifest.json
   const chromeManifest = readFileSync(join(ROOT_DIR, 'src/manifest.chrome.json'), 'utf-8');
   writeFileSync(join(CHROME_DIR, 'manifest.json'), chromeManifest);
@@ -119,13 +117,13 @@ function buildChrome() {
 function buildFirefox() {
   console.log('🦊 Building Firefox extension (MV3)...');
 
-  // Copy built files
-  const viteOutput = join(ROOT_DIR, 'dist-vite');
+  // Copy built files from Chrome build (Vite outputs to dist/chrome)
+  const viteOutput = CHROME_DIR;
   if (existsSync(viteOutput)) {
     copyDirectorySync(viteOutput, FIREFOX_DIR);
   }
 
-  // Copy Firefox manifest as manifest.json
+  // Copy Firefox manifest as manifest.json (overwrite Chrome manifest)
   const firefoxManifest = readFileSync(join(ROOT_DIR, 'src/manifest.firefox.json'), 'utf-8');
   writeFileSync(join(FIREFOX_DIR, 'manifest.json'), firefoxManifest);
 
@@ -147,13 +145,13 @@ function buildFirefox() {
 function buildSafari() {
   console.log('🧭 Building Safari extension (MV3)...');
 
-  // Copy built files
-  const viteOutput = join(ROOT_DIR, 'dist-vite');
+  // Copy built files from Chrome build (Vite outputs to dist/chrome)
+  const viteOutput = CHROME_DIR;
   if (existsSync(viteOutput)) {
     copyDirectorySync(viteOutput, SAFARI_DIR);
   }
 
-  // Copy Safari manifest as manifest.json
+  // Copy Safari manifest as manifest.json (overwrite Chrome manifest)
   const safariManifest = readFileSync(join(ROOT_DIR, 'src/manifest.safari.json'), 'utf-8');
   writeFileSync(join(SAFARI_DIR, 'manifest.json'), safariManifest);
 
@@ -191,13 +189,25 @@ function copyIcons(targetDir) {
     mkdirSync(targetIconsDir, { recursive: true });
   }
 
-  // Copy icon files if they exist
+  // Copy icon files if they exist (PNG or SVG)
   const iconSizes = ['16', '32', '48', '128'];
   for (const size of iconSizes) {
-    const iconFile = join(iconsDir, `icon-${size}.png`);
-    if (existsSync(iconFile)) {
-      copyFileSync(iconFile, join(targetIconsDir, `icon-${size}.png`));
+    // Try PNG first, then SVG
+    const pngFile = join(iconsDir, `icon-${size}.png`);
+    const svgFile = join(iconsDir, `icon-${size}.svg`);
+    
+    if (existsSync(pngFile)) {
+      copyFileSync(pngFile, join(targetIconsDir, `icon-${size}.png`));
     }
+    if (existsSync(svgFile)) {
+      copyFileSync(svgFile, join(targetIconsDir, `icon-${size}.svg`));
+    }
+  }
+  
+  // Also copy the base icon.svg if it exists
+  const baseIcon = join(iconsDir, 'icon.svg');
+  if (existsSync(baseIcon)) {
+    copyFileSync(baseIcon, join(targetIconsDir, 'icon.svg'));
   }
 }
 

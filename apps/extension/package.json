@@ -20,10 +20,12 @@
     "@marksyncr/core": "workspace:*",
     "@marksyncr/sources": "workspace:*",
     "@marksyncr/types": "workspace:*",
+    "@supabase/supabase-js": "^2.47.10",
+    "fuse.js": "^7.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zustand": "^5.0.2",
-    "webextension-polyfill": "^0.12.0"
+    "webextension-polyfill": "^0.12.0",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@types/react": "^19.0.2",

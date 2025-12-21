@@ -26,6 +26,12 @@ importers:
       '@marksyncr/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@supabase/supabase-js':
+        specifier: ^2.47.10
+        version: 2.89.0
+      fuse.js:
+        specifier: ^7.1.0
+        version: 7.1.0
       react:
         specifier: ^19.0.0
         version: 19.2.3

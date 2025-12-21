@@ -326,12 +326,28 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+            {/* Chrome Logo */}
             <svg
-              className="h-6 w-6 text-slate-600"
-              viewBox="0 0 24 24"
-              fill="currentColor"
+              className="h-6 w-6"
+              viewBox="0 0 48 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <circle cx="12" cy="12" r="10" />
+              <circle cx="24" cy="24" r="20" fill="#4285F4" />
+              <path
+                d="M24 14C29.523 14 34 18.477 34 24H24V14Z"
+                fill="#EA4335"
+              />
+              <path
+                d="M24 14C18.477 14 14 18.477 14 24C14 26.387 14.784 28.588 16.1 30.35L24 24V14Z"
+                fill="#FBBC05"
+              />
+              <path
+                d="M16.1 30.35C18.1 33.1 21.3 35 24 35C29.523 35 34 30.523 34 24H24L16.1 30.35Z"
+                fill="#34A853"
+              />
+              <circle cx="24" cy="24" r="8" fill="white" />
+              <circle cx="24" cy="24" r="4" fill="#4285F4" />
             </svg>
           </div>
           <div>
@@ -346,12 +362,38 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+            {/* Firefox Logo */}
             <svg
-              className="h-6 w-6 text-orange-500"
-              viewBox="0 0 24 24"
-              fill="currentColor"
+              className="h-6 w-6"
+              viewBox="0 0 48 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <circle cx="12" cy="12" r="10" />
+              <defs>
+                <linearGradient id="firefox-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#FF9500" />
+                  <stop offset="100%" stopColor="#FF0039" />
+                </linearGradient>
+                <linearGradient id="firefox-gradient-2" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#FF0039" />
+                  <stop offset="100%" stopColor="#FF9500" />
+                </linearGradient>
+              </defs>
+              <circle cx="24" cy="24" r="20" fill="url(#firefox-gradient-1)" />
+              <path
+                d="M24 8C15.163 8 8 15.163 8 24C8 32.837 15.163 40 24 40C32.837 40 40 32.837 40 24C40 15.163 32.837 8 24 8ZM24 36C17.373 36 12 30.627 12 24C12 17.373 17.373 12 24 12C30.627 12 36 17.373 36 24C36 30.627 30.627 36 24 36Z"
+                fill="url(#firefox-gradient-2)"
+                opacity="0.3"
+              />
+              <path
+                d="M32 16C30 14 27 13 24 13C18.477 13 14 17.477 14 23C14 28.523 18.477 33 24 33C29.523 33 34 28.523 34 23C34 20 33 18 32 16Z"
+                fill="#FF6611"
+              />
+              <path
+                d="M24 15C20 15 17 18 17 22C17 26 20 29 24 29C28 29 31 26 31 22C31 18 28 15 24 15Z"
+                fill="#FFBD4F"
+              />
+              <ellipse cx="21" cy="20" rx="2" ry="3" fill="white" opacity="0.6" />
             </svg>
           </div>
           <div>
