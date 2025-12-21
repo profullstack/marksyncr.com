@@ -1,7 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import {
+  trackPageView,
+  trackInitiateCheckout,
+  trackEvent,
+  ANALYTICS_EVENTS,
+} from '../../lib/analytics';
 
 const plans = [
   {
@@ -105,16 +111,48 @@ const faqs = [
 export default function PricingPage() {
   const [billingInterval, setBillingInterval] = useState('monthly');
 
+  // Track page view on mount
+  useEffect(() => {
+    trackPageView('pricing');
+    trackEvent(ANALYTICS_EVENTS.PRICING_VIEWED, {
+      initial_interval: billingInterval,
+    });
+  }, []);
+
+  // Track billing interval changes
+  const handleBillingToggle = () => {
+    const newInterval = billingInterval === 'monthly' ? 'yearly' : 'monthly';
+    setBillingInterval(newInterval);
+    trackEvent('billing_interval_changed', {
+      from: billingInterval,
+      to: newInterval,
+    });
+  };
+
   const handleCheckout = async (plan) => {
+    // Track plan selection
+    trackEvent(ANALYTICS_EVENTS.PLAN_SELECTED, {
+      plan: plan.toLowerCase(),
+      interval: billingInterval,
+    });
+
     if (plan === 'Free') {
+      trackEvent(ANALYTICS_EVENTS.SIGN_UP, { plan: 'free', source: 'pricing' });
       window.location.href = '/signup';
       return;
     }
 
     if (plan === 'Team') {
+      trackEvent('contact_sales_clicked', { plan: 'team' });
       window.location.href = '/contact';
       return;
     }
+
+    // Track checkout initiation for Pro plan
+    trackInitiateCheckout({
+      plan: plan.toLowerCase(),
+      interval: billingInterval,
+    });
 
     try {
       const response = await fetch('/api/checkout', {
@@ -185,9 +223,7 @@ export default function PricingPage() {
               Monthly
             </span>
             <button
-              onClick={() =>
-                setBillingInterval(billingInterval === 'monthly' ? 'yearly' : 'monthly')
-              }
+              onClick={handleBillingToggle}
               className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               <span

@@ -1,3 +1,4 @@
+import Script from 'next/script';
 import './globals.css';
 
 export const metadata = {
@@ -53,6 +54,14 @@ export default function RootLayout({ children }) {
         <div className="relative flex min-h-screen flex-col">
           <main className="flex-1">{children}</main>
         </div>
+        {/* Datafast Analytics */}
+        <Script
+          defer
+          data-website-id="dfid_qELSq3s3DLgYpQ7mz580t"
+          data-domain="marksyncr.com"
+          src="https://datafa.st/js/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

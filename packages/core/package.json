@@ -21,7 +21,8 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@marksyncr/types": "workspace:*"
+    "@marksyncr/types": "workspace:*",
+    "fuse.js": "^7.1.0"
   },
   "devDependencies": {
     "vitest": "^2.1.8"
