@@ -15,13 +15,16 @@ export async function GET(request) {
   const error = requestUrl.searchParams.get('error');
   const errorDescription = requestUrl.searchParams.get('error_description');
 
+  // Use NEXT_PUBLIC_APP_URL for redirects to ensure correct domain
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || requestUrl.origin;
+
   // Handle OAuth errors
   if (error) {
     console.error('OAuth error:', error, errorDescription);
     return NextResponse.redirect(
       new URL(
         `/login?error=${encodeURIComponent(errorDescription || error)}`,
-        requestUrl.origin
+        baseUrl
       )
     );
   }
@@ -61,7 +64,7 @@ export async function GET(request) {
         return NextResponse.redirect(
           new URL(
             `/login?error=${encodeURIComponent(exchangeError.message)}`,
-            requestUrl.origin
+            baseUrl
           )
         );
       }
@@ -70,12 +73,12 @@ export async function GET(request) {
       return NextResponse.redirect(
         new URL(
           `/login?error=${encodeURIComponent('Authentication failed')}`,
-          requestUrl.origin
+          baseUrl
         )
       );
     }
   }
 
   // Redirect to the next page or dashboard
-  return NextResponse.redirect(new URL(next, requestUrl.origin));
+  return NextResponse.redirect(new URL(next, baseUrl));
 }
