@@ -3,10 +3,10 @@
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "apps/web/Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [build.env]
-NODE_VERSION = "24"
+NODE_VERSION = "20"
 
 [deploy]
 numReplicas = 1
