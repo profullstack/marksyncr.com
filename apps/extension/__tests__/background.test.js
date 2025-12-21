@@ -609,27 +609,27 @@ describe('Background Service Worker', () => {
 
   describe('Browser Detection', () => {
     it('should detect Chrome', () => {
-      global.navigator.userAgent = 'Mozilla/5.0 Chrome/120.0.0.0';
+      mockUserAgent.value = 'Mozilla/5.0 Chrome/120.0.0.0';
       // detectBrowser() should return 'chrome'
     });
 
     it('should detect Firefox', () => {
-      global.navigator.userAgent = 'Mozilla/5.0 Firefox/120.0';
+      mockUserAgent.value = 'Mozilla/5.0 Firefox/120.0';
       // detectBrowser() should return 'firefox'
     });
 
     it('should detect Edge', () => {
-      global.navigator.userAgent = 'Mozilla/5.0 Edg/120.0.0.0';
+      mockUserAgent.value = 'Mozilla/5.0 Edg/120.0.0.0';
       // detectBrowser() should return 'edge'
     });
 
     it('should detect Opera', () => {
-      global.navigator.userAgent = 'Mozilla/5.0 OPR/120.0.0.0';
+      mockUserAgent.value = 'Mozilla/5.0 OPR/120.0.0.0';
       // detectBrowser() should return 'opera'
     });
 
     it('should detect Brave', () => {
-      global.navigator.userAgent = 'Mozilla/5.0 Brave Chrome/120.0.0.0';
+      mockUserAgent.value = 'Mozilla/5.0 Brave Chrome/120.0.0.0';
       // detectBrowser() should return 'brave'
     });
   });
