@@ -5,6 +5,22 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock localStorage for zustand persist middleware
+const localStorageMock = {
+  getItem: vi.fn(() => null),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+};
+globalThis.localStorage = localStorageMock;
+
+// Suppress zustand persist middleware warnings in tests
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  if (args[0]?.includes?.('zustand persist middleware')) return;
+  originalConsoleError(...args);
+};
+
 // Mock browser APIs before importing store
 globalThis.chrome = {
   storage: {
