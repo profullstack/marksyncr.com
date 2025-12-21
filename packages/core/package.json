@@ -1,0 +1,29 @@
+{
+  "name": "@marksyncr/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./parser": "./src/bookmark-parser.js",
+    "./serializer": "./src/bookmark-serializer.js",
+    "./sync": "./src/sync-engine.js",
+    "./diff": "./src/diff-engine.js",
+    "./conflict": "./src/conflict-resolver.js",
+    "./hash": "./src/hash-utils.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@marksyncr/types": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

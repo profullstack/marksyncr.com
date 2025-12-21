@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+**/.next
+dist
+**/dist
+dist-vite
+**/dist-vite
+.turbo
+**/.turbo
+
+# Development
+.git
+.gitignore
+*.md
+!README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files (will be provided at runtime)
+.env
+.env.*
+!.env.example
+
+# Test files
+**/__tests__
+**/*.test.js
+**/*.spec.js
+coverage
+.nyc_output
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Extension build artifacts
+apps/extension/dist
+apps/extension/*.zip
+apps/extension/*.xpi
+
+# Plans and docs (not needed in production)
+plans/
+docs/

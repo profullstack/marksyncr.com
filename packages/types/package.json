@@ -1,0 +1,24 @@
+{
+  "name": "@marksyncr/types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./bookmark": "./src/bookmark.js",
+    "./sync": "./src/sync.js",
+    "./source": "./src/source.js",
+    "./user": "./src/user.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

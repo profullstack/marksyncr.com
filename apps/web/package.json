@@ -1,0 +1,33 @@
+{
+  "name": "@marksyncr/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@marksyncr/types": "workspace:*",
+    "@supabase/supabase-js": "^2.47.10",
+    "next": "^15.1.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.1.2",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@marksyncr/sources",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./base": "./src/base-source.js",
+    "./local": "./src/local-file.js",
+    "./github": "./src/github.js",
+    "./dropbox": "./src/dropbox.js",
+    "./google-drive": "./src/google-drive.js",
+    "./supabase": "./src/supabase-cloud.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@marksyncr/types": "workspace:*",
+    "@marksyncr/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}
