@@ -1,5 +1,5 @@
 # MarkSyncr Web App Dockerfile
-# Multi-stage build for Next.js 15 with standalone output
+# Multi-stage build for Next.js 16 with standalone output
 
 # Stage 1: Dependencies
 FROM node:20-alpine AS deps

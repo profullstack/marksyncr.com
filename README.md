@@ -135,7 +135,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-publishable-key
 ## Tech Stack
 
 - **Frontend**: React 19, Tailwind CSS
-- **Build**: Vite (extension), Next.js 15 (web)
+- **Build**: Vite (extension), Next.js 16 (web)
 - **Backend**: Supabase (auth, database, storage)
 - **Payments**: Stripe
 - **Testing**: Vitest
