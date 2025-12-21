@@ -15,11 +15,14 @@ const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
 const DEFAULT_SYNC_INTERVAL = 15; // minutes
 
 /**
- * Get API base URL from storage or use default
+ * Get API base URL - uses VITE_APP_URL from build config or falls back to production URL
  */
-async function getApiBaseUrl() {
-  const { apiBaseUrl } = await browser.storage.local.get('apiBaseUrl');
-  return apiBaseUrl || 'http://localhost:3000';
+function getApiBaseUrl() {
+  // In production builds, this will be replaced by Vite with the actual URL
+  // eslint-disable-next-line no-undef
+  return typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_URL
+    ? import.meta.env.VITE_APP_URL
+    : 'https://marksyncr.com';
 }
 
 /**
@@ -42,7 +45,7 @@ async function isLoggedIn() {
  * Make an authenticated API request using Bearer token
  */
 async function apiRequest(endpoint, options = {}) {
-  const baseUrl = await getApiBaseUrl();
+  const baseUrl = getApiBaseUrl();
   const token = await getAccessToken();
   
   const headers = {
@@ -252,12 +255,18 @@ async function performSync(sourceId) {
 
     // Get source configuration
     const source = sources?.find((s) => s.id === targetSourceId);
-    if (!source?.connected) {
+    
+    // Browser bookmarks source is always available
+    const isBrowserSource = targetSourceId === 'browser-bookmarks';
+    
+    if (!isBrowserSource && !source?.connected) {
+      console.log('[MarkSyncr] Source not connected:', targetSourceId, source);
       return { success: false, error: 'Source not connected' };
     }
 
     // Check if user is logged in (has session)
     const loggedIn = await isLoggedIn();
+    console.log('[MarkSyncr] User logged in:', loggedIn);
     
     // If user is logged in, sync to cloud
     if (loggedIn) {
@@ -279,11 +288,13 @@ async function performSync(sourceId) {
         );
         console.log('[MarkSyncr] Version saved:', versionResult);
       } catch (cloudErr) {
-        console.error('[MarkSyncr] Cloud sync failed (continuing with local sync):', cloudErr);
-        // Don't fail the entire sync if cloud sync fails
+        console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
+        // Return error so user knows cloud sync failed
+        return { success: false, error: `Cloud sync failed: ${cloudErr.message}` };
       }
     } else {
       console.log('[MarkSyncr] User not logged in, skipping cloud sync');
+      // Still return success for local-only sync
     }
 
     console.log('[MarkSyncr] Sync completed:', stats);

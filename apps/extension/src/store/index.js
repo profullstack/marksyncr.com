@@ -316,6 +316,9 @@ export const useStore = create(
           source.id === sourceId ? { ...source, connected } : source
         );
         set({ sources });
+        // Also persist to browser storage for background script
+        const browserAPI = getBrowserAPI();
+        browserAPI.storage.local.set({ sources });
       },
 
       updateStats: (stats) => set({ stats }),
