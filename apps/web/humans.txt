@@ -1,0 +1,8 @@
+/* TEAM */
+Developer/Founder: Anthony Ettinger
+Contact: https://profullstack.com
+
+/* SITE */
+Last update: 2025/12/21
+Language: English
+Components: node.js, react, next, supabase, tailwind, ubuntu, railway
