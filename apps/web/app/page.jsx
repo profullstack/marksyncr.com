@@ -166,23 +166,60 @@ export default function HomePage() {
           </div>
           <div className="flex items-center space-x-6">
             {/* Chrome */}
-            <svg className="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="12" r="10" className="text-slate-300" />
-              <circle cx="12" cy="12" r="4" className="text-slate-500" />
-            </svg>
+            <div className="flex flex-col items-center">
+              <svg className="h-10 w-10" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="22" fill="#4CAF50"/>
+                <path fill="#F44336" d="M24 2C13.5 2 4.7 8.8 2.2 18h15.3c1.5-2.5 4.2-4 7.5-4 4.4 0 8 3.6 8 8h13C46 11.2 36.1 2 24 2z"/>
+                <path fill="#FFC107" d="M24 14c-5.5 0-10 4.5-10 10 0 1.3.3 2.5.7 3.6L2.2 18C.8 21.1 0 24.5 0 28c0 11 9 20 20 20 4.5 0 8.7-1.5 12-4l-12.7-22c-.1 0-.2 0-.3 0-2.8 0-5 2.2-5 5s2.2 5 5 5c1.4 0 2.7-.6 3.6-1.5L24 14z"/>
+                <path fill="#2196F3" d="M46 18H33c1.3 2.5 2 5.2 2 8 0 9.9-8.1 18-18 18-3.5 0-6.8-1-9.6-2.8l12.3-21.3c.4.1.9.1 1.3.1 5.5 0 10-4.5 10-10 0-1.3-.3-2.5-.7-3.6L46 18z"/>
+                <circle cx="24" cy="24" r="8" fill="#F5F5F5"/>
+                <circle cx="24" cy="24" r="5" fill="#2196F3"/>
+              </svg>
+              <span className="mt-1 text-xs text-slate-500">Chrome</span>
+            </div>
             {/* Firefox */}
-            <svg className="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="12" r="10" className="text-slate-300" />
-              <path
-                d="M12 6c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6-2.7-6-6-6z"
-                className="text-slate-500"
-              />
-            </svg>
+            <div className="flex flex-col items-center">
+              <svg className="h-10 w-10" viewBox="0 0 48 48">
+                <defs>
+                  <linearGradient id="firefox-grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FF9500"/>
+                    <stop offset="100%" stopColor="#FF0039"/>
+                  </linearGradient>
+                  <linearGradient id="firefox-grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFBD4F"/>
+                    <stop offset="100%" stopColor="#FF980E"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="24" cy="24" r="22" fill="url(#firefox-grad1)"/>
+                <path fill="url(#firefox-grad2)" d="M38 16c-1-3-4-6-8-7 2 2 3 5 3 8-2-3-5-5-9-5 0 0 1 2 1 4-4-2-7-1-9 1 3 0 5 2 6 4-3 0-5 2-6 5 2-1 4-1 6 0-2 2-3 5-2 8 2-3 5-5 9-5 0 3 1 6 3 8 1-2 2-5 2-8 3 1 5 3 6 6 0-3-1-6-3-9 2 0 4 1 5 3 0-4-2-8-4-13z"/>
+                <circle cx="24" cy="26" r="8" fill="#3023AE" opacity="0.3"/>
+              </svg>
+              <span className="mt-1 text-xs text-slate-500">Firefox</span>
+            </div>
             {/* Safari */}
-            <svg className="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="12" r="10" className="text-slate-300" />
-              <path d="M12 7l1 5 5 1-5 1-1 5-1-5-5-1 5-1z" className="text-slate-500" />
-            </svg>
+            <div className="flex flex-col items-center">
+              <svg className="h-10 w-10" viewBox="0 0 48 48">
+                <defs>
+                  <linearGradient id="safari-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#19D7FF"/>
+                    <stop offset="100%" stopColor="#1E64F0"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="24" cy="24" r="22" fill="url(#safari-grad)"/>
+                <circle cx="24" cy="24" r="18" fill="white"/>
+                <circle cx="24" cy="24" r="16" fill="#F5F5F5"/>
+                {/* Compass needle */}
+                <polygon points="24,8 26,24 24,26 22,24" fill="#FF3B30"/>
+                <polygon points="24,40 22,24 24,22 26,24" fill="#FFFFFF"/>
+                {/* Tick marks */}
+                <rect x="23" y="4" width="2" height="4" fill="#333"/>
+                <rect x="23" y="40" width="2" height="4" fill="#333"/>
+                <rect x="4" y="23" width="4" height="2" fill="#333"/>
+                <rect x="40" y="23" width="4" height="2" fill="#333"/>
+                <circle cx="24" cy="24" r="3" fill="#333"/>
+              </svg>
+              <span className="mt-1 text-xs text-slate-500">Safari</span>
+            </div>
           </div>
         </div>
       </section>
