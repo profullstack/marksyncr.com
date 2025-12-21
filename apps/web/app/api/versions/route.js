@@ -5,7 +5,41 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient, getUser } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+
+/**
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
+/**
+ * Helper to get user from authorization header
+ */
+async function getUserFromAuth(request, supabase) {
+  const authHeader = request.headers.get('authorization');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { user: null, error: 'Authorization header required' };
+  }
+
+  const accessToken = authHeader.substring(7);
+  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+
+  if (error || !user) {
+    return { user: null, error: 'Invalid or expired token' };
+  }
+
+  return { user, error: null };
+}
 
 /**
  * GET /api/versions
@@ -13,17 +47,16 @@ import { createClient, getUser } from '@/lib/supabase/server';
  */
 export async function GET(request) {
   try {
-    const user = await getUser();
+    const supabase = await createClient();
+    const { user, error: authError } = await getUserFromAuth(request, supabase);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
-
-    const supabase = await createClient();
 
     const { data, error } = await supabase.rpc('get_version_history', {
       p_user_id: user.id,
@@ -42,7 +75,7 @@ export async function GET(request) {
     });
 
     return NextResponse.json({
-      versions: data.map((v) => ({
+      versions: (data || []).map((v) => ({
         id: v.id,
         version: v.version,
         checksum: v.checksum,
@@ -68,10 +101,11 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const user = await getUser();
+    const supabase = await createClient();
+    const { user, error: authError } = await getUserFromAuth(request, supabase);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError) {
+      return NextResponse.json({ error: authError }, { status: 401 });
     }
 
     const body = await request.json();
@@ -83,8 +117,6 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-
-    const supabase = await createClient();
 
     // Compute checksum
     const { computeChecksum } = await import('@marksyncr/core');
@@ -108,10 +140,10 @@ export async function POST(request) {
 
     return NextResponse.json({
       version: {
-        id: data.id,
-        version: data.version,
-        checksum: data.checksum,
-        createdAt: data.created_at,
+        id: data?.id,
+        version: data?.version,
+        checksum: data?.checksum,
+        createdAt: data?.created_at,
       },
     });
   } catch (error) {

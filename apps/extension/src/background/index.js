@@ -13,6 +13,86 @@ import browser from 'webextension-polyfill';
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
 const DEFAULT_SYNC_INTERVAL = 15; // minutes
+const APP_URL = 'https://marksyncr.com';
+
+/**
+ * Get stored auth token
+ */
+async function getAuthToken() {
+  const { authToken } = await browser.storage.local.get('authToken');
+  return authToken;
+}
+
+/**
+ * Make an authenticated API request
+ */
+async function apiRequest(endpoint, options = {}) {
+  const token = await getAuthToken();
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`${APP_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+  
+  return response;
+}
+
+/**
+ * Sync bookmarks to cloud
+ */
+async function syncBookmarksToCloud(bookmarks, source = 'browser') {
+  try {
+    const response = await apiRequest('/api/bookmarks', {
+      method: 'POST',
+      body: JSON.stringify({ bookmarks, source }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to sync bookmarks');
+    }
+    
+    return await response.json();
+  } catch (err) {
+    console.error('[MarkSyncr] Failed to sync bookmarks to cloud:', err);
+    throw err;
+  }
+}
+
+/**
+ * Save bookmark version to cloud
+ */
+async function saveVersionToCloud(bookmarkData, sourceType, deviceName) {
+  try {
+    const response = await apiRequest('/api/versions', {
+      method: 'POST',
+      body: JSON.stringify({
+        bookmarkData,
+        sourceType,
+        deviceName,
+      }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to save version');
+    }
+    
+    return await response.json();
+  } catch (err) {
+    console.error('[MarkSyncr] Failed to save version to cloud:', err);
+    throw err;
+  }
+}
 
 /**
  * Initialize the background service worker
@@ -100,15 +180,45 @@ function scheduleSync(reason) {
 }
 
 /**
+ * Flatten bookmark tree to array for API sync
+ * @param {Array} tree - Browser bookmark tree
+ * @returns {Array} - Flat array of bookmarks
+ */
+function flattenBookmarkTree(tree) {
+  const bookmarks = [];
+
+  function traverse(nodes, path = '') {
+    for (const node of nodes) {
+      if (node.url) {
+        bookmarks.push({
+          id: node.id,
+          url: node.url,
+          title: node.title || node.url,
+          folderPath: path,
+          dateAdded: node.dateAdded,
+        });
+      } else if (node.children) {
+        const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
+        traverse(node.children, newPath);
+      }
+    }
+  }
+
+  traverse(tree);
+  return bookmarks;
+}
+
+/**
  * Perform bookmark sync
  * @param {string} [sourceId] - Optional specific source to sync with
  * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
  */
 async function performSync(sourceId) {
   try {
-    const { selectedSource, sources } = await browser.storage.local.get([
+    const { selectedSource, sources, authToken } = await browser.storage.local.get([
       'selectedSource',
       'sources',
+      'authToken',
     ]);
 
     const targetSourceId = sourceId || selectedSource;
@@ -121,7 +231,8 @@ async function performSync(sourceId) {
 
     // Get current bookmarks from browser
     const bookmarkTree = await browser.bookmarks.getTree();
-    const bookmarks = convertBrowserBookmarks(bookmarkTree);
+    const bookmarkData = convertBrowserBookmarks(bookmarkTree);
+    const stats = countBookmarks(bookmarkTree);
 
     // Get source configuration
     const source = sources?.find((s) => s.id === targetSourceId);
@@ -129,9 +240,32 @@ async function performSync(sourceId) {
       return { success: false, error: 'Source not connected' };
     }
 
-    // TODO: Implement actual sync logic using @marksyncr/core and @marksyncr/sources
-    // For now, just count bookmarks
-    const stats = countBookmarks(bookmarkTree);
+    // If user is logged in, sync to cloud
+    if (authToken) {
+      try {
+        // Flatten bookmarks for API
+        const flatBookmarks = flattenBookmarkTree(bookmarkTree);
+        
+        // Sync bookmarks to cloud
+        console.log(`[MarkSyncr] Syncing ${flatBookmarks.length} bookmarks to cloud...`);
+        const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
+        console.log('[MarkSyncr] Cloud sync result:', syncResult);
+
+        // Save version history
+        console.log('[MarkSyncr] Saving version history...');
+        const versionResult = await saveVersionToCloud(
+          bookmarkData,
+          detectBrowser(),
+          `${detectBrowser()}-extension`
+        );
+        console.log('[MarkSyncr] Version saved:', versionResult);
+      } catch (cloudErr) {
+        console.error('[MarkSyncr] Cloud sync failed (continuing with local sync):', cloudErr);
+        // Don't fail the entire sync if cloud sync fails
+      }
+    } else {
+      console.log('[MarkSyncr] User not logged in, skipping cloud sync');
+    }
 
     console.log('[MarkSyncr] Sync completed:', stats);
 

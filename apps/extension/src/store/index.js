@@ -965,10 +965,13 @@ export const useStore = create(
     }),
     {
       name: 'marksyncr-storage',
-      // Only persist certain fields
+      // Persist auth state and settings
       partialize: (state) => ({
         selectedSource: state.selectedSource,
         settings: state.settings,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        subscription: state.subscription,
       }),
     }
   )
