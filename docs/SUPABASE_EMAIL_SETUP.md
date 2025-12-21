@@ -1,6 +1,6 @@
 # Supabase Email Configuration Guide for MarkSyncr
 
-This guide walks you through configuring email authentication in Supabase so that signup confirmation emails are sent properly.
+This guide walks you through configuring email authentication in Supabase using Mailgun so that signup confirmation emails are sent properly.
 
 ## Why Emails Aren't Being Sent
 
@@ -8,92 +8,110 @@ By default, Supabase uses their built-in email service which has **strict rate l
 - **Free tier**: 4 emails per hour
 - **Pro tier**: 100 emails per hour
 
-For production applications, you need to configure a custom SMTP provider.
-
-## Step 1: Choose an SMTP Provider
-
-Here are recommended providers with free tiers:
-
-### Option A: Resend (Recommended)
-- **Free tier**: 3,000 emails/month, 100 emails/day
-- **Website**: https://resend.com
-- **Pros**: Easy setup, great developer experience, good deliverability
-
-### Option B: SendGrid
-- **Free tier**: 100 emails/day forever
-- **Website**: https://sendgrid.com
-- **Pros**: Established provider, good documentation
-
-### Option C: Mailgun
-- **Free tier**: 5,000 emails/month for 3 months, then pay-as-you-go
-- **Website**: https://mailgun.com
-- **Pros**: Powerful API, good for transactional emails
-
-### Option D: Postmark
-- **Free tier**: 100 emails/month
-- **Website**: https://postmarkapp.com
-- **Pros**: Excellent deliverability, fast delivery
+For production applications, you need to configure a custom SMTP provider. We recommend **Mailgun** for its reliability and generous free tier.
 
 ---
 
-## Step 2: Set Up Resend (Recommended)
+## Step 1: Create a Mailgun Account
 
-### 2.1 Create a Resend Account
-1. Go to https://resend.com
-2. Sign up with your email or GitHub
-3. Verify your email address
+### 1.1 Sign Up
+1. Go to https://www.mailgun.com
+2. Click **Sign Up** or **Start Sending**
+3. Create an account with your email
+4. Verify your email address
 
-### 2.2 Add Your Domain
-1. In Resend dashboard, go to **Domains**
-2. Click **Add Domain**
-3. Enter your domain: `marksyncr.com`
-4. Add the DNS records Resend provides to your domain registrar:
-   - **MX record** for receiving bounces
-   - **TXT record** for SPF
-   - **CNAME records** for DKIM
-5. Wait for verification (usually 5-10 minutes)
-
-### 2.3 Get Your API Key
-1. Go to **API Keys** in Resend dashboard
-2. Click **Create API Key**
-3. Name it: `marksyncr-supabase`
-4. Copy the API key (starts with `re_`)
-
-### 2.4 Get SMTP Credentials
-Resend provides SMTP access. Use these settings:
-- **Host**: `smtp.resend.com`
-- **Port**: `465` (SSL) or `587` (TLS)
-- **Username**: `resend`
-- **Password**: Your API key (the `re_...` key)
+### 1.2 Free Tier Details
+- **5,000 emails/month free** for the first 3 months
+- After trial: Pay-as-you-go pricing (~$0.80 per 1,000 emails)
+- No credit card required for trial
 
 ---
 
-## Step 3: Configure Supabase SMTP
+## Step 2: Add and Verify Your Domain
 
-### 3.1 Open Supabase Dashboard
+### 2.1 Add Your Domain
+1. In Mailgun dashboard, go to **Sending** → **Domains**
+2. Click **Add New Domain**
+3. Enter your domain: `mg.marksyncr.com` (using a subdomain is recommended)
+4. Select your region (US or EU)
+5. Click **Add Domain**
+
+### 2.2 Configure DNS Records
+Mailgun will provide DNS records to add. Go to your domain registrar (Cloudflare, Namecheap, etc.) and add:
+
+**Required Records:**
+
+| Type | Name | Value |
+|------|------|-------|
+| TXT | mg.marksyncr.com | `v=spf1 include:mailgun.org ~all` |
+| TXT | smtp._domainkey.mg.marksyncr.com | (DKIM key provided by Mailgun) |
+| CNAME | email.mg.marksyncr.com | `mailgun.org` |
+
+**Optional but Recommended:**
+
+| Type | Name | Value |
+|------|------|-------|
+| MX | mg.marksyncr.com | `mxa.mailgun.org` (priority 10) |
+| MX | mg.marksyncr.com | `mxb.mailgun.org` (priority 10) |
+
+### 2.3 Verify Domain
+1. After adding DNS records, wait 5-10 minutes for propagation
+2. In Mailgun, click **Verify DNS Settings**
+3. All records should show green checkmarks when verified
+
+---
+
+## Step 3: Get SMTP Credentials
+
+### 3.1 Find Your SMTP Credentials
+1. In Mailgun dashboard, go to **Sending** → **Domain Settings**
+2. Select your domain (`mg.marksyncr.com`)
+3. Click on **SMTP credentials** tab
+
+### 3.2 Create SMTP User (if needed)
+1. Click **Add new SMTP user**
+2. Enter a login name (e.g., `postmaster`)
+3. Click **Create**
+4. Copy the generated password (you won't see it again!)
+
+### 3.3 Your SMTP Settings
+Note these values for Supabase configuration:
+
+| Setting | Value |
+|---------|-------|
+| **SMTP Host** | `smtp.mailgun.org` (US) or `smtp.eu.mailgun.org` (EU) |
+| **Port** | `587` (TLS) or `465` (SSL) |
+| **Username** | `postmaster@mg.marksyncr.com` |
+| **Password** | Your SMTP password from step 3.2 |
+
+---
+
+## Step 4: Configure Supabase SMTP
+
+### 4.1 Open Supabase Dashboard
 1. Go to https://supabase.com/dashboard
 2. Select your MarkSyncr project
 3. Navigate to **Project Settings** (gear icon in sidebar)
 
-### 3.2 Configure SMTP Settings
+### 4.2 Configure SMTP Settings
 1. Go to **Authentication** section
 2. Scroll down to **SMTP Settings**
 3. Toggle **Enable Custom SMTP** to ON
 4. Fill in the following:
 
-| Field | Value (Resend) |
-|-------|----------------|
-| **Sender email** | `noreply@marksyncr.com` |
+| Field | Value |
+|-------|-------|
+| **Sender email** | `noreply@mg.marksyncr.com` |
 | **Sender name** | `MarkSyncr` |
-| **Host** | `smtp.resend.com` |
-| **Port number** | `465` |
+| **Host** | `smtp.mailgun.org` |
+| **Port number** | `587` |
 | **Minimum interval** | `60` (seconds between emails to same address) |
-| **Username** | `resend` |
-| **Password** | Your Resend API key (`re_...`) |
+| **Username** | `postmaster@mg.marksyncr.com` |
+| **Password** | Your Mailgun SMTP password |
 
 5. Click **Save**
 
-### 3.3 Test the Configuration
+### 4.3 Test the Configuration
 1. Click **Send test email** button
 2. Enter your email address
 3. Check your inbox for the test email
@@ -101,13 +119,13 @@ Resend provides SMTP access. Use these settings:
 
 ---
 
-## Step 4: Configure URL Settings
+## Step 5: Configure URL Settings
 
-### 4.1 Set Site URL
+### 5.1 Set Site URL
 1. In Supabase dashboard, go to **Authentication** → **URL Configuration**
 2. Set **Site URL** to: `https://marksyncr.com`
 
-### 4.2 Add Redirect URLs
+### 5.2 Add Redirect URLs
 Add these URLs to **Redirect URLs**:
 
 ```
@@ -123,9 +141,9 @@ Click **Save**.
 
 ---
 
-## Step 5: Configure Email Templates (Optional)
+## Step 6: Configure Email Templates (Optional)
 
-### 5.1 Customize Email Templates
+### 6.1 Customize Email Templates
 1. Go to **Authentication** → **Email Templates**
 2. You can customize these templates:
    - **Confirm signup** - Sent when user signs up
@@ -134,7 +152,7 @@ Click **Save**.
    - **Change Email Address** - Sent when user changes email
    - **Reset Password** - Sent for password reset
 
-### 5.2 Example: Customize Confirm Signup Template
+### 6.2 Example: Customize Confirm Signup Template
 
 **Subject:**
 ```
@@ -168,9 +186,9 @@ Confirm your MarkSyncr account
 
 ---
 
-## Step 6: Enable Email Confirmations
+## Step 7: Enable Email Confirmations
 
-### 6.1 Check Email Auth Settings
+### 7.1 Check Email Auth Settings
 1. Go to **Authentication** → **Providers**
 2. Click on **Email**
 3. Ensure these settings:
@@ -186,28 +204,31 @@ Confirm your MarkSyncr account
 ### Email not arriving?
 
 1. **Check spam/junk folder** - First place to look
-2. **Verify domain DNS** - Ensure SPF, DKIM, DMARC records are set
-3. **Check Resend logs** - Go to Resend dashboard → Emails to see delivery status
+2. **Verify domain DNS** - Ensure SPF, DKIM records are properly set
+3. **Check Mailgun logs** - Go to Mailgun dashboard → Logs → Messages to see delivery status
 4. **Check Supabase logs** - Go to Supabase dashboard → Logs → Auth
 5. **Test SMTP connection** - Use a tool like https://www.smtper.net to test
 
-### Common errors:
+### Common Errors
 
 | Error | Solution |
 |-------|----------|
 | "Email rate limit exceeded" | Wait or upgrade Supabase plan |
-| "Invalid SMTP credentials" | Double-check API key and username |
+| "Invalid SMTP credentials" | Double-check username and password |
 | "Connection refused" | Check port number (try 587 instead of 465) |
-| "Domain not verified" | Complete DNS verification in Resend |
+| "Domain not verified" | Complete DNS verification in Mailgun |
+| "Sender not authorized" | Use an email from your verified domain |
 
-### Rate Limits
+### Mailgun Logs
 
-| Provider | Free Tier Limit |
-|----------|-----------------|
-| Supabase built-in | 4/hour |
-| Resend | 100/day, 3000/month |
-| SendGrid | 100/day |
-| Mailgun | 5000/month (3 months) |
+To debug email delivery issues:
+1. Go to Mailgun dashboard → **Sending** → **Logs**
+2. Filter by your domain
+3. Look for:
+   - **Delivered** - Email was accepted by recipient's server
+   - **Dropped** - Email was rejected (check reason)
+   - **Bounced** - Recipient server rejected the email
+   - **Complained** - Recipient marked as spam
 
 ---
 
@@ -238,9 +259,11 @@ These should already be configured if your app is working.
 
 ## Quick Checklist
 
-- [ ] Created Resend account
-- [ ] Added and verified domain in Resend
-- [ ] Got Resend API key
+- [ ] Created Mailgun account
+- [ ] Added domain (`mg.marksyncr.com`) in Mailgun
+- [ ] Added DNS records (SPF, DKIM, CNAME)
+- [ ] Verified domain in Mailgun
+- [ ] Created SMTP credentials in Mailgun
 - [ ] Configured SMTP in Supabase dashboard
 - [ ] Sent test email successfully
 - [ ] Set Site URL to `https://marksyncr.com`
@@ -250,10 +273,23 @@ These should already be configured if your app is working.
 
 ---
 
+## Mailgun Pricing Reference
+
+| Plan | Emails/Month | Price |
+|------|--------------|-------|
+| Trial | 5,000 | Free (3 months) |
+| Foundation | 50,000 | $35/month |
+| Scale | 100,000 | $90/month |
+| Pay-as-you-go | Variable | ~$0.80/1,000 emails |
+
+For most startups, the trial period followed by pay-as-you-go is sufficient.
+
+---
+
 ## Support
 
 If you're still having issues:
 1. Check Supabase status: https://status.supabase.com
-2. Check Resend status: https://status.resend.com
-3. Supabase Discord: https://discord.supabase.com
-4. Resend Discord: https://discord.gg/resend
+2. Check Mailgun status: https://status.mailgun.com
+3. Mailgun documentation: https://documentation.mailgun.com
+4. Supabase Discord: https://discord.supabase.com
