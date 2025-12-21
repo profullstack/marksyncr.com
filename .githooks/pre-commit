@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Pre-commit hook to run build and tests before committing
+# This ensures code quality and prevents broken commits
+
+echo "🔨 Running pre-commit checks..."
+
+# Run build
+echo "📦 Building..."
+pnpm build
+if [ $? -ne 0 ]; then
+    echo "❌ Build failed. Please fix the errors before committing."
+    exit 1
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+pnpm test
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed. Please fix the failing tests before committing."
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
+exit 0
