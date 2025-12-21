@@ -18,15 +18,23 @@ export {
   detectChanges,
   applyChanges,
   hasChanges,
+  flattenBookmarks as flattenBookmarksForDiff,
+  areBookmarksEqual,
+  detectDeletions,
+  findConflicts,
+  getParentPath,
+  summarizeChanges,
 } from './diff-engine.js';
 
 // Conflict resolver
 export {
-  RESOLUTION_STRATEGIES,
-  detectConflicts,
   resolveConflict,
+  mergeBookmarks,
+  mergeChildren,
+  resolveDeleteModifyConflict,
   resolveAllConflicts,
-  createConflictResolver,
+  requiresManualResolution,
+  createConflictSummary,
 } from './conflict-resolver.js';
 
 // Sync engine

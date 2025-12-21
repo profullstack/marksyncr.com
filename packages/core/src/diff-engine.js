@@ -5,6 +5,11 @@
 import { CHANGE_TYPE } from '@marksyncr/types';
 
 /**
+ * Change types constant for external use
+ */
+export const CHANGE_TYPES = CHANGE_TYPE;
+
+/**
  * @typedef {import('@marksyncr/types').BookmarkItem} BookmarkItem
  * @typedef {import('@marksyncr/types').BookmarkData} BookmarkData
  * @typedef {import('@marksyncr/types').SyncChange} SyncChange
@@ -238,4 +243,148 @@ export const summarizeChanges = (changes) => {
   }
 
   return summary;
+};
+
+/**
+ * Checks if there are any changes between two bookmark data structures
+ * @param {BookmarkData} localBookmarks - Local bookmark data
+ * @param {BookmarkData} remoteBookmarks - Remote bookmark data
+ * @returns {boolean} True if there are changes
+ */
+export const hasChanges = (localBookmarks, remoteBookmarks) => {
+  const { localChanges, remoteChanges } = detectChanges(localBookmarks, remoteBookmarks);
+  return localChanges.length > 0 || remoteChanges.length > 0;
+};
+
+/**
+ * Applies changes to a bookmark data structure
+ * @param {BookmarkData} bookmarks - Base bookmark data
+ * @param {SyncChange[]} changes - Changes to apply
+ * @returns {BookmarkData} Updated bookmark data
+ */
+export const applyChanges = (bookmarks, changes) => {
+  // Deep clone the bookmarks to avoid mutation
+  const result = JSON.parse(JSON.stringify(bookmarks));
+  
+  for (const change of changes) {
+    switch (change.type) {
+      case CHANGE_TYPE.ADDED:
+        // Add the bookmark to the appropriate location
+        if (change.after) {
+          addBookmarkToPath(result, change.path, change.after);
+        }
+        break;
+      case CHANGE_TYPE.MODIFIED:
+        // Update the bookmark at the location
+        if (change.after) {
+          updateBookmarkAtPath(result, change.path, change.after);
+        }
+        break;
+      case CHANGE_TYPE.DELETED:
+        // Remove the bookmark from the location
+        removeBookmarkAtPath(result, change.path);
+        break;
+      case CHANGE_TYPE.MOVED:
+        // Move the bookmark to a new location
+        if (change.before && change.after) {
+          removeBookmarkAtPath(result, change.path);
+          addBookmarkToPath(result, change.newPath || change.path, change.after);
+        }
+        break;
+    }
+  }
+  
+  return result;
+};
+
+/**
+ * Helper to add a bookmark to a specific path
+ * @param {BookmarkData} bookmarks - Bookmark data
+ * @param {string} path - Path to add to
+ * @param {BookmarkItem} item - Item to add
+ */
+const addBookmarkToPath = (bookmarks, path, item) => {
+  const parts = path.split('/');
+  const rootKey = parts[0]; // toolbar, menu, or other
+  
+  if (!bookmarks[rootKey]) {
+    bookmarks[rootKey] = { id: rootKey, title: rootKey, type: 'folder', children: [] };
+  }
+  
+  let current = bookmarks[rootKey];
+  
+  // Navigate to parent folder
+  for (let i = 1; i < parts.length - 1; i++) {
+    const folderName = parts[i];
+    let folder = current.children?.find(c => c.title === folderName && c.type === 'folder');
+    if (!folder) {
+      folder = { id: `folder-${Date.now()}`, title: folderName, type: 'folder', children: [] };
+      current.children = current.children || [];
+      current.children.push(folder);
+    }
+    current = folder;
+  }
+  
+  // Add the item
+  current.children = current.children || [];
+  current.children.push(item);
+};
+
+/**
+ * Helper to update a bookmark at a specific path
+ * @param {BookmarkData} bookmarks - Bookmark data
+ * @param {string} path - Path to update
+ * @param {BookmarkItem} item - Updated item
+ */
+const updateBookmarkAtPath = (bookmarks, path, item) => {
+  const parts = path.split('/');
+  const rootKey = parts[0];
+  
+  if (!bookmarks[rootKey]) return;
+  
+  let current = bookmarks[rootKey];
+  
+  // Navigate to parent folder
+  for (let i = 1; i < parts.length - 1; i++) {
+    const folderName = parts[i];
+    const folder = current.children?.find(c => c.title === folderName && c.type === 'folder');
+    if (!folder) return;
+    current = folder;
+  }
+  
+  // Find and update the item
+  const itemName = parts[parts.length - 1];
+  const index = current.children?.findIndex(c => c.title === itemName);
+  if (index !== undefined && index >= 0) {
+    current.children[index] = { ...current.children[index], ...item };
+  }
+};
+
+/**
+ * Helper to remove a bookmark at a specific path
+ * @param {BookmarkData} bookmarks - Bookmark data
+ * @param {string} path - Path to remove
+ */
+const removeBookmarkAtPath = (bookmarks, path) => {
+  const parts = path.split('/');
+  const rootKey = parts[0];
+  
+  if (!bookmarks[rootKey]) return;
+  
+  let current = bookmarks[rootKey];
+  
+  // Navigate to parent folder
+  for (let i = 1; i < parts.length - 1; i++) {
+    const folderName = parts[i];
+    const folder = current.children?.find(c => c.title === folderName && c.type === 'folder');
+    if (!folder) return;
+    current = folder;
+  }
+  
+  // Find and remove the item
+  const itemName = parts[parts.length - 1];
+  const index = current.children?.findIndex(c => c.title === itemName);
+  if (index !== undefined && index >= 0) {
+    current.children.splice(index, 1);
+  }
 };
