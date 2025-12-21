@@ -19,13 +19,10 @@
     "default_title": "MarkSyncr"
   },
   "background": {
-    "scripts": ["background/index.js"],
+    "service_worker": "background/index.js",
     "type": "module"
   },
-  "options_ui": {
-    "page": "options/index.html",
-    "open_in_tab": true
-  },
+  "options_page": "options/index.html",
   "permissions": [
     "bookmarks",
     "storage",
@@ -50,11 +47,5 @@
       "resources": ["icons/*"],
       "matches": ["<all_urls>"]
     }
-  ],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "marksyncr@marksyncr.com",
-      "strict_min_version": "109.0"
-    }
-  }
+  ]
 }

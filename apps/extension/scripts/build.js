@@ -3,8 +3,8 @@
 /**
  * Build script for MarkSyncr browser extension
  *
- * Builds the extension for Chrome (MV3) and Firefox (MV2)
- * Usage: node scripts/build.js [chrome|firefox|all]
+ * Builds the extension for Chrome (MV3), Firefox (MV3), and Safari (MV3)
+ * Usage: node scripts/build.js [chrome|firefox|safari|all]
  */
 
 import { execSync } from 'node:child_process';
@@ -29,6 +29,7 @@ const ROOT_DIR = join(__dirname, '..');
 const BUILD_DIR = join(ROOT_DIR, 'dist');
 const CHROME_DIR = join(BUILD_DIR, 'chrome');
 const FIREFOX_DIR = join(BUILD_DIR, 'firefox');
+const SAFARI_DIR = join(BUILD_DIR, 'safari');
 
 /**
  * Clean build directories
@@ -43,6 +44,7 @@ function clean() {
   mkdirSync(BUILD_DIR, { recursive: true });
   mkdirSync(CHROME_DIR, { recursive: true });
   mkdirSync(FIREFOX_DIR, { recursive: true });
+  mkdirSync(SAFARI_DIR, { recursive: true });
 }
 
 /**
@@ -95,7 +97,7 @@ function buildChrome() {
     copyDirectorySync(viteOutput, CHROME_DIR);
   }
 
-  // Copy Chrome manifest
+  // Copy Chrome manifest as manifest.json
   const chromeManifest = readFileSync(join(ROOT_DIR, 'src/manifest.chrome.json'), 'utf-8');
   writeFileSync(join(CHROME_DIR, 'manifest.json'), chromeManifest);
 
@@ -115,7 +117,7 @@ function buildChrome() {
  * Copy manifest and assets for Firefox
  */
 function buildFirefox() {
-  console.log('🦊 Building Firefox extension (MV2)...');
+  console.log('🦊 Building Firefox extension (MV3)...');
 
   // Copy built files
   const viteOutput = join(ROOT_DIR, 'dist-vite');
@@ -123,7 +125,7 @@ function buildFirefox() {
     copyDirectorySync(viteOutput, FIREFOX_DIR);
   }
 
-  // Copy Firefox manifest
+  // Copy Firefox manifest as manifest.json
   const firefoxManifest = readFileSync(join(ROOT_DIR, 'src/manifest.firefox.json'), 'utf-8');
   writeFileSync(join(FIREFOX_DIR, 'manifest.json'), firefoxManifest);
 
@@ -137,6 +139,40 @@ function buildFirefox() {
   }
 
   console.log('✅ Firefox build complete');
+}
+
+/**
+ * Copy manifest and assets for Safari
+ */
+function buildSafari() {
+  console.log('🧭 Building Safari extension (MV3)...');
+
+  // Copy built files
+  const viteOutput = join(ROOT_DIR, 'dist-vite');
+  if (existsSync(viteOutput)) {
+    copyDirectorySync(viteOutput, SAFARI_DIR);
+  }
+
+  // Copy Safari manifest as manifest.json
+  const safariManifest = readFileSync(join(ROOT_DIR, 'src/manifest.safari.json'), 'utf-8');
+  writeFileSync(join(SAFARI_DIR, 'manifest.json'), safariManifest);
+
+  // Copy icons
+  copyIcons(SAFARI_DIR);
+
+  // Copy background script
+  const bgSrc = join(ROOT_DIR, 'src/background/index.js');
+  if (existsSync(bgSrc)) {
+    copyFileSync(bgSrc, join(SAFARI_DIR, 'background.js'));
+  }
+
+  console.log('✅ Safari build complete');
+  console.log('');
+  console.log('📝 Note: Safari requires additional steps:');
+  console.log('   1. Use Xcode to create a Safari Web Extension project');
+  console.log('   2. Copy the contents of dist/safari into the extension folder');
+  console.log('   3. Build and sign with Xcode');
+  console.log('   See: https://developer.apple.com/documentation/safariservices/safari_web_extensions');
 }
 
 /**
@@ -168,7 +204,7 @@ function copyIcons(targetDir) {
 /**
  * Create ZIP packages for distribution
  */
-async function createPackages() {
+async function createPackages(targets) {
   console.log('📦 Creating distribution packages...');
 
   let archiver;
@@ -181,10 +217,19 @@ async function createPackages() {
   }
 
   // Create Chrome ZIP
-  await createZip(archiver, CHROME_DIR, join(BUILD_DIR, 'marksyncr-chrome.zip'));
+  if (targets.includes('chrome')) {
+    await createZip(archiver, CHROME_DIR, join(BUILD_DIR, 'marksyncr-chrome.zip'));
+  }
 
-  // Create Firefox ZIP (XPI)
-  await createZip(archiver, FIREFOX_DIR, join(BUILD_DIR, 'marksyncr-firefox.xpi'));
+  // Create Firefox ZIP
+  if (targets.includes('firefox')) {
+    await createZip(archiver, FIREFOX_DIR, join(BUILD_DIR, 'marksyncr-firefox.zip'));
+  }
+
+  // Create Safari ZIP
+  if (targets.includes('safari')) {
+    await createZip(archiver, SAFARI_DIR, join(BUILD_DIR, 'marksyncr-safari.zip'));
+  }
 
   console.log('✅ Packages created');
 }
@@ -224,28 +269,45 @@ async function main() {
     clean();
     buildVite();
 
+    const targets = [];
+
     switch (target) {
       case 'chrome':
         buildChrome();
+        targets.push('chrome');
         break;
       case 'firefox':
         buildFirefox();
+        targets.push('firefox');
+        break;
+      case 'safari':
+        buildSafari();
+        targets.push('safari');
         break;
       case 'all':
       default:
         buildChrome();
         buildFirefox();
+        buildSafari();
+        targets.push('chrome', 'firefox', 'safari');
         break;
     }
 
-    await createPackages();
+    await createPackages(targets);
 
     console.log('');
     console.log('🎉 Build complete!');
     console.log('');
     console.log('Output:');
-    console.log(`   Chrome: ${CHROME_DIR}`);
-    console.log(`   Firefox: ${FIREFOX_DIR}`);
+    if (targets.includes('chrome')) {
+      console.log(`   Chrome:  ${CHROME_DIR}`);
+    }
+    if (targets.includes('firefox')) {
+      console.log(`   Firefox: ${FIREFOX_DIR}`);
+    }
+    if (targets.includes('safari')) {
+      console.log(`   Safari:  ${SAFARI_DIR}`);
+    }
     console.log('');
     console.log('To load in Chrome:');
     console.log('   1. Go to chrome://extensions');
@@ -258,6 +320,12 @@ async function main() {
     console.log('   2. Click "This Firefox"');
     console.log('   3. Click "Load Temporary Add-on"');
     console.log(`   4. Select: ${FIREFOX_DIR}/manifest.json`);
+    console.log('');
+    console.log('To load in Safari:');
+    console.log('   1. Open Xcode and create a Safari Web Extension project');
+    console.log('   2. Copy dist/safari contents to the extension folder');
+    console.log('   3. Build and run from Xcode');
+    console.log('   4. Enable in Safari > Preferences > Extensions');
   } catch (error) {
     console.error('❌ Build failed:', error.message);
     process.exit(1);

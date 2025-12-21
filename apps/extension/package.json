@@ -8,6 +8,7 @@
     "build": "node scripts/build.js all",
     "build:chrome": "node scripts/build.js chrome",
     "build:firefox": "node scripts/build.js firefox",
+    "build:safari": "node scripts/build.js safari",
     "build:vite": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx",
