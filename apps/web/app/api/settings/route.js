@@ -59,6 +59,10 @@ export async function GET(request) {
 
     if (settingsError && settingsError.code !== 'PGRST116') {
       console.error('Settings fetch error:', settingsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch settings' },
+        { status: 500, headers }
+      );
     }
 
     // Return settings or defaults
