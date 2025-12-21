@@ -32,7 +32,7 @@ const nextConfig = {
     // Disable image optimization in Docker for simpler deployment
     unoptimized: process.env.NODE_ENV === 'production',
   },
-  // Headers for security
+  // Headers for security and CORS
   async headers() {
     return [
       {
@@ -49,6 +49,28 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+      // CORS headers for API routes (needed for browser extension)
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
+          },
+          {
+            key: 'Access-Control-Max-Age',
+            value: '86400',
           },
         ],
       },

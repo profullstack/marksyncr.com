@@ -40,7 +40,9 @@
     "https://api.dropboxapi.com/*",
     "https://content.dropboxapi.com/*",
     "https://www.googleapis.com/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://marksyncr.com/*",
+    "http://localhost:3000/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

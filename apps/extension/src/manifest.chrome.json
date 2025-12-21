@@ -37,7 +37,9 @@
     "https://api.dropboxapi.com/*",
     "https://content.dropboxapi.com/*",
     "https://www.googleapis.com/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://marksyncr.com/*",
+    "http://localhost:3000/*"
   ],
   "oauth2": {
     "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
