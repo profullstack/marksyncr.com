@@ -3,7 +3,7 @@
 
 -- Bookmark version history table
 CREATE TABLE IF NOT EXISTS public.bookmark_versions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     version INTEGER NOT NULL,
     bookmark_data JSONB NOT NULL,

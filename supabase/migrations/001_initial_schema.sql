@@ -1,8 +1,7 @@
 -- MarkSyncr Initial Database Schema
 -- This migration creates the core tables for user management, subscriptions, and bookmark sync
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Note: gen_random_uuid() is built into PostgreSQL 13+ and doesn't require an extension
 
 -- Users table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.users (
@@ -18,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 -- Subscriptions table
 CREATE TABLE IF NOT EXISTS public.subscriptions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'team')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due', 'trialing')),
@@ -34,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
 
 -- OAuth tokens table (encrypted storage for OAuth credentials)
 CREATE TABLE IF NOT EXISTS public.oauth_tokens (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL CHECK (provider IN ('github', 'dropbox', 'google-drive')),
     access_token_encrypted TEXT NOT NULL,
@@ -47,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.oauth_tokens (
 
 -- Cloud bookmarks table (for paid tier users)
 CREATE TABLE IF NOT EXISTS public.cloud_bookmarks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     bookmark_data JSONB NOT NULL,
     checksum TEXT NOT NULL,
@@ -58,7 +57,7 @@ CREATE TABLE IF NOT EXISTS public.cloud_bookmarks (
 
 -- Sync state table (tracks sync state per device)
 CREATE TABLE IF NOT EXISTS public.sync_state (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     device_id TEXT NOT NULL,
     device_name TEXT,
@@ -76,7 +75,7 @@ CREATE TABLE IF NOT EXISTS public.sync_state (
 
 -- Devices table (tracks user devices)
 CREATE TABLE IF NOT EXISTS public.devices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     device_id TEXT NOT NULL,
     name TEXT NOT NULL,
