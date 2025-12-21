@@ -370,12 +370,14 @@ browser.runtime.onInstalled.addListener((details) => {
         conflictResolution: 'newest-wins',
       },
       sources: [
-        { id: 'local-file', name: 'Local File', type: 'local-file', connected: false },
-        { id: 'github', name: 'GitHub', type: 'github', connected: false },
-        { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false },
-        { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false },
-        { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false },
+        { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true, description: 'Sync your browser bookmarks' },
+        { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false, description: 'Sync to cloud (requires login)' },
+        { id: 'github', name: 'GitHub', type: 'github', connected: false, description: 'Sync to GitHub repository' },
+        { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false, description: 'Sync to Dropbox' },
+        { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false, description: 'Sync to Google Drive' },
       ],
+      // Auto-select browser bookmarks as default source
+      selectedSource: 'browser-bookmarks',
     });
   }
 });

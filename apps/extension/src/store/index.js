@@ -3,14 +3,15 @@ import { persist } from 'zustand/middleware';
 import {
   signInWithEmail,
   signUpWithEmail,
-  signOut as supabaseSignOut,
+  signOut as apiSignOut,
   getSession,
   getUser,
   fetchSubscription,
   fetchCloudSettings,
   saveCloudSettings,
-  onAuthStateChange,
-} from '../lib/supabase.js';
+  saveBookmarkVersion,
+  fetchTags as apiFetchTags,
+} from '../lib/api.js';
 
 /**
  * @typedef {'synced' | 'syncing' | 'error' | 'pending' | 'disconnected'} SyncStatus
@@ -62,11 +63,11 @@ import {
 
 // Default sources available
 const DEFAULT_SOURCES = [
-  { id: 'local-file', name: 'Local File', type: 'local-file', connected: false },
-  { id: 'github', name: 'GitHub', type: 'github', connected: false },
-  { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false },
-  { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false },
-  { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false },
+  { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true, description: 'Sync your browser bookmarks' },
+  { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false, description: 'Sync to cloud (requires login)' },
+  { id: 'github', name: 'GitHub', type: 'github', connected: false, description: 'Sync to GitHub repository' },
+  { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false, description: 'Sync to Dropbox' },
+  { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false, description: 'Sync to Google Drive' },
 ];
 
 // Default settings
@@ -236,7 +237,7 @@ export const useStore = create(
         set({ isAuthLoading: true });
 
         try {
-          await supabaseSignOut();
+          await apiSignOut();
           
           set({
             user: null,

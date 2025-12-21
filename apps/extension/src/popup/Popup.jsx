@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/index.js';
 import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
 import { LoginPanel } from './components/LoginPanel.jsx';
@@ -119,7 +119,9 @@ function StatusIndicator({ status }) {
 }
 
 // Source selector component
-function SourceSelector({ sources, selectedSource, onSelect }) {
+function SourceSelector({ sources, selectedSource, onSelect, onConnect, onDisconnect }) {
+  const selectedSourceObj = sources.find((s) => s.id === selectedSource);
+
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-slate-700">Sync Source</label>
@@ -131,10 +133,41 @@ function SourceSelector({ sources, selectedSource, onSelect }) {
         <option value="">Select a source...</option>
         {sources.map((source) => (
           <option key={source.id} value={source.id}>
-            {source.name}
+            {source.name} {source.connected ? '✓' : ''}
           </option>
         ))}
       </select>
+
+      {/* Connection status and button */}
+      {selectedSource && selectedSourceObj && (
+        <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+          <div className="flex items-center space-x-2">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                selectedSourceObj.connected ? 'bg-green-500' : 'bg-slate-400'
+              }`}
+            />
+            <span className="text-sm text-slate-600">
+              {selectedSourceObj.connected ? 'Connected' : 'Not connected'}
+            </span>
+          </div>
+          {selectedSourceObj.connected ? (
+            <button
+              onClick={() => onDisconnect(selectedSource)}
+              className="text-sm text-red-600 hover:text-red-700"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              onClick={() => onConnect(selectedSource)}
+              className="rounded-lg bg-primary-600 px-3 py-1 text-sm text-white hover:bg-primary-700"
+            >
+              Connect
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -211,6 +244,8 @@ export function Popup() {
     setSelectedSource,
     triggerSync,
     initialize,
+    connectSource,
+    disconnectSource,
     // Pro features
     subscription,
     tags,
@@ -235,6 +270,8 @@ export function Popup() {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'pro' | 'account'
+  const [exportMessage, setExportMessage] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -260,6 +297,178 @@ export function Popup() {
     } else if (typeof browser !== 'undefined' && browser.runtime) {
       browser.runtime.openOptionsPage();
     }
+  };
+
+  /**
+   * Export bookmarks to HTML file
+   */
+  const handleExport = async () => {
+    try {
+      const browserAPI = typeof chrome !== 'undefined' && chrome.bookmarks ? chrome : browser;
+      const tree = await browserAPI.bookmarks.getTree();
+      
+      // Convert browser bookmarks to exportable format
+      const convertNode = (node) => {
+        if (node.url) {
+          return {
+            type: 'bookmark',
+            title: node.title || '',
+            url: node.url,
+            dateAdded: node.dateAdded,
+          };
+        }
+        return {
+          type: 'folder',
+          title: node.title || '',
+          children: (node.children || []).map(convertNode),
+          dateAdded: node.dateAdded,
+        };
+      };
+
+      const bookmarks = tree[0]?.children?.map(convertNode) || [];
+      
+      // Format to Netscape HTML
+      const escapeHtml = (str) => {
+        if (!str) return '';
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      };
+
+      const formatItem = (item, indent = '    ') => {
+        if (item.type === 'folder' || item.children) {
+          const children = (item.children || [])
+            .map((child) => formatItem(child, indent + '    '))
+            .join('\n');
+          
+          return `${indent}<DT><H3 ADD_DATE="${Math.floor((item.dateAdded || Date.now()) / 1000)}">${escapeHtml(item.title)}</H3>
+${indent}<DL><p>
+${children}
+${indent}</DL><p>`;
+        }
+
+        const addDate = item.dateAdded
+          ? ` ADD_DATE="${Math.floor(item.dateAdded / 1000)}"`
+          : '';
+        
+        return `${indent}<DT><A HREF="${escapeHtml(item.url)}"${addDate}>${escapeHtml(item.title)}</A>`;
+      };
+
+      const content = bookmarks.map((b) => formatItem(b)).join('\n');
+      const html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file.
+     It will be read and overwritten.
+     DO NOT EDIT! -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+${content}
+</DL><p>`;
+
+      // Create download
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bookmarks-${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportMessage({ type: 'success', text: 'Bookmarks exported successfully!' });
+      setTimeout(() => setExportMessage(null), 3000);
+    } catch (err) {
+      console.error('Export failed:', err);
+      setExportMessage({ type: 'error', text: `Export failed: ${err.message}` });
+      setTimeout(() => setExportMessage(null), 5000);
+    }
+  };
+
+  /**
+   * Handle import file selection
+   */
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  /**
+   * Process imported file
+   */
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      
+      // Parse Netscape HTML format
+      const bookmarks = [];
+      
+      const parseFolder = (htmlContent) => {
+        const items = [];
+        const bookmarkRegex = /<DT><A\s+HREF="([^"]*)"[^>]*>([^<]*)<\/A>/gi;
+        
+        let match;
+        while ((match = bookmarkRegex.exec(htmlContent)) !== null) {
+          items.push({
+            title: match[2] || 'Untitled',
+            url: match[1],
+          });
+        }
+        return items;
+      };
+
+      const parsedBookmarks = parseFolder(content);
+      
+      if (parsedBookmarks.length === 0) {
+        setExportMessage({ type: 'error', text: 'No bookmarks found in file' });
+        setTimeout(() => setExportMessage(null), 5000);
+        return;
+      }
+
+      // Import bookmarks using browser API
+      const browserAPI = typeof chrome !== 'undefined' && chrome.bookmarks ? chrome : browser;
+      
+      // Create an "Imported" folder
+      const importFolder = await browserAPI.bookmarks.create({
+        title: `Imported ${new Date().toLocaleDateString()}`,
+      });
+
+      // Add bookmarks to the folder
+      let importedCount = 0;
+      for (const bookmark of parsedBookmarks) {
+        try {
+          await browserAPI.bookmarks.create({
+            parentId: importFolder.id,
+            title: bookmark.title,
+            url: bookmark.url,
+          });
+          importedCount++;
+        } catch (err) {
+          console.warn('Failed to import bookmark:', bookmark.title, err);
+        }
+      }
+
+      setExportMessage({
+        type: 'success',
+        text: `Imported ${importedCount} bookmarks!`
+      });
+      setTimeout(() => setExportMessage(null), 3000);
+
+      // Refresh stats
+      await initialize();
+    } catch (err) {
+      console.error('Import failed:', err);
+      setExportMessage({ type: 'error', text: `Import failed: ${err.message}` });
+      setTimeout(() => setExportMessage(null), 5000);
+    }
+
+    // Reset file input
+    event.target.value = '';
   };
 
   if (!isInitialized) {
@@ -370,6 +579,8 @@ export function Popup() {
               sources={sources}
               selectedSource={selectedSource}
               onSelect={setSelectedSource}
+              onConnect={connectSource}
+              onDisconnect={disconnectSource}
             />
 
             {/* Sync button */}
@@ -382,20 +593,39 @@ export function Popup() {
               <span>{status === 'syncing' ? 'Syncing...' : 'Sync Now'}</span>
             </button>
 
+            {/* Export/Import message */}
+            {exportMessage && (
+              <div className={`rounded-lg p-3 text-sm ${
+                exportMessage.type === 'success'
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-red-50 text-red-700'
+              }`}>
+                {exportMessage.text}
+              </div>
+            )}
+
             {/* Quick actions */}
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => {/* TODO: Implement export */}}
+                onClick={handleExport}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
                 Export Bookmarks
               </button>
               <button
-                onClick={() => {/* TODO: Implement import */}}
+                onClick={handleImportClick}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
                 Import Bookmarks
               </button>
+              {/* Hidden file input for import */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".html,.htm"
+                onChange={handleFileChange}
+                className="hidden"
+              />
             </div>
 
             {/* Version History */}
