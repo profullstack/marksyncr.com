@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import Header from '../../components/Header';
+import Footer from '../../components/Footer';
 
 export const metadata = {
   title: 'Privacy Policy - MarkSyncr',
@@ -8,152 +9,135 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navigation */}
-      <nav className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2">
-            <svg
-              className="h-8 w-8 text-primary-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-            <span className="text-xl font-bold text-slate-900">MarkSyncr</span>
-          </Link>
-        </div>
-      </nav>
+      <Header />
 
-      {/* Content */}
-      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-slate-900">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-slate-500">Last updated: December 21, 2024</p>
+      <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+        <h1 className="mb-8 text-4xl font-bold text-slate-900">Privacy Policy</h1>
+        <p className="mb-8 text-slate-600">Last updated: December 2024</p>
 
-        <div className="prose prose-slate mt-8 max-w-none">
-          <h2>1. Introduction</h2>
-          <p>
-            MarkSyncr (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. 
-            This Privacy Policy explains how we collect, use, disclose, and safeguard your 
-            information when you use our bookmark synchronization service.
-          </p>
+        <div className="prose prose-slate max-w-none">
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">1. Introduction</h2>
+            <p className="mb-4 text-slate-600">
+              MarkSyncr (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. 
+              This Privacy Policy explains how we collect, use, disclose, and safeguard your 
+              information when you use our browser extension and web service.
+            </p>
+          </section>
 
-          <h2>2. Information We Collect</h2>
-          <h3>2.1 Account Information</h3>
-          <p>When you create an account, we collect:</p>
-          <ul>
-            <li>Email address</li>
-            <li>Password (encrypted)</li>
-            <li>OAuth tokens for connected services (GitHub, Dropbox, Google Drive)</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">2. Information We Collect</h2>
+            
+            <h3 className="mb-2 text-xl font-medium text-slate-800">2.1 Account Information</h3>
+            <p className="mb-4 text-slate-600">
+              When you create an account, we collect your email address and, if you choose 
+              OAuth login, basic profile information from your identity provider (GitHub or Google).
+            </p>
 
-          <h3>2.2 Bookmark Data</h3>
-          <p>
-            <strong>Free Tier:</strong> Your bookmarks are stored in your own storage provider 
-            (GitHub, Dropbox, Google Drive, or local file). We do not have access to this data.
-          </p>
-          <p>
-            <strong>Pro/Team Tier:</strong> If you use MarkSyncr Cloud storage, your bookmarks 
-            are stored encrypted on our servers.
-          </p>
+            <h3 className="mb-2 text-xl font-medium text-slate-800">2.2 Bookmark Data</h3>
+            <p className="mb-4 text-slate-600">
+              If you use MarkSyncr Cloud storage (paid tier), your bookmarks are stored on our 
+              servers. If you use third-party storage (GitHub, Dropbox, Google Drive), your 
+              bookmarks are stored in your own accounts and we do not have access to them.
+            </p>
 
-          <h3>2.3 Usage Data</h3>
-          <p>We automatically collect:</p>
-          <ul>
-            <li>Browser type and version</li>
-            <li>Sync frequency and timing</li>
-            <li>Error logs (anonymized)</li>
-            <li>Feature usage statistics</li>
-          </ul>
+            <h3 className="mb-2 text-xl font-medium text-slate-800">2.3 Usage Data</h3>
+            <p className="mb-4 text-slate-600">
+              We collect anonymous usage statistics to improve our service, including sync 
+              frequency, error rates, and feature usage. This data cannot be used to identify you.
+            </p>
+          </section>
 
-          <h2>3. How We Use Your Information</h2>
-          <p>We use the collected information to:</p>
-          <ul>
-            <li>Provide and maintain the bookmark sync service</li>
-            <li>Process your subscription payments</li>
-            <li>Send service-related communications</li>
-            <li>Improve our service and develop new features</li>
-            <li>Detect and prevent fraud or abuse</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">3. How We Use Your Information</h2>
+            <ul className="mb-4 list-disc pl-6 text-slate-600">
+              <li className="mb-2">To provide and maintain our service</li>
+              <li className="mb-2">To sync your bookmarks across devices</li>
+              <li className="mb-2">To send you important service updates</li>
+              <li className="mb-2">To respond to your support requests</li>
+              <li className="mb-2">To improve our service based on usage patterns</li>
+            </ul>
+          </section>
 
-          <h2>4. Data Storage and Security</h2>
-          <p>
-            We implement industry-standard security measures to protect your data:
-          </p>
-          <ul>
-            <li>All data is encrypted in transit using TLS 1.3</li>
-            <li>Bookmark data in MarkSyncr Cloud is encrypted at rest</li>
-            <li>OAuth tokens are stored encrypted</li>
-            <li>We use Supabase for secure data storage with Row Level Security</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">4. Data Storage and Security</h2>
+            <p className="mb-4 text-slate-600">
+              We use industry-standard security measures to protect your data. Your account 
+              information is stored securely using Supabase, which provides encryption at rest 
+              and in transit.
+            </p>
+            <p className="mb-4 text-slate-600">
+              For users of third-party storage options, your bookmark data is protected by the 
+              security measures of your chosen provider (GitHub, Dropbox, or Google Drive).
+            </p>
+          </section>
 
-          <h2>5. Third-Party Services</h2>
-          <p>We integrate with the following third-party services:</p>
-          <ul>
-            <li><strong>Supabase:</strong> Authentication and database</li>
-            <li><strong>Stripe:</strong> Payment processing</li>
-            <li><strong>GitHub/Dropbox/Google Drive:</strong> Optional bookmark storage</li>
-          </ul>
-          <p>
-            Each of these services has their own privacy policy. We encourage you to review them.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">5. Third-Party Services</h2>
+            <p className="mb-4 text-slate-600">
+              We integrate with the following third-party services:
+            </p>
+            <ul className="mb-4 list-disc pl-6 text-slate-600">
+              <li className="mb-2"><strong>Supabase</strong> - Authentication and database</li>
+              <li className="mb-2"><strong>Stripe</strong> - Payment processing</li>
+              <li className="mb-2"><strong>GitHub, Dropbox, Google Drive</strong> - Optional storage providers</li>
+            </ul>
+            <p className="mb-4 text-slate-600">
+              Each of these services has their own privacy policies that govern their use of your data.
+            </p>
+          </section>
 
-          <h2>6. Data Retention</h2>
-          <p>
-            We retain your account data for as long as your account is active. If you delete 
-            your account, we will delete your data within 30 days, except where we are required 
-            to retain it for legal purposes.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">6. Your Rights</h2>
+            <p className="mb-4 text-slate-600">You have the right to:</p>
+            <ul className="mb-4 list-disc pl-6 text-slate-600">
+              <li className="mb-2">Access your personal data</li>
+              <li className="mb-2">Correct inaccurate data</li>
+              <li className="mb-2">Delete your account and associated data</li>
+              <li className="mb-2">Export your bookmark data</li>
+              <li className="mb-2">Opt out of marketing communications</li>
+            </ul>
+          </section>
 
-          <h2>7. Your Rights</h2>
-          <p>You have the right to:</p>
-          <ul>
-            <li>Access your personal data</li>
-            <li>Correct inaccurate data</li>
-            <li>Delete your account and data</li>
-            <li>Export your bookmark data</li>
-            <li>Opt out of marketing communications</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">7. Data Retention</h2>
+            <p className="mb-4 text-slate-600">
+              We retain your account information for as long as your account is active. If you 
+              delete your account, we will delete your personal data within 30 days, except 
+              where we are required to retain it for legal purposes.
+            </p>
+          </section>
 
-          <h2>8. Cookies</h2>
-          <p>
-            We use essential cookies for authentication and session management. We do not use 
-            tracking cookies or third-party advertising cookies.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">8. Children&apos;s Privacy</h2>
+            <p className="mb-4 text-slate-600">
+              Our service is not intended for children under 13 years of age. We do not 
+              knowingly collect personal information from children under 13.
+            </p>
+          </section>
 
-          <h2>9. Children&apos;s Privacy</h2>
-          <p>
-            Our service is not intended for children under 13. We do not knowingly collect 
-            personal information from children under 13.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">9. Changes to This Policy</h2>
+            <p className="mb-4 text-slate-600">
+              We may update this Privacy Policy from time to time. We will notify you of any 
+              changes by posting the new Privacy Policy on this page and updating the 
+              &quot;Last updated&quot; date.
+            </p>
+          </section>
 
-          <h2>10. Changes to This Policy</h2>
-          <p>
-            We may update this Privacy Policy from time to time. We will notify you of any 
-            changes by posting the new Privacy Policy on this page and updating the 
-            &quot;Last updated&quot; date.
-          </p>
-
-          <h2>11. Contact Us</h2>
-          <p>
-            If you have any questions about this Privacy Policy, please contact us at:
-          </p>
-          <ul>
-            <li>Email: privacy@marksyncr.com</li>
-          </ul>
-        </div>
-
-        <div className="mt-12 border-t border-slate-200 pt-8">
-          <Link href="/" className="text-primary-600 hover:text-primary-700">
-            ← Back to Home
-          </Link>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">10. Contact Us</h2>
+            <p className="mb-4 text-slate-600">
+              If you have any questions about this Privacy Policy, please contact us at:
+            </p>
+            <p className="text-slate-600">
+              <strong>Email:</strong> privacy@marksyncr.com
+            </p>
+          </section>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

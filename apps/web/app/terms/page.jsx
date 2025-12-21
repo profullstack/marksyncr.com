@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import Header from '../../components/Header';
+import Footer from '../../components/Footer';
 
 export const metadata = {
   title: 'Terms of Service - MarkSyncr',
@@ -8,199 +9,176 @@ export const metadata = {
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navigation */}
-      <nav className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2">
-            <svg
-              className="h-8 w-8 text-primary-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-            <span className="text-xl font-bold text-slate-900">MarkSyncr</span>
-          </Link>
-        </div>
-      </nav>
+      <Header />
 
-      {/* Content */}
-      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-slate-900">Terms of Service</h1>
-        <p className="mt-2 text-sm text-slate-500">Last updated: December 21, 2024</p>
+      <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+        <h1 className="mb-8 text-4xl font-bold text-slate-900">Terms of Service</h1>
+        <p className="mb-8 text-slate-600">Last updated: December 2024</p>
 
-        <div className="prose prose-slate mt-8 max-w-none">
-          <h2>1. Acceptance of Terms</h2>
-          <p>
-            By accessing or using MarkSyncr (&quot;the Service&quot;), you agree to be bound by these 
-            Terms of Service (&quot;Terms&quot;). If you do not agree to these Terms, please do not 
-            use the Service.
-          </p>
+        <div className="prose prose-slate max-w-none">
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">1. Acceptance of Terms</h2>
+            <p className="mb-4 text-slate-600">
+              By accessing or using MarkSyncr (&quot;the Service&quot;), you agree to be bound by these 
+              Terms of Service. If you do not agree to these terms, please do not use the Service.
+            </p>
+          </section>
 
-          <h2>2. Description of Service</h2>
-          <p>
-            MarkSyncr is a bookmark synchronization service that allows you to sync your 
-            browser bookmarks across multiple browsers and devices. The Service includes:
-          </p>
-          <ul>
-            <li>Browser extensions for Chrome, Firefox, and Safari</li>
-            <li>Integration with third-party storage providers (GitHub, Dropbox, Google Drive)</li>
-            <li>Optional cloud storage for paid subscribers</li>
-            <li>Web dashboard for managing your account and bookmarks</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">2. Description of Service</h2>
+            <p className="mb-4 text-slate-600">
+              MarkSyncr is a browser extension and web service that allows you to synchronize 
+              your bookmarks across multiple browsers and devices. The Service supports various 
+              storage options including GitHub, Dropbox, Google Drive, local files, and our 
+              managed cloud storage.
+            </p>
+          </section>
 
-          <h2>3. Account Registration</h2>
-          <p>
-            To use certain features of the Service, you must create an account. You agree to:
-          </p>
-          <ul>
-            <li>Provide accurate and complete information</li>
-            <li>Maintain the security of your account credentials</li>
-            <li>Notify us immediately of any unauthorized access</li>
-            <li>Be responsible for all activities under your account</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">3. Account Registration</h2>
+            <p className="mb-4 text-slate-600">
+              To use certain features of the Service, you must create an account. You agree to:
+            </p>
+            <ul className="mb-4 list-disc pl-6 text-slate-600">
+              <li className="mb-2">Provide accurate and complete registration information</li>
+              <li className="mb-2">Maintain the security of your account credentials</li>
+              <li className="mb-2">Notify us immediately of any unauthorized access</li>
+              <li className="mb-2">Be responsible for all activities under your account</li>
+            </ul>
+          </section>
 
-          <h2>4. Subscription Plans</h2>
-          <h3>4.1 Free Plan</h3>
-          <p>
-            The Free plan includes unlimited bookmark sync using your own storage providers 
-            (GitHub, Dropbox, Google Drive, or local file).
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">4. Subscription Plans</h2>
+            
+            <h3 className="mb-2 text-xl font-medium text-slate-800">4.1 Free Plan</h3>
+            <p className="mb-4 text-slate-600">
+              The free plan allows you to sync bookmarks using your own storage providers 
+              (GitHub, Dropbox, Google Drive, or local files) at no cost.
+            </p>
 
-          <h3>4.2 Pro Plan</h3>
-          <p>
-            The Pro plan ($5/month) includes all Free features plus:
-          </p>
-          <ul>
-            <li>MarkSyncr Cloud storage</li>
-            <li>Priority sync</li>
-            <li>Safari support</li>
-            <li>30-day version history</li>
-            <li>Priority support</li>
-          </ul>
+            <h3 className="mb-2 text-xl font-medium text-slate-800">4.2 Paid Plans</h3>
+            <p className="mb-4 text-slate-600">
+              Paid plans (Pro and Team) provide access to MarkSyncr Cloud storage and additional 
+              features. Subscription fees are billed monthly or annually as selected at signup.
+            </p>
 
-          <h3>4.3 Team Plan</h3>
-          <p>
-            The Team plan ($12/month per user) includes all Pro features plus:
-          </p>
-          <ul>
-            <li>Shared bookmark folders</li>
-            <li>Team management</li>
-            <li>Admin controls</li>
-            <li>1-year version history</li>
-            <li>Dedicated support</li>
-          </ul>
+            <h3 className="mb-2 text-xl font-medium text-slate-800">4.3 Billing</h3>
+            <p className="mb-4 text-slate-600">
+              Payments are processed through Stripe. By subscribing to a paid plan, you authorize 
+              us to charge your payment method on a recurring basis until you cancel.
+            </p>
 
-          <h2>5. Payment Terms</h2>
-          <p>
-            For paid subscriptions:
-          </p>
-          <ul>
-            <li>Payments are processed through Stripe</li>
-            <li>Subscriptions are billed monthly</li>
-            <li>You may cancel at any time; access continues until the end of the billing period</li>
-            <li>Refunds are provided at our discretion</li>
-          </ul>
+            <h3 className="mb-2 text-xl font-medium text-slate-800">4.4 Cancellation</h3>
+            <p className="mb-4 text-slate-600">
+              You may cancel your subscription at any time. Upon cancellation, you will retain 
+              access to paid features until the end of your current billing period.
+            </p>
+          </section>
 
-          <h2>6. Acceptable Use</h2>
-          <p>You agree not to:</p>
-          <ul>
-            <li>Use the Service for any illegal purpose</li>
-            <li>Attempt to gain unauthorized access to the Service</li>
-            <li>Interfere with or disrupt the Service</li>
-            <li>Upload malicious content or malware</li>
-            <li>Resell or redistribute the Service without permission</li>
-            <li>Use automated systems to access the Service excessively</li>
-          </ul>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">5. Acceptable Use</h2>
+            <p className="mb-4 text-slate-600">You agree not to:</p>
+            <ul className="mb-4 list-disc pl-6 text-slate-600">
+              <li className="mb-2">Use the Service for any illegal purpose</li>
+              <li className="mb-2">Attempt to gain unauthorized access to our systems</li>
+              <li className="mb-2">Interfere with or disrupt the Service</li>
+              <li className="mb-2">Upload malicious content or malware</li>
+              <li className="mb-2">Violate any applicable laws or regulations</li>
+              <li className="mb-2">Resell or redistribute the Service without permission</li>
+            </ul>
+          </section>
 
-          <h2>7. Intellectual Property</h2>
-          <p>
-            The Service, including its design, code, and content, is owned by MarkSyncr and 
-            protected by intellectual property laws. You retain ownership of your bookmark data.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">6. Intellectual Property</h2>
+            <p className="mb-4 text-slate-600">
+              The Service, including its original content, features, and functionality, is owned 
+              by MarkSyncr and is protected by international copyright, trademark, and other 
+              intellectual property laws.
+            </p>
+            <p className="mb-4 text-slate-600">
+              You retain ownership of your bookmark data. By using the Service, you grant us a 
+              limited license to store and process your data solely for the purpose of providing 
+              the Service.
+            </p>
+          </section>
 
-          <h2>8. Third-Party Services</h2>
-          <p>
-            The Service integrates with third-party services (GitHub, Dropbox, Google Drive, 
-            Stripe). Your use of these services is subject to their respective terms and 
-            privacy policies.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">7. Third-Party Services</h2>
+            <p className="mb-4 text-slate-600">
+              The Service integrates with third-party services (GitHub, Dropbox, Google Drive, 
+              Stripe). Your use of these services is subject to their respective terms of service 
+              and privacy policies.
+            </p>
+          </section>
 
-          <h2>9. Data and Privacy</h2>
-          <p>
-            Your use of the Service is also governed by our{' '}
-            <Link href="/privacy" className="text-primary-600 hover:text-primary-700">
-              Privacy Policy
-            </Link>
-            , which describes how we collect, use, and protect your data.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">8. Disclaimer of Warranties</h2>
+            <p className="mb-4 text-slate-600">
+              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, 
+              EITHER EXPRESS OR IMPLIED. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, 
+              SECURE, OR ERROR-FREE.
+            </p>
+          </section>
 
-          <h2>10. Disclaimer of Warranties</h2>
-          <p>
-            THE SERVICE IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR 
-            IMPLIED. WE DO NOT GUARANTEE THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, 
-            OR ERROR-FREE.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">9. Limitation of Liability</h2>
+            <p className="mb-4 text-slate-600">
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, MARKSYNCR SHALL NOT BE LIABLE FOR ANY 
+              INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING 
+              LOSS OF DATA, PROFITS, OR GOODWILL.
+            </p>
+          </section>
 
-          <h2>11. Limitation of Liability</h2>
-          <p>
-            TO THE MAXIMUM EXTENT PERMITTED BY LAW, MARKSYNCR SHALL NOT BE LIABLE FOR ANY 
-            INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING 
-            LOSS OF DATA OR PROFITS.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">10. Indemnification</h2>
+            <p className="mb-4 text-slate-600">
+              You agree to indemnify and hold harmless MarkSyncr and its officers, directors, 
+              employees, and agents from any claims, damages, or expenses arising from your 
+              use of the Service or violation of these Terms.
+            </p>
+          </section>
 
-          <h2>12. Indemnification</h2>
-          <p>
-            You agree to indemnify and hold harmless MarkSyncr from any claims, damages, or 
-            expenses arising from your use of the Service or violation of these Terms.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">11. Termination</h2>
+            <p className="mb-4 text-slate-600">
+              We may terminate or suspend your account and access to the Service immediately, 
+              without prior notice, for conduct that we believe violates these Terms or is 
+              harmful to other users, us, or third parties.
+            </p>
+          </section>
 
-          <h2>13. Termination</h2>
-          <p>
-            We may terminate or suspend your account at any time for violation of these Terms. 
-            You may delete your account at any time through the dashboard.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">12. Changes to Terms</h2>
+            <p className="mb-4 text-slate-600">
+              We reserve the right to modify these Terms at any time. We will notify you of 
+              significant changes by posting a notice on our website or sending you an email. 
+              Your continued use of the Service after changes constitutes acceptance of the 
+              new Terms.
+            </p>
+          </section>
 
-          <h2>14. Changes to Terms</h2>
-          <p>
-            We may modify these Terms at any time. We will notify you of material changes by 
-            email or through the Service. Continued use after changes constitutes acceptance.
-          </p>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">13. Governing Law</h2>
+            <p className="mb-4 text-slate-600">
+              These Terms shall be governed by and construed in accordance with the laws of 
+              the State of Delaware, United States, without regard to its conflict of law 
+              provisions.
+            </p>
+          </section>
 
-          <h2>15. Governing Law</h2>
-          <p>
-            These Terms are governed by the laws of the State of California, USA, without 
-            regard to conflict of law principles.
-          </p>
-
-          <h2>16. Dispute Resolution</h2>
-          <p>
-            Any disputes arising from these Terms or the Service shall be resolved through 
-            binding arbitration in accordance with the rules of the American Arbitration 
-            Association.
-          </p>
-
-          <h2>17. Contact Information</h2>
-          <p>
-            For questions about these Terms, please contact us at:
-          </p>
-          <ul>
-            <li>Email: legal@marksyncr.com</li>
-          </ul>
-        </div>
-
-        <div className="mt-12 border-t border-slate-200 pt-8">
-          <Link href="/" className="text-primary-600 hover:text-primary-700">
-            ← Back to Home
-          </Link>
+          <section className="mb-8">
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">14. Contact Us</h2>
+            <p className="mb-4 text-slate-600">
+              If you have any questions about these Terms, please contact us at:
+            </p>
+            <p className="text-slate-600">
+              <strong>Email:</strong> legal@marksyncr.com
+            </p>
+          </section>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }
