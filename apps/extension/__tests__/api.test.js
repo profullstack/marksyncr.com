@@ -2,6 +2,10 @@
  * @fileoverview Tests for extension API client
  * Tests all API functions in apps/extension/src/lib/api.js
  * Uses Vitest with mocked fetch and browser APIs
+ * 
+ * Authentication: Session cookies only (credentials: 'include')
+ * The server sets HttpOnly cookies on login, which are automatically
+ * sent with all subsequent requests.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -74,35 +78,14 @@ describe('API Client', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
         })
       );
       expect(result).toEqual(mockResponse);
     });
 
-    it('should store tokens on successful login', async () => {
-      const mockResponse = {
-        user: { id: 'user-123' },
-        session: {
-          access_token: 'access-token',
-          refresh_token: 'refresh-token',
-        },
-      };
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-
-      await api.signInWithEmail('test@example.com', 'password123');
-
-      expect(mockStorageSet).toHaveBeenCalledWith({
-        authToken: 'access-token',
-        refreshToken: 'refresh-token',
-      });
-    });
-
-    it('should store user info on successful login', async () => {
+    it('should store user data on successful login', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
       const mockResponse = {
         user: mockUser,
@@ -119,7 +102,10 @@ describe('API Client', () => {
 
       await api.signInWithEmail('test@example.com', 'password123');
 
-      expect(mockStorageSet).toHaveBeenCalledWith({ user: mockUser });
+      expect(mockStorageSet).toHaveBeenCalledWith({
+        user: mockUser,
+        isLoggedIn: true,
+      });
     });
 
     it('should throw error on failed login', async () => {
@@ -163,6 +149,7 @@ describe('API Client', () => {
         'https://marksyncr.com/api/auth/signup',
         expect.objectContaining({
           method: 'POST',
+          credentials: 'include',
           body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
         })
       );
@@ -182,8 +169,7 @@ describe('API Client', () => {
   });
 
   describe('signOut', () => {
-    it('should call logout API and clear tokens', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
+    it('should call logout API and clear user data', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ message: 'Logged out' }),
@@ -191,30 +177,27 @@ describe('API Client', () => {
 
       await api.signOut();
 
-      expect(mockStorageRemove).toHaveBeenCalledWith(['authToken', 'refreshToken', 'user']);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://marksyncr.com/api/auth/logout',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        })
+      );
+      expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn']);
     });
 
-    it('should clear tokens even if API call fails', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
+    it('should clear user data even if API call fails', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       await api.signOut();
 
-      expect(mockStorageRemove).toHaveBeenCalledWith(['authToken', 'refreshToken', 'user']);
+      expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn']);
     });
   });
 
   describe('getSession', () => {
-    it('should return null when no token is stored', async () => {
-      mockStorageGet.mockResolvedValue({});
-
-      const result = await api.getSession();
-
-      expect(result).toBeNull();
-    });
-
-    it('should call session API with token', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'valid-token' });
+    it('should call session API with credentials', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ session: { user: { id: 'user-123' } } }),
@@ -225,20 +208,26 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/auth/session',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer valid-token',
-          }),
+          credentials: 'include',
         })
       );
+      expect(result).toEqual({ user: { id: 'user-123' } });
     });
 
     it('should return null when session API fails', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'invalid-token' });
       mockFetch.mockResolvedValue({
         ok: false,
         status: 401,
-        json: async () => ({ error: 'Invalid token' }),
+        json: async () => ({ error: 'Not authenticated' }),
       });
+
+      const result = await api.getSession();
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null on network error', async () => {
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       const result = await api.getSession();
 
@@ -249,7 +238,7 @@ describe('API Client', () => {
   describe('getUser', () => {
     it('should return cached user from storage', async () => {
       const cachedUser = { id: 'user-123', email: 'test@example.com' };
-      mockStorageGet.mockResolvedValue({ user: cachedUser });
+      mockStorageGet.mockResolvedValue({ user: cachedUser, isLoggedIn: true });
 
       const result = await api.getUser();
 
@@ -258,7 +247,7 @@ describe('API Client', () => {
     });
 
     it('should fetch user from API when not cached', async () => {
-      mockStorageGet.mockResolvedValueOnce({}).mockResolvedValueOnce({ authToken: 'token' });
+      mockStorageGet.mockResolvedValue({});
       
       const mockUser = { id: 'user-123', email: 'test@example.com' };
       mockFetch.mockResolvedValue({
@@ -272,7 +261,7 @@ describe('API Client', () => {
     });
 
     it('should cache user after fetching from API', async () => {
-      mockStorageGet.mockResolvedValueOnce({}).mockResolvedValueOnce({ authToken: 'token' });
+      mockStorageGet.mockResolvedValue({});
       
       const mockUser = { id: 'user-123', email: 'test@example.com' };
       mockFetch.mockResolvedValue({
@@ -282,84 +271,56 @@ describe('API Client', () => {
 
       await api.getUser();
 
-      expect(mockStorageSet).toHaveBeenCalledWith({ user: mockUser });
+      expect(mockStorageSet).toHaveBeenCalledWith({
+        user: mockUser,
+        isLoggedIn: true,
+      });
+    });
+
+    it('should return null when not logged in and API fails', async () => {
+      mockStorageGet.mockResolvedValue({});
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+      });
+
+      const result = await api.getUser();
+
+      expect(result).toBeNull();
     });
   });
 
-  describe('refreshSession', () => {
-    it('should return null when no refresh token is stored', async () => {
+  describe('isLoggedIn', () => {
+    it('should return false when not logged in locally', async () => {
       mockStorageGet.mockResolvedValue({});
 
-      const result = await api.refreshSession();
+      const result = await api.isLoggedIn();
 
-      expect(result).toBeNull();
+      expect(result).toBe(false);
     });
 
-    it('should call refresh API with refresh token', async () => {
-      mockStorageGet.mockResolvedValue({ refreshToken: 'refresh-token' });
-      
-      const mockSession = {
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
-      };
-      
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ session: mockSession }),
-      });
+    it('should verify with server when logged in locally', async () => {
+      mockStorageGet.mockResolvedValue({ isLoggedIn: true });
+      mockFetch.mockResolvedValue({ ok: true });
 
-      const result = await api.refreshSession();
+      const result = await api.isLoggedIn();
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://marksyncr.com/api/auth/refresh',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ refresh_token: 'refresh-token' }),
-        })
-      );
-      expect(result).toEqual(mockSession);
+      expect(result).toBe(true);
+      expect(mockFetch).toHaveBeenCalled();
     });
 
-    it('should update stored tokens on successful refresh', async () => {
-      mockStorageGet.mockResolvedValue({ refreshToken: 'old-refresh-token' });
-      
-      const mockSession = {
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
-      };
-      
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ session: mockSession }),
-      });
+    it('should return false when server verification fails', async () => {
+      mockStorageGet.mockResolvedValue({ isLoggedIn: true });
+      mockFetch.mockResolvedValue({ ok: false });
 
-      await api.refreshSession();
+      const result = await api.isLoggedIn();
 
-      expect(mockStorageSet).toHaveBeenCalledWith({
-        authToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
-      });
-    });
-
-    it('should clear tokens on failed refresh', async () => {
-      mockStorageGet.mockResolvedValue({ refreshToken: 'invalid-refresh-token' });
-      
-      mockFetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'Invalid refresh token' }),
-      });
-
-      const result = await api.refreshSession();
-
-      expect(result).toBeNull();
-      expect(mockStorageRemove).toHaveBeenCalledWith(['authToken', 'refreshToken', 'user']);
+      expect(result).toBe(false);
     });
   });
 
   describe('fetchSubscription', () => {
-    it('should fetch subscription with auth token', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
+    it('should fetch subscription with credentials', async () => {
       const mockSubscription = {
         subscription: { tier: 'pro', status: 'active' },
       };
@@ -371,11 +332,20 @@ describe('API Client', () => {
 
       const result = await api.fetchSubscription();
 
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://marksyncr.com/api/subscription',
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      );
       expect(result).toEqual(mockSubscription);
     });
 
-    it('should return null when not authenticated', async () => {
-      mockStorageGet.mockResolvedValue({});
+    it('should return null on error', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+      });
 
       const result = await api.fetchSubscription();
 
@@ -384,9 +354,7 @@ describe('API Client', () => {
   });
 
   describe('fetchCloudSettings', () => {
-    it('should fetch settings with auth token', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
+    it('should fetch settings with credentials', async () => {
       const mockSettings = {
         settings: { syncEnabled: true, theme: 'dark' },
       };
@@ -398,12 +366,16 @@ describe('API Client', () => {
 
       const result = await api.fetchCloudSettings();
 
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://marksyncr.com/api/settings',
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      );
       expect(result).toEqual(mockSettings);
     });
 
     it('should return null on error', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
         json: async () => ({ error: 'Failed' }),
@@ -417,8 +389,6 @@ describe('API Client', () => {
 
   describe('saveCloudSettings', () => {
     it('should save settings with PUT request', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ settings: { theme: 'dark' } }),
@@ -431,14 +401,13 @@ describe('API Client', () => {
         'https://marksyncr.com/api/settings',
         expect.objectContaining({
           method: 'PUT',
+          credentials: 'include',
           body: JSON.stringify({ theme: 'dark' }),
         })
       );
     });
 
     it('should return false on error', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
       });
@@ -450,9 +419,7 @@ describe('API Client', () => {
   });
 
   describe('fetchBookmarks', () => {
-    it('should fetch bookmarks with auth token', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
+    it('should fetch bookmarks with credentials', async () => {
       const mockBookmarks = {
         bookmarks: [{ id: '1', url: 'https://example.com' }],
         count: 1,
@@ -465,12 +432,16 @@ describe('API Client', () => {
 
       const result = await api.fetchBookmarks();
 
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://marksyncr.com/api/bookmarks',
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      );
       expect(result).toEqual(mockBookmarks);
     });
 
     it('should return empty array on error', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
       });
@@ -483,8 +454,6 @@ describe('API Client', () => {
 
   describe('syncBookmarks', () => {
     it('should sync bookmarks with POST request', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       const bookmarks = [
         { url: 'https://example.com', title: 'Example' },
       ];
@@ -500,6 +469,7 @@ describe('API Client', () => {
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
           method: 'POST',
+          credentials: 'include',
           body: JSON.stringify({ bookmarks, source: 'browser' }),
         })
       );
@@ -507,8 +477,6 @@ describe('API Client', () => {
     });
 
     it('should throw error on failed sync', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
         json: async () => ({ error: 'Sync failed' }),
@@ -520,8 +488,6 @@ describe('API Client', () => {
 
   describe('deleteBookmark', () => {
     it('should delete bookmark by URL', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: true,
       });
@@ -532,6 +498,7 @@ describe('API Client', () => {
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
           method: 'DELETE',
+          credentials: 'include',
           body: JSON.stringify({ url: 'https://example.com' }),
         })
       );
@@ -539,8 +506,6 @@ describe('API Client', () => {
     });
 
     it('should delete bookmark by ID', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: true,
       });
@@ -551,6 +516,7 @@ describe('API Client', () => {
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
           method: 'DELETE',
+          credentials: 'include',
           body: JSON.stringify({ id: 'bookmark-123' }),
         })
       );
@@ -558,8 +524,6 @@ describe('API Client', () => {
     });
 
     it('should return false on error', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
       });
@@ -654,8 +618,6 @@ describe('API Client', () => {
 
   describe('fetchVersionHistory', () => {
     it('should fetch version history with pagination', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       const mockVersions = {
         versions: [{ id: '1', created_at: '2024-01-01' }],
         retentionLimit: 10,
@@ -670,14 +632,14 @@ describe('API Client', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/versions?limit=10&offset=0',
-        expect.any(Object)
+        expect.objectContaining({
+          credentials: 'include',
+        })
       );
       expect(result).toEqual(mockVersions);
     });
 
     it('should return empty versions on error', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
       });
@@ -689,9 +651,7 @@ describe('API Client', () => {
   });
 
   describe('fetchTags', () => {
-    it('should fetch tags with auth token', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
+    it('should fetch tags with credentials', async () => {
       const mockTags = {
         tags: [{ id: '1', name: 'work', color: '#ff0000' }],
       };
@@ -703,12 +663,16 @@ describe('API Client', () => {
 
       const result = await api.fetchTags();
 
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://marksyncr.com/api/tags',
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      );
       expect(result).toEqual([{ id: '1', name: 'work', color: '#ff0000' }]);
     });
 
     it('should return empty array on error', async () => {
-      mockStorageGet.mockResolvedValue({ authToken: 'token' });
-      
       mockFetch.mockResolvedValue({
         ok: false,
       });
@@ -718,51 +682,75 @@ describe('API Client', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('saveBookmarkVersion', () => {
+    it('should save bookmark version with POST request', async () => {
+      const bookmarkData = { bookmarks: [{ url: 'https://example.com' }] };
+      
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ version: { id: 'v1' } }),
+      });
+
+      const result = await api.saveBookmarkVersion(bookmarkData, 'browser', 'My Device');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://marksyncr.com/api/versions',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          body: JSON.stringify({
+            bookmarkData,
+            sourceType: 'browser',
+            deviceName: 'My Device',
+          }),
+        })
+      );
+      expect(result).toEqual({ version: { id: 'v1' } });
+    });
+
+    it('should throw error on failed save', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'Failed to save version' }),
+      });
+
+      await expect(
+        api.saveBookmarkVersion({}, 'browser', 'Device')
+      ).rejects.toThrow('Failed to save version');
+    });
+  });
 });
 
-describe('API Client Token Refresh', () => {
+describe('API Client Session Handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStorageGet.mockResolvedValue({});
+    mockStorageSet.mockResolvedValue(undefined);
+    mockStorageRemove.mockResolvedValue(undefined);
   });
 
-  it('should retry request after token refresh on 401', async () => {
-    // First call returns 401, second call (after refresh) succeeds
-    let callCount = 0;
-    
-    mockStorageGet.mockImplementation(async (keys) => {
-      if (Array.isArray(keys) || typeof keys === 'string') {
-        if (keys === 'refreshToken' || keys.includes?.('refreshToken')) {
-          return { refreshToken: 'refresh-token' };
-        }
-      }
-      return { authToken: callCount === 0 ? 'old-token' : 'new-token' };
+  it('should clear user data on 401 response', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Not authenticated' }),
     });
 
-    mockFetch.mockImplementation(async (url) => {
-      if (url.includes('/api/auth/refresh')) {
-        return {
-          ok: true,
-          json: async () => ({
-            session: {
-              access_token: 'new-token',
-              refresh_token: 'new-refresh-token',
-            },
-          }),
-        };
-      }
-      
-      callCount++;
-      if (callCount === 1) {
-        return { ok: false, status: 401 };
-      }
-      return {
-        ok: true,
-        json: async () => ({ settings: { theme: 'dark' } }),
-      };
+    await api.fetchCloudSettings();
+
+    expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn']);
+  });
+
+  it('should not clear user data on other errors', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'Server error' }),
     });
 
-    const result = await api.fetchCloudSettings();
+    await api.fetchCloudSettings();
 
-    expect(result).toEqual({ settings: { theme: 'dark' } });
+    expect(mockStorageRemove).not.toHaveBeenCalled();
   });
 });
