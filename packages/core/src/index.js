@@ -59,3 +59,23 @@ export {
   VersionHistoryManager,
   createChangeSummary,
 } from './version-history.js';
+
+// Feature gating (Pro features)
+export {
+  FEATURE_REQUIREMENTS,
+  FREE_FEATURES,
+  isSubscriptionActive,
+  hasFeatureAccess,
+  getFeaturesForPlan,
+  getMinimumPlanForFeature,
+  createFeatureGate,
+  checkMultipleFeatures,
+  getUpgradeSuggestions,
+  VERSION_HISTORY_LIMITS,
+  getVersionHistoryLimit,
+  SYNC_INTERVAL_LIMITS,
+  getSyncIntervalOptions,
+  canUseScheduledSync,
+  FEATURE_DISPLAY_NAMES,
+  getFeatureDisplayName,
+} from './feature-gate.js';

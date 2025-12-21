@@ -6,6 +6,8 @@ import {
   createSeparatorItem,
   BOOKMARK_TYPES,
   ROOT_FOLDER_IDS,
+  CURRENT_SCHEMA_VERSION,
+  CURRENT_VERSION_STRING,
 } from '../src/bookmark.js';
 
 describe('bookmark types', () => {
@@ -13,8 +15,8 @@ describe('bookmark types', () => {
     it('should create a valid empty bookmark file structure', () => {
       const file = createEmptyBookmarkFile();
 
-      expect(file.version).toBe('1.0');
-      expect(file.schemaVersion).toBe(1);
+      expect(file.version).toBe(CURRENT_VERSION_STRING);
+      expect(file.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(file.metadata).toBeDefined();
       expect(file.bookmarks).toBeDefined();
     });
