@@ -86,14 +86,12 @@ export async function POST(request) {
       user_id: user.id,
       url: bookmark.url,
       title: bookmark.title || bookmark.url,
-      description: bookmark.description || null,
-      folder_path: bookmark.folderPath || bookmark.folder_path || '/',
+      description: bookmark.description || '',
+      folder_path: bookmark.folderPath || bookmark.folder_path || '',
       tags: bookmark.tags || [],
-      favicon: bookmark.favicon || null,
+      favicon: bookmark.favicon || '',
       source,
-      external_id: bookmark.id?.toString() || null,
-      created_at: bookmark.dateAdded ? new Date(bookmark.dateAdded).toISOString() : new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      date_added: bookmark.dateAdded ? new Date(bookmark.dateAdded).toISOString() : new Date().toISOString(),
     }));
 
     // Upsert bookmarks (update if URL exists for user, insert if not)
