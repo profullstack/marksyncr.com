@@ -81,6 +81,9 @@ importers:
       '@marksyncr/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@marksyncr/sources':
+        specifier: workspace:*
+        version: link:../../packages/sources
       '@marksyncr/types':
         specifier: workspace:*
         version: link:../../packages/types

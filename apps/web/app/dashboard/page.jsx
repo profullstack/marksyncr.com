@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getUser, createClient } from '../../lib/supabase/server';
 import DashboardClient from './dashboard-client';
+import SyncSourcesClient from './sync-sources-client';
 
 /**
  * Get user subscription from server
@@ -43,6 +44,25 @@ async function getUserDevices(userId) {
   return data || [];
 }
 
+/**
+ * Get connected sync sources from server
+ * @param {string} userId
+ */
+async function getConnectedSources(userId) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('sync_sources')
+    .select('*')
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error getting sync sources:', error.message);
+    return [];
+  }
+
+  return data || [];
+}
+
 export default async function DashboardPage({ searchParams }) {
   const user = await getUser();
 
@@ -50,13 +70,16 @@ export default async function DashboardPage({ searchParams }) {
     redirect('/login');
   }
 
-  const [subscription, devices] = await Promise.all([
+  const [subscription, devices, connectedSources] = await Promise.all([
     getUserSubscription(user.id),
     getUserDevices(user.id),
+    getConnectedSources(user.id),
   ]);
 
   const params = await searchParams;
   const checkoutStatus = params?.checkout;
+  const connectedProvider = params?.connected;
+  const errorMessage = params?.error;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -85,7 +108,7 @@ export default async function DashboardPage({ searchParams }) {
 
       {/* Main content */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Success message */}
+        {/* Success messages */}
         {checkoutStatus === 'success' && (
           <div className="mb-6 rounded-lg bg-green-50 p-4 text-green-700">
             <div className="flex items-center">
@@ -109,6 +132,52 @@ export default async function DashboardPage({ searchParams }) {
           </div>
         )}
 
+        {connectedProvider && (
+          <div className="mb-6 rounded-lg bg-green-50 p-4 text-green-700">
+            <div className="flex items-center">
+              <svg
+                className="mr-2 h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <span>
+                Successfully connected to {connectedProvider.charAt(0).toUpperCase() + connectedProvider.slice(1)}!
+              </span>
+            </div>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
+            <div className="flex items-center">
+              <svg
+                className="mr-2 h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              <span>
+                Connection error: {decodeURIComponent(errorMessage)}
+              </span>
+            </div>
+          </div>
+        )}
+
         <h1 className="mb-8 text-2xl font-bold text-slate-900">Dashboard</h1>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -123,7 +192,7 @@ export default async function DashboardPage({ searchParams }) {
         </div>
 
         {/* Sync Sources Section */}
-        <SyncSourcesSection subscription={subscription} />
+        <SyncSourcesClient subscription={subscription} connectedSources={connectedSources} />
       </main>
     </div>
   );
@@ -343,73 +412,3 @@ function QuickActionsCard() {
   );
 }
 
-function SyncSourcesSection({ subscription }) {
-  const sources = [
-    { name: 'GitHub', icon: 'github', available: true },
-    { name: 'Dropbox', icon: 'dropbox', available: true },
-    { name: 'Google Drive', icon: 'google', available: true },
-    {
-      name: 'MarkSyncr Cloud',
-      icon: 'cloud',
-      available: subscription?.plan !== 'free',
-      requiresPro: true,
-    },
-  ];
-
-  return (
-    <div className="mt-8">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">Sync Sources</h2>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {sources.map((source) => (
-          <div
-            key={source.name}
-            className={`rounded-xl border p-4 ${
-              source.available
-                ? 'border-slate-200 bg-white'
-                : 'border-slate-100 bg-slate-50'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                    source.available ? 'bg-slate-100' : 'bg-slate-200'
-                  }`}
-                >
-                  <svg
-                    className={`h-5 w-5 ${source.available ? 'text-slate-600' : 'text-slate-400'}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p
-                    className={`font-medium ${source.available ? 'text-slate-900' : 'text-slate-400'}`}
-                  >
-                    {source.name}
-                  </p>
-                  {source.requiresPro && !source.available && (
-                    <p className="text-xs text-slate-400">Pro plan required</p>
-                  )}
-                </div>
-              </div>
-              {source.available && (
-                <button className="text-sm text-primary-600 hover:text-primary-700">
-                  Connect
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

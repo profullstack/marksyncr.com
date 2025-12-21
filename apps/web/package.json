@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@marksyncr/core": "workspace:*",
+    "@marksyncr/sources": "workspace:*",
     "@marksyncr/types": "workspace:*",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
