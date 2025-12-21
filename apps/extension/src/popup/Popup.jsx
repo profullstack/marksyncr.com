@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/index.js';
+import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
 
 // Icons
 const SyncIcon = ({ className = '', spinning = false }) => (
@@ -197,17 +198,31 @@ export function Popup() {
     setSelectedSource,
     triggerSync,
     initialize,
+    // Pro features
+    subscription,
+    tags,
+    selectedBookmark,
+    isPro,
+    fetchTags,
+    createTag,
+    updateTag,
+    deleteTag,
+    saveBookmarkTags,
+    saveBookmarkNotes,
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'pro'
 
   useEffect(() => {
     const init = async () => {
       await initialize();
+      // Fetch tags if user is Pro
+      await fetchTags();
       setIsInitialized(true);
     };
     init();
-  }, [initialize]);
+  }, [initialize, fetchTags]);
 
   const handleSync = async () => {
     try {
@@ -250,74 +265,131 @@ export function Popup() {
         </button>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 space-y-4 p-4">
-        {/* Status */}
-        <div className="flex items-center justify-between">
-          <StatusIndicator status={status} />
-          <LastSyncInfo lastSync={lastSync} />
-        </div>
-
-        {/* Error message */}
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {error}
+      {/* Tab Navigation */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('sync')}
+          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'sync'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1">
+            <SyncIcon className="h-4 w-4" />
+            Sync
           </div>
-        )}
-
-        {/* Stats */}
-        <SyncStats stats={stats} />
-
-        {/* Source selector */}
-        <SourceSelector
-          sources={sources}
-          selectedSource={selectedSource}
-          onSelect={setSelectedSource}
-        />
-
-        {/* Sync button */}
-        <button
-          onClick={handleSync}
-          disabled={status === 'syncing' || !selectedSource}
-          className="flex w-full items-center justify-center space-x-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <SyncIcon className="h-5 w-5" spinning={status === 'syncing'} />
-          <span>{status === 'syncing' ? 'Syncing...' : 'Sync Now'}</span>
         </button>
-
-        {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => {/* TODO: Implement export */}}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Export Bookmarks
-          </button>
-          <button
-            onClick={() => {/* TODO: Implement import */}}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Import Bookmarks
-          </button>
-        </div>
-
-        {/* Version History */}
         <button
-          onClick={() => {
-            window.open('https://marksyncr.com/dashboard/history', '_blank');
-          }}
-          className="flex w-full items-center justify-center space-x-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          onClick={() => setActiveTab('pro')}
+          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'pro'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          <div className="flex items-center justify-center gap-1">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 3l3.5 7L12 6l3.5 4L19 3M5 21h14M5 17h14M5 13h14"
+              />
+            </svg>
+            Pro
+            {isPro() && (
+              <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
+                ✓
+              </span>
+            )}
+          </div>
+        </button>
+      </div>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto p-4">
+        {activeTab === 'sync' ? (
+          <div className="space-y-4">
+            {/* Status */}
+            <div className="flex items-center justify-between">
+              <StatusIndicator status={status} />
+              <LastSyncInfo lastSync={lastSync} />
+            </div>
+
+            {/* Error message */}
+            {error && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {/* Stats */}
+            <SyncStats stats={stats} />
+
+            {/* Source selector */}
+            <SourceSelector
+              sources={sources}
+              selectedSource={selectedSource}
+              onSelect={setSelectedSource}
             />
-          </svg>
-          <span>View Version History</span>
-        </button>
+
+            {/* Sync button */}
+            <button
+              onClick={handleSync}
+              disabled={status === 'syncing' || !selectedSource}
+              className="flex w-full items-center justify-center space-x-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <SyncIcon className="h-5 w-5" spinning={status === 'syncing'} />
+              <span>{status === 'syncing' ? 'Syncing...' : 'Sync Now'}</span>
+            </button>
+
+            {/* Quick actions */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {/* TODO: Implement export */}}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Export Bookmarks
+              </button>
+              <button
+                onClick={() => {/* TODO: Implement import */}}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Import Bookmarks
+              </button>
+            </div>
+
+            {/* Version History */}
+            <button
+              onClick={() => {
+                window.open('https://marksyncr.com/dashboard/history', '_blank');
+              }}
+              className="flex w-full items-center justify-center space-x-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>View Version History</span>
+            </button>
+          </div>
+        ) : (
+          <ProFeaturesPanel
+            isPro={isPro()}
+            tags={tags}
+            onCreateTag={createTag}
+            onUpdateTag={updateTag}
+            onDeleteTag={deleteTag}
+            selectedBookmark={selectedBookmark}
+            onSaveBookmarkTags={saveBookmarkTags}
+            onSaveBookmarkNotes={saveBookmarkNotes}
+          />
+        )}
       </main>
 
       {/* Footer */}

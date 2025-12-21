@@ -21,6 +21,20 @@ import { persist } from 'zustand/middleware';
  */
 
 /**
+ * @typedef {Object} Tag
+ * @property {string} id
+ * @property {string} name
+ * @property {string} color
+ * @property {string} created_at
+ */
+
+/**
+ * @typedef {Object} Subscription
+ * @property {'free' | 'pro' | 'team'} plan
+ * @property {'active' | 'canceled' | 'past_due'} status
+ */
+
+/**
  * @typedef {Object} StoreState
  * @property {SyncStatus} status
  * @property {string | null} lastSync
@@ -30,6 +44,9 @@ import { persist } from 'zustand/middleware';
  * @property {string | null} error
  * @property {Object | null} user
  * @property {Object} settings
+ * @property {Subscription | null} subscription
+ * @property {Tag[]} tags
+ * @property {Object | null} selectedBookmark
  */
 
 // Default sources available
@@ -80,6 +97,9 @@ const getBrowserAPI = () => {
 /**
  * Create the extension store with Zustand
  */
+// API base URL for Pro features
+const API_BASE_URL = 'https://marksyncr.com/api';
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -92,6 +112,11 @@ export const useStore = create(
       error: null,
       user: null,
       settings: DEFAULT_SETTINGS,
+      // Pro features state
+      subscription: null,
+      tags: [],
+      selectedBookmark: null,
+      isLoadingTags: false,
 
       // Actions
       setStatus: (status) => set({ status }),
@@ -284,6 +309,245 @@ export const useStore = create(
           }
         } catch (err) {
           console.error('Failed to disconnect source:', err);
+        }
+      },
+
+      // ==========================================
+      // Pro Features Actions
+      // ==========================================
+
+      /**
+       * Set subscription info
+       */
+      setSubscription: (subscription) => set({ subscription }),
+
+      /**
+       * Check if user has Pro features
+       */
+      isPro: () => {
+        const { subscription } = get();
+        return (
+          subscription &&
+          ['pro', 'team'].includes(subscription.plan) &&
+          subscription.status === 'active'
+        );
+      },
+
+      /**
+       * Set selected bookmark for editing
+       */
+      setSelectedBookmark: (bookmark) => set({ selectedBookmark: bookmark }),
+
+      /**
+       * Clear selected bookmark
+       */
+      clearSelectedBookmark: () => set({ selectedBookmark: null }),
+
+      /**
+       * Fetch user's tags from API
+       */
+      fetchTags: async () => {
+        const browserAPI = getBrowserAPI();
+        set({ isLoadingTags: true });
+
+        try {
+          // Get auth token from storage
+          const { authToken } = await browserAPI.storage.local.get('authToken');
+          
+          if (!authToken) {
+            set({ tags: [], isLoadingTags: false });
+            return;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/tags`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          if (!response.ok) {
+            if (response.status === 403) {
+              // Not a Pro user, clear tags
+              set({ tags: [], isLoadingTags: false });
+              return;
+            }
+            throw new Error('Failed to fetch tags');
+          }
+
+          const data = await response.json();
+          set({ tags: data.tags || [], isLoadingTags: false });
+        } catch (err) {
+          console.error('Failed to fetch tags:', err);
+          set({ isLoadingTags: false });
+        }
+      },
+
+      /**
+       * Create a new tag
+       */
+      createTag: async ({ name, color }) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const { authToken } = await browserAPI.storage.local.get('authToken');
+          
+          if (!authToken) {
+            throw new Error('Not authenticated');
+          }
+
+          const response = await fetch(`${API_BASE_URL}/tags`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ name, color }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create tag');
+          }
+
+          const data = await response.json();
+          const newTag = data.tag;
+
+          // Add to local state
+          set({ tags: [...get().tags, newTag] });
+
+          return newTag;
+        } catch (err) {
+          console.error('Failed to create tag:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Update an existing tag
+       */
+      updateTag: async (tagId, updates) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const { authToken } = await browserAPI.storage.local.get('authToken');
+          
+          if (!authToken) {
+            throw new Error('Not authenticated');
+          }
+
+          const response = await fetch(`${API_BASE_URL}/tags/${tagId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify(updates),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update tag');
+          }
+
+          const data = await response.json();
+          const updatedTag = data.tag;
+
+          // Update local state
+          set({
+            tags: get().tags.map((t) => (t.id === tagId ? updatedTag : t)),
+          });
+
+          return updatedTag;
+        } catch (err) {
+          console.error('Failed to update tag:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Delete a tag
+       */
+      deleteTag: async (tagId) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const { authToken } = await browserAPI.storage.local.get('authToken');
+          
+          if (!authToken) {
+            throw new Error('Not authenticated');
+          }
+
+          const response = await fetch(`${API_BASE_URL}/tags/${tagId}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete tag');
+          }
+
+          // Remove from local state
+          set({
+            tags: get().tags.filter((t) => t.id !== tagId),
+          });
+        } catch (err) {
+          console.error('Failed to delete tag:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Save tags for a bookmark
+       */
+      saveBookmarkTags: async (bookmarkId, tags) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          // Send message to background script to update bookmark
+          await browserAPI.runtime.sendMessage({
+            type: 'UPDATE_BOOKMARK_TAGS',
+            payload: { bookmarkId, tags },
+          });
+
+          // Update selected bookmark if it matches
+          const { selectedBookmark } = get();
+          if (selectedBookmark?.id === bookmarkId) {
+            set({
+              selectedBookmark: { ...selectedBookmark, tags },
+            });
+          }
+        } catch (err) {
+          console.error('Failed to save bookmark tags:', err);
+          throw err;
+        }
+      },
+
+      /**
+       * Save notes for a bookmark
+       */
+      saveBookmarkNotes: async (bookmarkId, notes) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          // Send message to background script to update bookmark
+          await browserAPI.runtime.sendMessage({
+            type: 'UPDATE_BOOKMARK_NOTES',
+            payload: { bookmarkId, notes },
+          });
+
+          // Update selected bookmark if it matches
+          const { selectedBookmark } = get();
+          if (selectedBookmark?.id === bookmarkId) {
+            set({
+              selectedBookmark: { ...selectedBookmark, notes },
+            });
+          }
+        } catch (err) {
+          console.error('Failed to save bookmark notes:', err);
+          throw err;
         }
       },
     }),
