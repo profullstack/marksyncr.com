@@ -13,32 +13,49 @@ import browser from 'webextension-polyfill';
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
 const DEFAULT_SYNC_INTERVAL = 15; // minutes
-const APP_URL = 'https://marksyncr.com';
 
 /**
- * Get stored auth token
+ * Get API base URL from storage or use default
  */
-async function getAuthToken() {
-  const { authToken } = await browser.storage.local.get('authToken');
-  return authToken;
+async function getApiBaseUrl() {
+  const { apiBaseUrl } = await browser.storage.local.get('apiBaseUrl');
+  return apiBaseUrl || 'http://localhost:3000';
 }
 
 /**
- * Make an authenticated API request
+ * Get stored access token
+ */
+async function getAccessToken() {
+  const { session } = await browser.storage.local.get('session');
+  return session?.access_token || null;
+}
+
+/**
+ * Check if user is logged in (has valid session token)
+ */
+async function isLoggedIn() {
+  const token = await getAccessToken();
+  return !!token;
+}
+
+/**
+ * Make an authenticated API request using Bearer token
  */
 async function apiRequest(endpoint, options = {}) {
-  const token = await getAuthToken();
+  const baseUrl = await getApiBaseUrl();
+  const token = await getAccessToken();
   
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
   
+  // Add Authorization header if we have a token
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`${APP_URL}${endpoint}`, {
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
   });
@@ -215,10 +232,9 @@ function flattenBookmarkTree(tree) {
  */
 async function performSync(sourceId) {
   try {
-    const { selectedSource, sources, authToken } = await browser.storage.local.get([
+    const { selectedSource, sources } = await browser.storage.local.get([
       'selectedSource',
       'sources',
-      'authToken',
     ]);
 
     const targetSourceId = sourceId || selectedSource;
@@ -240,8 +256,11 @@ async function performSync(sourceId) {
       return { success: false, error: 'Source not connected' };
     }
 
+    // Check if user is logged in (has session)
+    const loggedIn = await isLoggedIn();
+    
     // If user is logged in, sync to cloud
-    if (authToken) {
+    if (loggedIn) {
       try {
         // Flatten bookmarks for API
         const flatBookmarks = flattenBookmarkTree(bookmarkTree);

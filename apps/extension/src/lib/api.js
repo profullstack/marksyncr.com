@@ -2,12 +2,12 @@
  * API client for MarkSyncr extension
  * All communication with the backend goes through web API calls
  *
- * Authentication: Session cookies only (credentials: 'include')
- * The server sets HttpOnly cookies on login, which are automatically
- * sent with all subsequent requests.
+ * Authentication: Bearer token in Authorization header
+ * The extension stores tokens in browser.storage.local after login
+ * and sends them with each request.
  */
 
-const APP_URL = import.meta.env.VITE_APP_URL || 'https://marksyncr.com';
+const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:3000';
 
 /**
  * Get browser API (Chrome or Firefox)
@@ -23,13 +23,34 @@ const getBrowserAPI = () => {
 };
 
 /**
+ * Get stored access token
+ */
+async function getAccessToken() {
+  const browserAPI = getBrowserAPI();
+  if (!browserAPI) return null;
+  
+  const { session } = await browserAPI.storage.local.get('session');
+  return session?.access_token || null;
+}
+
+/**
+ * Store session data locally
+ */
+async function storeSession(session) {
+  const browserAPI = getBrowserAPI();
+  if (!browserAPI) return;
+  
+  await browserAPI.storage.local.set({ session });
+}
+
+/**
  * Clear local user data (called on logout)
  */
 async function clearUserData() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return;
   
-  await browserAPI.storage.local.remove(['user', 'isLoggedIn']);
+  await browserAPI.storage.local.remove(['user', 'isLoggedIn', 'session']);
 }
 
 /**
@@ -47,22 +68,38 @@ async function storeUserData(user) {
 
 /**
  * Make an authenticated API request
- * Uses credentials: 'include' to send session cookies
+ * Uses Bearer token in Authorization header
  */
 async function apiRequest(endpoint, options = {}) {
+  const token = await getAccessToken();
+  
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
   
+  // Add Authorization header if we have a token
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
   const response = await fetch(`${APP_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: 'include', // Send cookies with request
   });
   
-  // Handle 401 - session expired, clear local data
+  // Handle 401 - session expired, try to refresh or clear local data
   if (response.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Retry the request with new token
+      const newToken = await getAccessToken();
+      headers['Authorization'] = `Bearer ${newToken}`;
+      return fetch(`${APP_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    }
     await clearUserData();
   }
   
@@ -70,8 +107,40 @@ async function apiRequest(endpoint, options = {}) {
 }
 
 /**
+ * Try to refresh the access token
+ */
+async function tryRefreshToken() {
+  const browserAPI = getBrowserAPI();
+  if (!browserAPI) return false;
+  
+  const { session } = await browserAPI.storage.local.get('session');
+  if (!session?.refresh_token) return false;
+  
+  try {
+    const response = await fetch(`${APP_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+    
+    if (!response.ok) return false;
+    
+    const data = await response.json();
+    if (data.session) {
+      await storeSession(data.session);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Sign in with email and password
- * The server sets session cookies on successful login
+ * Stores session tokens in browser.storage.local for authenticated requests
  */
 export async function signInWithEmail(email, password) {
   const response = await fetch(`${APP_URL}/api/auth/login`, {
@@ -79,7 +148,6 @@ export async function signInWithEmail(email, password) {
     headers: {
       'Content-Type': 'application/json',
     },
-    credentials: 'include', // Receive and store cookies
     body: JSON.stringify({ email, password }),
   });
   
@@ -87,6 +155,11 @@ export async function signInWithEmail(email, password) {
   
   if (!response.ok) {
     throw new Error(data.error || 'Login failed');
+  }
+  
+  // Store session tokens for authenticated requests
+  if (data.session) {
+    await storeSession(data.session);
   }
   
   // Store user info locally for quick access
@@ -106,7 +179,6 @@ export async function signUpWithEmail(email, password) {
     headers: {
       'Content-Type': 'application/json',
     },
-    credentials: 'include',
     body: JSON.stringify({ email, password }),
   });
   
@@ -114,6 +186,16 @@ export async function signUpWithEmail(email, password) {
   
   if (!response.ok) {
     throw new Error(data.error || 'Signup failed');
+  }
+  
+  // Store session tokens if returned
+  if (data.session) {
+    await storeSession(data.session);
+  }
+  
+  // Store user info locally
+  if (data.user) {
+    await storeUserData(data.user);
   }
   
   return data;

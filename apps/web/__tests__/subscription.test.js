@@ -1,13 +1,10 @@
 /**
  * @fileoverview Tests for subscription API route
  * Tests GET /api/subscription endpoint
- * Uses Vitest with mocked Supabase client
+ * Uses Vitest with mocked auth helper
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock Supabase responses
-const mockGetUser = vi.fn();
 
 // Chain mock setup
 const createChainMock = () => ({
@@ -18,20 +15,28 @@ const createChainMock = () => ({
 
 let chainMock = createChainMock();
 
-// Mock @/lib/supabase/server
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({
-      auth: {
-        getUser: mockGetUser,
-      },
-      from: vi.fn(() => chainMock),
-    })
-  ),
+// Mock user for authenticated requests
+const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+// Mock Supabase client
+const mockSupabase = {
+  from: vi.fn(() => chainMock),
+};
+
+// Mock @/lib/auth-helper
+vi.mock('@/lib/auth-helper', () => ({
+  corsHeaders: vi.fn((request, methods) => ({
+    'Access-Control-Allow-Origin': request.headers.get('origin') || '*',
+    'Access-Control-Allow-Methods': methods?.join(', ') || 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  })),
+  getAuthenticatedUser: vi.fn(),
 }));
 
 // Import after mocks
 const { GET } = await import('../app/api/subscription/route.js');
+const { getAuthenticatedUser } = await import('@/lib/auth-helper');
 
 /**
  * Helper to create a mock request
@@ -51,6 +56,7 @@ describe('Subscription API Route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   afterEach(() => {
@@ -59,11 +65,8 @@ describe('Subscription API Route', () => {
 
   describe('GET /api/subscription', () => {
     it('should return 401 when no session cookie (not authenticated)', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         headers: {},
@@ -77,11 +80,8 @@ describe('Subscription API Route', () => {
     });
 
     it('should return 401 when session is invalid', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Invalid session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         headers: {},
@@ -95,16 +95,13 @@ describe('Subscription API Route', () => {
     });
 
     it('should return free tier for user with no subscription', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       // PGRST116 = no rows returned
       chainMock.single.mockResolvedValue({
         data: null,
         error: { code: 'PGRST116' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -121,11 +118,6 @@ describe('Subscription API Route', () => {
     });
 
     it('should return pro subscription for active pro user', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           tier: 'pro',
@@ -135,6 +127,8 @@ describe('Subscription API Route', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -153,11 +147,6 @@ describe('Subscription API Route', () => {
     });
 
     it('should return inactive pro subscription when canceled', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           tier: 'pro',
@@ -167,6 +156,8 @@ describe('Subscription API Route', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -184,11 +175,6 @@ describe('Subscription API Route', () => {
     });
 
     it('should return inactive when subscription is past_due', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           tier: 'pro',
@@ -198,6 +184,8 @@ describe('Subscription API Route', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -214,11 +202,6 @@ describe('Subscription API Route', () => {
     });
 
     it('should handle team tier subscription', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           tier: 'team',
@@ -228,6 +211,8 @@ describe('Subscription API Route', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -244,11 +229,6 @@ describe('Subscription API Route', () => {
     });
 
     it('should handle null subscription fields gracefully', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           tier: 'pro',
@@ -258,6 +238,8 @@ describe('Subscription API Route', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -277,18 +259,16 @@ describe('Subscription Tier Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   it('should correctly identify free tier as active', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.single.mockResolvedValue({
       data: null,
       error: { code: 'PGRST116' },
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       headers: { authorization: 'Bearer valid-token' },
@@ -303,11 +283,6 @@ describe('Subscription Tier Logic', () => {
   });
 
   it('should correctly identify pro tier with active status', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.single.mockResolvedValue({
       data: {
         tier: 'pro',
@@ -315,6 +290,8 @@ describe('Subscription Tier Logic', () => {
       },
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       headers: { authorization: 'Bearer valid-token' },
@@ -331,11 +308,6 @@ describe('Subscription Tier Logic', () => {
     const inactiveStatuses = ['canceled', 'past_due', 'unpaid', 'incomplete'];
 
     for (const status of inactiveStatuses) {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           tier: 'pro',
@@ -343,6 +315,8 @@ describe('Subscription Tier Logic', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         headers: { authorization: 'Bearer valid-token' },
@@ -360,19 +334,17 @@ describe('Subscription API Error Handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   it('should handle database errors gracefully', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     // Non-PGRST116 error (actual database error)
     chainMock.single.mockResolvedValue({
       data: null,
       error: { code: 'PGRST500', message: 'Database connection failed' },
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       headers: { authorization: 'Bearer valid-token' },
@@ -387,11 +359,8 @@ describe('Subscription API Error Handling', () => {
   });
 
   it('should handle expired session', async () => {
-    // Mock session cookie auth to fail
-    mockGetUser.mockResolvedValue({
-      data: { user: null },
-      error: { message: 'Session has expired' },
-    });
+    // Mock auth to fail
+    getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
     const request = createMockRequest({
       headers: {},

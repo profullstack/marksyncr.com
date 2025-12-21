@@ -2,48 +2,13 @@
  * GET /api/subscription
  * Get the current user's subscription status
  * 
- * Authentication: Session cookie only (both web and extension use cookies)
+ * Authentication: Session cookie (web) OR Bearer token (extension)
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
 
-// Allowed origins for CORS (extension and web app)
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'https://marksyncr.com',
-  'https://www.marksyncr.com',
-  'chrome-extension://',
-  'moz-extension://',
-  'safari-extension://',
-];
-
-/**
- * Get CORS origin from request
- */
-function getCorsOrigin(request) {
-  const origin = request.headers.get('origin');
-  if (!origin) return null;
-  
-  // Check if origin matches allowed patterns
-  if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
-    return origin;
-  }
-  return null;
-}
-
-/**
- * Create CORS headers for response
- */
-function corsHeaders(request) {
-  const origin = getCorsOrigin(request);
-  return {
-    'Access-Control-Allow-Origin': origin || 'null',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
-  };
-}
+const METHODS = ['GET', 'OPTIONS'];
 
 /**
  * Handle CORS preflight requests
@@ -51,20 +16,17 @@ function corsHeaders(request) {
 export async function OPTIONS(request) {
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders(request),
+    headers: corsHeaders(request, METHODS),
   });
 }
 
 export async function GET(request) {
-  const headers = corsHeaders(request);
+  const headers = corsHeaders(request, METHODS);
   
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await getAuthenticatedUser(request);
 
-    // Session cookie authentication only
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (!user || !supabase) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401, headers }

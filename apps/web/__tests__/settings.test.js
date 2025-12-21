@@ -1,13 +1,10 @@
 /**
  * @fileoverview Tests for settings API routes
  * Tests GET, PUT /api/settings endpoints
- * Uses Vitest with mocked Supabase client
+ * Uses Vitest with mocked auth helper
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock Supabase responses
-const mockGetUser = vi.fn();
 
 // Chain mock setup
 const createChainMock = () => ({
@@ -19,20 +16,28 @@ const createChainMock = () => ({
 
 let chainMock = createChainMock();
 
-// Mock @/lib/supabase/server
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({
-      auth: {
-        getUser: mockGetUser,
-      },
-      from: vi.fn(() => chainMock),
-    })
-  ),
+// Mock user for authenticated requests
+const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+// Mock Supabase client
+const mockSupabase = {
+  from: vi.fn(() => chainMock),
+};
+
+// Mock @/lib/auth-helper
+vi.mock('@/lib/auth-helper', () => ({
+  corsHeaders: vi.fn((request, methods) => ({
+    'Access-Control-Allow-Origin': request.headers.get('origin') || '*',
+    'Access-Control-Allow-Methods': methods?.join(', ') || 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  })),
+  getAuthenticatedUser: vi.fn(),
 }));
 
 // Import after mocks
 const { GET, PUT } = await import('../app/api/settings/route.js');
+const { getAuthenticatedUser } = await import('@/lib/auth-helper');
 
 /**
  * Helper to create a mock request
@@ -53,6 +58,7 @@ describe('Settings API Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   afterEach(() => {
@@ -61,11 +67,8 @@ describe('Settings API Routes', () => {
 
   describe('GET /api/settings', () => {
     it('should return 401 when no session cookie (not authenticated)', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -80,11 +83,8 @@ describe('Settings API Routes', () => {
     });
 
     it('should return 401 when session is invalid', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Invalid session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -113,15 +113,12 @@ describe('Settings API Routes', () => {
         theme: 'dark',
       };
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: { settings: mockSettings },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -136,16 +133,13 @@ describe('Settings API Routes', () => {
     });
 
     it('should return default settings when user has no saved settings', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       // PGRST116 = no rows returned
       chainMock.single.mockResolvedValue({
         data: null,
         error: { code: 'PGRST116' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -172,15 +166,12 @@ describe('Settings API Routes', () => {
     });
 
     it('should return default settings when settings field is null', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: { settings: null },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -198,11 +189,8 @@ describe('Settings API Routes', () => {
 
   describe('PUT /api/settings', () => {
     it('should return 401 when no session cookie (not authenticated)', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -218,10 +206,7 @@ describe('Settings API Routes', () => {
     });
 
     it('should return 400 when settings is missing', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -237,10 +222,7 @@ describe('Settings API Routes', () => {
     });
 
     it('should return 400 when settings is not an object', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -262,11 +244,6 @@ describe('Settings API Routes', () => {
         theme: 'dark',
       };
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           settings: {
@@ -283,6 +260,8 @@ describe('Settings API Routes', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -305,11 +284,6 @@ describe('Settings API Routes', () => {
         theme: 'light',
       };
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           settings: {
@@ -328,6 +302,8 @@ describe('Settings API Routes', () => {
         },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -350,11 +326,6 @@ describe('Settings API Routes', () => {
         },
       };
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: {
           settings: {
@@ -374,6 +345,8 @@ describe('Settings API Routes', () => {
         error: null,
       });
 
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
       const request = createMockRequest({
         method: 'PUT',
         headers: { authorization: 'Bearer valid-token' },
@@ -389,15 +362,12 @@ describe('Settings API Routes', () => {
     });
 
     it('should return 500 when upsert fails', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: null,
         error: { message: 'Database error' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -418,21 +388,19 @@ describe('Settings API Validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   it('should accept valid syncInterval values', async () => {
     const validIntervals = ['manual', 'hourly', 'daily', 'weekly'];
 
     for (const interval of validIntervals) {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: { settings: { syncInterval: interval } },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -450,15 +418,12 @@ describe('Settings API Validation', () => {
     const validResolutions = ['newest', 'oldest', 'manual'];
 
     for (const resolution of validResolutions) {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: { settings: { conflictResolution: resolution } },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -476,15 +441,12 @@ describe('Settings API Validation', () => {
     const validThemes = ['light', 'dark', 'system'];
 
     for (const theme of validThemes) {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.single.mockResolvedValue({
         data: { settings: { theme } },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'PUT',
@@ -504,15 +466,12 @@ describe('Settings API Validation', () => {
       autoBackup: false,
     };
 
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.single.mockResolvedValue({
       data: { settings: booleanSettings },
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       method: 'PUT',

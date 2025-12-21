@@ -2,10 +2,10 @@
  * @fileoverview Tests for extension API client
  * Tests all API functions in apps/extension/src/lib/api.js
  * Uses Vitest with mocked fetch and browser APIs
- * 
- * Authentication: Session cookies only (credentials: 'include')
- * The server sets HttpOnly cookies on login, which are automatically
- * sent with all subsequent requests.
+ *
+ * Authentication: Bearer tokens stored in browser.storage.local
+ * The extension stores access_token and refresh_token after login,
+ * and sends the access_token in the Authorization header.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -78,21 +78,21 @@ describe('API Client', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
         })
       );
       expect(result).toEqual(mockResponse);
     });
 
-    it('should store user data on successful login', async () => {
+    it('should store user data and session on successful login', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
+      const mockSession = {
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+      };
       const mockResponse = {
         user: mockUser,
-        session: {
-          access_token: 'access-token',
-          refresh_token: 'refresh-token',
-        },
+        session: mockSession,
       };
 
       mockFetch.mockResolvedValue({
@@ -102,6 +102,11 @@ describe('API Client', () => {
 
       await api.signInWithEmail('test@example.com', 'password123');
 
+      // Should store session
+      expect(mockStorageSet).toHaveBeenCalledWith({
+        session: mockSession,
+      });
+      // Should store user data
       expect(mockStorageSet).toHaveBeenCalledWith({
         user: mockUser,
         isLoggedIn: true,
@@ -149,7 +154,6 @@ describe('API Client', () => {
         'https://marksyncr.com/api/auth/signup',
         expect.objectContaining({
           method: 'POST',
-          credentials: 'include',
           body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
         })
       );
@@ -170,6 +174,7 @@ describe('API Client', () => {
 
   describe('signOut', () => {
     it('should call logout API and clear user data', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ message: 'Logged out' }),
@@ -181,10 +186,9 @@ describe('API Client', () => {
         'https://marksyncr.com/api/auth/logout',
         expect.objectContaining({
           method: 'POST',
-          credentials: 'include',
         })
       );
-      expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn']);
+      expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn', 'session']);
     });
 
     it('should clear user data even if API call fails', async () => {
@@ -192,12 +196,13 @@ describe('API Client', () => {
 
       await api.signOut();
 
-      expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn']);
+      expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn', 'session']);
     });
   });
 
   describe('getSession', () => {
-    it('should call session API with credentials', async () => {
+    it('should call session API with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ session: { user: { id: 'user-123' } } }),
@@ -208,7 +213,9 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/auth/session',
         expect.objectContaining({
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
         })
       );
       expect(result).toEqual({ user: { id: 'user-123' } });
@@ -320,7 +327,8 @@ describe('API Client', () => {
   });
 
   describe('fetchSubscription', () => {
-    it('should fetch subscription with credentials', async () => {
+    it('should fetch subscription with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const mockSubscription = {
         subscription: { tier: 'pro', status: 'active' },
       };
@@ -335,7 +343,9 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/subscription',
         expect.objectContaining({
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
         })
       );
       expect(result).toEqual(mockSubscription);
@@ -354,7 +364,8 @@ describe('API Client', () => {
   });
 
   describe('fetchCloudSettings', () => {
-    it('should fetch settings with credentials', async () => {
+    it('should fetch settings with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const mockSettings = {
         settings: { syncEnabled: true, theme: 'dark' },
       };
@@ -369,7 +380,9 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/settings',
         expect.objectContaining({
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
         })
       );
       expect(result).toEqual(mockSettings);
@@ -388,7 +401,8 @@ describe('API Client', () => {
   });
 
   describe('saveCloudSettings', () => {
-    it('should save settings with PUT request', async () => {
+    it('should save settings with PUT request and Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ settings: { theme: 'dark' } }),
@@ -401,7 +415,9 @@ describe('API Client', () => {
         'https://marksyncr.com/api/settings',
         expect.objectContaining({
           method: 'PUT',
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
           body: JSON.stringify({ theme: 'dark' }),
         })
       );
@@ -419,7 +435,8 @@ describe('API Client', () => {
   });
 
   describe('fetchBookmarks', () => {
-    it('should fetch bookmarks with credentials', async () => {
+    it('should fetch bookmarks with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const mockBookmarks = {
         bookmarks: [{ id: '1', url: 'https://example.com' }],
         count: 1,
@@ -435,7 +452,9 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
         })
       );
       expect(result).toEqual(mockBookmarks);
@@ -453,7 +472,8 @@ describe('API Client', () => {
   });
 
   describe('syncBookmarks', () => {
-    it('should sync bookmarks with POST request', async () => {
+    it('should sync bookmarks with POST request and Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const bookmarks = [
         { url: 'https://example.com', title: 'Example' },
       ];
@@ -469,7 +489,9 @@ describe('API Client', () => {
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
           method: 'POST',
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
           body: JSON.stringify({ bookmarks, source: 'browser' }),
         })
       );
@@ -487,7 +509,8 @@ describe('API Client', () => {
   });
 
   describe('deleteBookmark', () => {
-    it('should delete bookmark by URL', async () => {
+    it('should delete bookmark by URL with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       mockFetch.mockResolvedValue({
         ok: true,
       });
@@ -498,14 +521,17 @@ describe('API Client', () => {
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
           method: 'DELETE',
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
           body: JSON.stringify({ url: 'https://example.com' }),
         })
       );
       expect(result).toBe(true);
     });
 
-    it('should delete bookmark by ID', async () => {
+    it('should delete bookmark by ID with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       mockFetch.mockResolvedValue({
         ok: true,
       });
@@ -516,7 +542,9 @@ describe('API Client', () => {
         'https://marksyncr.com/api/bookmarks',
         expect.objectContaining({
           method: 'DELETE',
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
           body: JSON.stringify({ id: 'bookmark-123' }),
         })
       );
@@ -617,7 +645,8 @@ describe('API Client', () => {
   });
 
   describe('fetchVersionHistory', () => {
-    it('should fetch version history with pagination', async () => {
+    it('should fetch version history with pagination and Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const mockVersions = {
         versions: [{ id: '1', created_at: '2024-01-01' }],
         retentionLimit: 10,
@@ -633,7 +662,9 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/versions?limit=10&offset=0',
         expect.objectContaining({
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
         })
       );
       expect(result).toEqual(mockVersions);
@@ -651,7 +682,8 @@ describe('API Client', () => {
   });
 
   describe('fetchTags', () => {
-    it('should fetch tags with credentials', async () => {
+    it('should fetch tags with Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const mockTags = {
         tags: [{ id: '1', name: 'work', color: '#ff0000' }],
       };
@@ -666,7 +698,9 @@ describe('API Client', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://marksyncr.com/api/tags',
         expect.objectContaining({
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
         })
       );
       expect(result).toEqual([{ id: '1', name: 'work', color: '#ff0000' }]);
@@ -684,7 +718,8 @@ describe('API Client', () => {
   });
 
   describe('saveBookmarkVersion', () => {
-    it('should save bookmark version with POST request', async () => {
+    it('should save bookmark version with POST request and Bearer token', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
       const bookmarkData = { bookmarks: [{ url: 'https://example.com' }] };
       
       mockFetch.mockResolvedValue({
@@ -698,7 +733,9 @@ describe('API Client', () => {
         'https://marksyncr.com/api/versions',
         expect.objectContaining({
           method: 'POST',
-          credentials: 'include',
+          headers: expect.objectContaining({
+            'Authorization': 'Bearer test-token',
+          }),
           body: JSON.stringify({
             bookmarkData,
             sourceType: 'browser',
@@ -730,7 +767,9 @@ describe('API Client Session Handling', () => {
     mockStorageRemove.mockResolvedValue(undefined);
   });
 
-  it('should clear user data on 401 response', async () => {
+  it('should clear user data on 401 response when no refresh token', async () => {
+    // No session stored, so no refresh token available
+    mockStorageGet.mockResolvedValue({});
     mockFetch.mockResolvedValue({
       ok: false,
       status: 401,
@@ -739,7 +778,7 @@ describe('API Client Session Handling', () => {
 
     await api.fetchCloudSettings();
 
-    expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn']);
+    expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn', 'session']);
   });
 
   it('should not clear user data on other errors', async () => {

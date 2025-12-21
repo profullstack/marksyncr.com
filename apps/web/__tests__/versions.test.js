@@ -6,19 +6,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock Supabase responses
-const mockGetUser = vi.fn();
 const mockRpc = vi.fn();
+const mockSupabase = {
+  rpc: mockRpc,
+};
 
-// Mock @/lib/supabase/server
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({
-      auth: {
-        getUser: mockGetUser,
-      },
-      rpc: mockRpc,
-    })
-  ),
+// Mock user for authenticated requests
+const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+// Mock @/lib/auth-helper
+vi.mock('@/lib/auth-helper', () => ({
+  corsHeaders: vi.fn((request, methods) => ({
+    'Access-Control-Allow-Origin': request.headers.get('origin') || '*',
+    'Access-Control-Allow-Methods': methods?.join(', ') || 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  })),
+  getAuthenticatedUser: vi.fn(),
 }));
 
 // Mock @marksyncr/core
@@ -28,6 +32,7 @@ vi.mock('@marksyncr/core', () => ({
 
 // Import after mocks
 const { GET, POST, OPTIONS } = await import('../app/api/versions/route.js');
+const { getAuthenticatedUser } = await import('@/lib/auth-helper');
 
 /**
  * Helper to create a mock request
@@ -66,18 +71,15 @@ describe('Versions API', () => {
       expect(response.status).toBe(204);
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
       expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET, POST, OPTIONS');
-      expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
+      expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization');
       expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     });
   });
 
   describe('GET /api/versions', () => {
     it('should return 401 if no auth (no header and no session)', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -92,11 +94,8 @@ describe('Versions API', () => {
     });
 
     it('should return 401 if authorization header is invalid format and no session', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -111,11 +110,8 @@ describe('Versions API', () => {
     });
 
     it('should return 401 if token is invalid and no session', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Invalid token' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -130,7 +126,6 @@ describe('Versions API', () => {
     });
 
     it('should return version history for authenticated user', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
       const mockVersions = [
         {
           id: 'v1',
@@ -158,14 +153,11 @@ describe('Versions API', () => {
         },
       ];
 
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc
         .mockResolvedValueOnce({ data: mockVersions, error: null })
         .mockResolvedValueOnce({ data: 10, error: null });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -194,16 +186,11 @@ describe('Versions API', () => {
     });
 
     it('should use default limit and offset', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc
         .mockResolvedValueOnce({ data: [], error: null })
         .mockResolvedValueOnce({ data: 5, error: null });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -220,16 +207,11 @@ describe('Versions API', () => {
     });
 
     it('should use custom limit and offset from query params', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc
         .mockResolvedValueOnce({ data: [], error: null })
         .mockResolvedValueOnce({ data: 5, error: null });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -247,17 +229,12 @@ describe('Versions API', () => {
     });
 
     it('should return 500 if database query fails', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc.mockResolvedValue({
         data: null,
         error: { message: 'Database error' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -272,16 +249,11 @@ describe('Versions API', () => {
     });
 
     it('should return default retention limit if not found', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc
         .mockResolvedValueOnce({ data: [], error: null })
         .mockResolvedValueOnce({ data: null, error: null });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -296,16 +268,11 @@ describe('Versions API', () => {
     });
 
     it('should handle empty version history', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc
         .mockResolvedValueOnce({ data: null, error: null })
         .mockResolvedValueOnce({ data: 5, error: null });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -322,11 +289,8 @@ describe('Versions API', () => {
 
   describe('POST /api/versions', () => {
     it('should return 401 if no auth (no header and no session)', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'POST',
@@ -342,11 +306,8 @@ describe('Versions API', () => {
     });
 
     it('should return 401 if token is invalid and no session', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Invalid token' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'POST',
@@ -362,12 +323,7 @@ describe('Versions API', () => {
     });
 
     it('should return 400 if bookmarkData is missing', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -383,12 +339,7 @@ describe('Versions API', () => {
     });
 
     it('should return 400 if sourceType is missing', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -404,7 +355,6 @@ describe('Versions API', () => {
     });
 
     it('should save version successfully', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
       const mockVersion = {
         id: 'v1',
         version: 1,
@@ -412,15 +362,12 @@ describe('Versions API', () => {
         created_at: '2024-01-01T00:00:00Z',
       };
 
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc.mockResolvedValue({
         data: mockVersion,
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -448,17 +395,12 @@ describe('Versions API', () => {
     });
 
     it('should call save_bookmark_version with correct parameters', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc.mockResolvedValue({
         data: { id: 'v1', version: 1, checksum: 'abc', created_at: '2024-01-01' },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const bookmarkData = { roots: { toolbar: [], menu: [], other: [] } };
       const request = createMockRequest({
@@ -489,17 +431,12 @@ describe('Versions API', () => {
     });
 
     it('should use null for optional fields if not provided', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc.mockResolvedValue({
         data: { id: 'v1', version: 1, checksum: 'abc', created_at: '2024-01-01' },
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const bookmarkData = { roots: {} };
       const request = createMockRequest({
@@ -526,17 +463,12 @@ describe('Versions API', () => {
     });
 
     it('should return 500 if database save fails', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc.mockResolvedValue({
         data: null,
         error: { message: 'Database error' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -555,17 +487,12 @@ describe('Versions API', () => {
     });
 
     it('should handle null response data gracefully', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockGetUser.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
       mockRpc.mockResolvedValue({
         data: null,
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',

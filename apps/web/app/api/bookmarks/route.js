@@ -2,48 +2,11 @@
  * GET /api/bookmarks - Get user's bookmarks
  * POST /api/bookmarks - Sync bookmarks from extension
  *
- * Authentication: Session cookie only (both web and extension use cookies)
+ * Authentication: Session cookie (web) OR Bearer token (extension)
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-
-// Allowed origins for CORS (extension and web app)
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'https://marksyncr.com',
-  'https://www.marksyncr.com',
-  'chrome-extension://',
-  'moz-extension://',
-  'safari-extension://',
-];
-
-/**
- * Get CORS origin from request
- */
-function getCorsOrigin(request) {
-  const origin = request.headers.get('origin');
-  if (!origin) return null;
-  
-  // Check if origin matches allowed patterns
-  if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
-    return origin;
-  }
-  return null;
-}
-
-/**
- * Create CORS headers for response
- */
-function corsHeaders(request) {
-  const origin = getCorsOrigin(request);
-  return {
-    'Access-Control-Allow-Origin': origin || 'null',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
-  };
-}
+import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
 
 /**
  * Handle CORS preflight requests
@@ -51,20 +14,17 @@ function corsHeaders(request) {
 export async function OPTIONS(request) {
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders(request),
+    headers: corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']),
   });
 }
 
 export async function GET(request) {
-  const headers = corsHeaders(request);
+  const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
   
   try {
-    const supabase = await createClient();
-    
-    // Session cookie authentication only
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, supabase } = await getAuthenticatedUser(request);
 
-    if (authError || !user) {
+    if (!user || !supabase) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401, headers }
@@ -100,15 +60,12 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const headers = corsHeaders(request);
+  const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
   
   try {
-    const supabase = await createClient();
-    
-    // Session cookie authentication only
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, supabase } = await getAuthenticatedUser(request);
 
-    if (authError || !user) {
+    if (!user || !supabase) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401, headers }
@@ -156,22 +113,6 @@ export async function POST(request) {
       );
     }
 
-    // Create a version history entry for this sync
-    const { error: versionError } = await supabase
-      .from('bookmark_versions')
-      .insert({
-        user_id: user.id,
-        source,
-        bookmark_count: processedBookmarks.length,
-        snapshot: processedBookmarks,
-        created_at: new Date().toISOString(),
-      });
-
-    if (versionError) {
-      console.error('Version history error:', versionError);
-      // Don't fail the sync if version history fails
-    }
-
     return NextResponse.json({
       synced: data?.length || 0,
       total: processedBookmarks.length,
@@ -187,15 +128,12 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
-  const headers = corsHeaders(request);
+  const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
   
   try {
-    const supabase = await createClient();
-    
-    // Session cookie authentication only
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, supabase } = await getAuthenticatedUser(request);
 
-    if (authError || !user) {
+    if (!user || !supabase) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401, headers }

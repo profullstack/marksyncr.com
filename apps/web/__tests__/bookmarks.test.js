@@ -1,22 +1,10 @@
 /**
  * @fileoverview Tests for bookmarks API routes
  * Tests GET, POST, DELETE /api/bookmarks endpoints
- * Uses Vitest with mocked Supabase client
+ * Uses Vitest with mocked auth helper
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NextRequest } from 'next/server';
-
-// Mock Supabase responses
-const mockGetUser = vi.fn();
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpsert = vi.fn();
-const mockDelete = vi.fn();
-const mockEq = vi.fn();
-const mockOrder = vi.fn();
-const mockSingle = vi.fn();
 
 // Chain mock setup
 const createChainMock = () => ({
@@ -31,20 +19,28 @@ const createChainMock = () => ({
 
 let chainMock = createChainMock();
 
-// Mock @/lib/supabase/server
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({
-      auth: {
-        getUser: mockGetUser,
-      },
-      from: vi.fn(() => chainMock),
-    })
-  ),
+// Mock user for authenticated requests
+const mockUser = { id: 'user-123', email: 'test@example.com' };
+
+// Mock Supabase client
+const mockSupabase = {
+  from: vi.fn(() => chainMock),
+};
+
+// Mock @/lib/auth-helper
+vi.mock('@/lib/auth-helper', () => ({
+  corsHeaders: vi.fn((request, methods) => ({
+    'Access-Control-Allow-Origin': request.headers.get('origin') || '*',
+    'Access-Control-Allow-Methods': methods?.join(', ') || 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  })),
+  getAuthenticatedUser: vi.fn(),
 }));
 
 // Import after mocks
 const { GET, POST, DELETE } = await import('../app/api/bookmarks/route.js');
+const { getAuthenticatedUser } = await import('@/lib/auth-helper');
 
 /**
  * Helper to create a mock NextRequest
@@ -67,6 +63,7 @@ describe('Bookmarks API Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   afterEach(() => {
@@ -75,11 +72,8 @@ describe('Bookmarks API Routes', () => {
 
   describe('GET /api/bookmarks', () => {
     it('should return 401 when no auth (no header and no session)', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -94,11 +88,8 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 401 when authorization header is invalid format and no session', async () => {
-      // Mock session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -113,11 +104,8 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 401 when token is invalid and no session', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Invalid token' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'GET',
@@ -137,15 +125,12 @@ describe('Bookmarks API Routes', () => {
         { id: '2', url: 'https://test.com', title: 'Test', user_id: 'user-123' },
       ];
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.order.mockResolvedValue({
         data: mockBookmarks,
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -161,15 +146,12 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return empty array when user has no bookmarks', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.order.mockResolvedValue({
         data: [],
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -185,15 +167,12 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 500 when database query fails', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.order.mockResolvedValue({
         data: null,
         error: { message: 'Database error' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'GET',
@@ -210,11 +189,8 @@ describe('Bookmarks API Routes', () => {
 
   describe('POST /api/bookmarks', () => {
     it('should return 401 when no auth (no header and no session)', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'POST',
@@ -230,10 +206,7 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 400 when bookmarks is not an array', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -249,10 +222,7 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 400 when bookmarks is missing', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -273,11 +243,6 @@ describe('Bookmarks API Routes', () => {
         { id: '2', url: 'https://test.com', title: 'Test' },
       ];
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.select.mockResolvedValue({
         data: bookmarksToSync.map((b) => ({ ...b, user_id: 'user-123' })),
         error: null,
@@ -287,6 +252,8 @@ describe('Bookmarks API Routes', () => {
       chainMock.insert = vi.fn().mockResolvedValue({
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -308,11 +275,6 @@ describe('Bookmarks API Routes', () => {
         { url: 'https://example.com' }, // Missing title, id, etc.
       ];
 
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.select.mockResolvedValue({
         data: [{ url: 'https://example.com', user_id: 'user-123' }],
         error: null,
@@ -321,6 +283,8 @@ describe('Bookmarks API Routes', () => {
       chainMock.insert = vi.fn().mockResolvedValue({
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -336,11 +300,6 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should use default source when not provided', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.select.mockResolvedValue({
         data: [{ url: 'https://example.com', user_id: 'user-123' }],
         error: null,
@@ -349,6 +308,8 @@ describe('Bookmarks API Routes', () => {
       chainMock.insert = vi.fn().mockResolvedValue({
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -362,15 +323,12 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 500 when upsert fails', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.select.mockResolvedValue({
         data: null,
         error: { message: 'Upsert failed' },
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -386,11 +344,6 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should handle empty bookmarks array', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       chainMock.select.mockResolvedValue({
         data: [],
         error: null,
@@ -399,6 +352,8 @@ describe('Bookmarks API Routes', () => {
       chainMock.insert = vi.fn().mockResolvedValue({
         error: null,
       });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'POST',
@@ -417,11 +372,8 @@ describe('Bookmarks API Routes', () => {
 
   describe('DELETE /api/bookmarks', () => {
     it('should return 401 when no auth (no header and no session)', async () => {
-      // Mock both Bearer token and session cookie auth to fail
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'No session' },
-      });
+      // Mock auth to fail
+      getAuthenticatedUser.mockResolvedValue({ user: null, supabase: null });
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -437,10 +389,7 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 400 when neither url nor id is provided', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -456,11 +405,6 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should delete bookmark by URL', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       // Create a proper chain mock for delete operations
       // The chain is: from().delete().eq('user_id').eq('url')
       // Each .eq() call returns an object with another .eq() method
@@ -469,6 +413,8 @@ describe('Bookmarks API Routes', () => {
       const firstEq = vi.fn().mockReturnValue({ eq: secondEq, then: finalResult.then.bind(finalResult) });
       const deleteMock = vi.fn().mockReturnValue({ eq: firstEq });
       chainMock.delete = deleteMock;
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -484,17 +430,14 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should delete bookmark by ID', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       // Create a proper chain mock for delete operations
       const finalResult = Promise.resolve({ error: null });
       const secondEq = vi.fn().mockReturnValue(finalResult);
       const firstEq = vi.fn().mockReturnValue({ eq: secondEq, then: finalResult.then.bind(finalResult) });
       const deleteMock = vi.fn().mockReturnValue({ eq: firstEq });
       chainMock.delete = deleteMock;
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -510,17 +453,14 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should prefer ID over URL when both are provided', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       // Create a proper chain mock for delete operations
       const finalResult = Promise.resolve({ error: null });
       const secondEq = vi.fn().mockReturnValue(finalResult);
       const firstEq = vi.fn().mockReturnValue({ eq: secondEq, then: finalResult.then.bind(finalResult) });
       const deleteMock = vi.fn().mockReturnValue({ eq: firstEq });
       chainMock.delete = deleteMock;
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -534,17 +474,14 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 500 when delete fails', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      });
-
       // Create a proper chain mock for delete operations that fails
       const finalResult = Promise.resolve({ error: { message: 'Delete failed' } });
       const secondEq = vi.fn().mockReturnValue(finalResult);
       const firstEq = vi.fn().mockReturnValue({ eq: secondEq, then: finalResult.then.bind(finalResult) });
       const deleteMock = vi.fn().mockReturnValue({ eq: firstEq });
       chainMock.delete = deleteMock;
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -565,17 +502,13 @@ describe('Bookmarks API Edge Cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     chainMock = createChainMock();
+    mockSupabase.from = vi.fn(() => chainMock);
   });
 
   it('should handle bookmarks with special characters in URL', async () => {
     const bookmarksToSync = [
       { url: 'https://example.com/path?query=value&foo=bar#section', title: 'Special URL' },
     ];
-
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
 
     chainMock.select.mockResolvedValue({
       data: bookmarksToSync.map((b) => ({ ...b, user_id: 'user-123' })),
@@ -585,6 +518,8 @@ describe('Bookmarks API Edge Cases', () => {
     chainMock.insert = vi.fn().mockResolvedValue({
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       method: 'POST',
@@ -602,11 +537,6 @@ describe('Bookmarks API Edge Cases', () => {
       { url: 'https://example.com', title: '日本語タイトル 🎉' },
     ];
 
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.select.mockResolvedValue({
       data: bookmarksToSync.map((b) => ({ ...b, user_id: 'user-123' })),
       error: null,
@@ -615,6 +545,8 @@ describe('Bookmarks API Edge Cases', () => {
     chainMock.insert = vi.fn().mockResolvedValue({
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       method: 'POST',
@@ -633,11 +565,6 @@ describe('Bookmarks API Edge Cases', () => {
       title: `Bookmark ${i}`,
     }));
 
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.select.mockResolvedValue({
       data: bookmarksToSync.map((b) => ({ ...b, user_id: 'user-123' })),
       error: null,
@@ -646,6 +573,8 @@ describe('Bookmarks API Edge Cases', () => {
     chainMock.insert = vi.fn().mockResolvedValue({
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       method: 'POST',
@@ -665,11 +594,6 @@ describe('Bookmarks API Edge Cases', () => {
       { url: 'https://example.com', title: 'Example', folderPath: '/Bookmarks/Work/Projects/2024' },
     ];
 
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.select.mockResolvedValue({
       data: bookmarksToSync.map((b) => ({ ...b, user_id: 'user-123' })),
       error: null,
@@ -678,6 +602,8 @@ describe('Bookmarks API Edge Cases', () => {
     chainMock.insert = vi.fn().mockResolvedValue({
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       method: 'POST',
@@ -695,11 +621,6 @@ describe('Bookmarks API Edge Cases', () => {
       { url: 'https://example.com', title: 'Example', tags: ['work', 'important', 'reference'] },
     ];
 
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    });
-
     chainMock.select.mockResolvedValue({
       data: bookmarksToSync.map((b) => ({ ...b, user_id: 'user-123' })),
       error: null,
@@ -708,6 +629,8 @@ describe('Bookmarks API Edge Cases', () => {
     chainMock.insert = vi.fn().mockResolvedValue({
       error: null,
     });
+
+    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
     const request = createMockRequest({
       method: 'POST',
