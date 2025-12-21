@@ -44,9 +44,14 @@ export async function signUpWithEmail(formData) {
 
   const supabase = await createClient();
   const headersList = await headers();
-  const origin = headersList.get('origin') || headersList.get('host');
+  
+  // Use NEXT_PUBLIC_APP_URL if available, otherwise construct from headers
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    headersList.get('origin') ||
+    `https://${headersList.get('host')}`;
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -55,8 +60,17 @@ export async function signUpWithEmail(formData) {
   });
 
   if (error) {
+    console.error('Signup error:', error.message);
     return { error: error.message };
   }
+
+  // Check if user already exists (Supabase returns a user with identities: [] for existing users)
+  if (data?.user?.identities?.length === 0) {
+    return { error: 'An account with this email already exists. Please sign in instead.' };
+  }
+
+  // Log successful signup for debugging
+  console.log('Signup successful for:', email, 'User ID:', data?.user?.id);
 
   return {
     success: true,
@@ -71,7 +85,12 @@ export async function signUpWithEmail(formData) {
 export async function signInWithOAuth(provider) {
   const supabase = await createClient();
   const headersList = await headers();
-  const origin = headersList.get('origin') || `https://${headersList.get('host')}`;
+  
+  // Use NEXT_PUBLIC_APP_URL if available, otherwise construct from headers
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    headersList.get('origin') ||
+    `https://${headersList.get('host')}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
@@ -81,6 +100,7 @@ export async function signInWithOAuth(provider) {
   });
 
   if (error) {
+    console.error('OAuth error:', error.message);
     return { error: error.message };
   }
 
@@ -119,15 +139,23 @@ export async function resetPassword(formData) {
 
   const supabase = await createClient();
   const headersList = await headers();
-  const origin = headersList.get('origin') || `https://${headersList.get('host')}`;
+  
+  // Use NEXT_PUBLIC_APP_URL if available, otherwise construct from headers
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    headersList.get('origin') ||
+    `https://${headersList.get('host')}`;
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/reset-password`,
+    redirectTo: `${origin}/reset-password`,
   });
 
   if (error) {
+    console.error('Password reset error:', error.message);
     return { error: error.message };
   }
+
+  console.log('Password reset email sent to:', email);
 
   return {
     success: true,
