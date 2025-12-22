@@ -3,7 +3,7 @@
  * POST /api/bookmarks - Sync bookmarks from extension
  *
  * Authentication: Session cookie (web) OR Bearer token (extension)
- * 
+ *
  * The cloud_bookmarks table stores ALL bookmarks as a single JSONB blob per user:
  * - bookmark_data: JSONB containing array of bookmarks
  * - checksum: Hash of the bookmark data for change detection
@@ -29,6 +29,59 @@ export async function OPTIONS(request) {
  */
 function generateChecksum(data) {
   return crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+}
+
+/**
+ * Ensure user exists in public.users table
+ * This is needed because cloud_bookmarks has a foreign key to users
+ * The trigger should create users on signup, but this handles edge cases
+ */
+async function ensureUserExists(supabase, user) {
+  // First check if user exists
+  const { data: existingUser, error: checkError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', user.id)
+    .single();
+
+  if (existingUser) {
+    return true; // User already exists
+  }
+
+  // User doesn't exist, create them
+  const { error: insertError } = await supabase
+    .from('users')
+    .insert({
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.name || user.user_metadata?.full_name || null,
+      avatar_url: user.user_metadata?.avatar_url || null,
+      created_at: new Date().toISOString(),
+    });
+
+  if (insertError && insertError.code !== '23505') {
+    // 23505 = unique violation (user already exists, race condition)
+    console.error('Error creating user:', insertError);
+    return false;
+  }
+
+  // Also create a free subscription for the user
+  const { error: subError } = await supabase
+    .from('subscriptions')
+    .insert({
+      user_id: user.id,
+      plan: 'free',
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+  if (subError && subError.code !== '23505') {
+    console.error('Error creating subscription:', subError);
+    // Don't fail - user was created, subscription is optional
+  }
+
+  return true;
 }
 
 export async function GET(request) {
@@ -98,6 +151,15 @@ export async function POST(request) {
       return NextResponse.json(
         { error: 'Bookmarks array is required' },
         { status: 400, headers }
+      );
+    }
+
+    // Ensure user exists in public.users table (required for foreign key)
+    const userCreated = await ensureUserExists(supabase, user);
+    if (!userCreated) {
+      return NextResponse.json(
+        { error: 'Failed to create user record' },
+        { status: 500, headers }
       );
     }
 
