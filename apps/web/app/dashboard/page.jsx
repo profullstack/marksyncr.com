@@ -429,6 +429,26 @@ function QuickActionsCard() {
             <p className="text-xs text-slate-500">Install for Safari</p>
           </div>
         </a>
+        <a
+          href="https://addons.opera.com/en/extensions/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
+        >
+          <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+            <Image
+              src="/icons/browser-opera.svg"
+              alt="Opera"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
+          </div>
+          <div>
+            <p className="font-medium text-slate-900">Opera Extension</p>
+            <p className="text-xs text-slate-500">Install for Opera</p>
+          </div>
+        </a>
         <Link
           href="/dashboard/history"
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"

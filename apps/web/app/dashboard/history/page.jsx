@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 /**
  * Version History Page
@@ -120,46 +121,43 @@ export default function HistoryPage() {
     return date.toLocaleString();
   };
 
-  const getBrowserIcon = (sourceType) => {
+  const getBrowserIconPath = (sourceType) => {
     switch (sourceType?.toLowerCase()) {
-      case 'firefox':
-        return <span className="text-3xl">🦊</span>;
       case 'chrome':
-        return (
-          <svg className="w-8 h-8" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="20" fill="#4CAF50"/>
-            <path fill="#F44336" d="M24,4C12.95,4,4,12.95,4,24c0,3.31,0.81,6.43,2.23,9.18L24,24V4z"/>
-            <path fill="#FFEB3B" d="M24,4v20l17.77,9.18C43.19,30.43,44,27.31,44,24C44,12.95,35.05,4,24,4z"/>
-            <path fill="#4CAF50" d="M6.23,33.18C9.38,39.49,16.18,44,24,44c7.82,0,14.62-4.51,17.77-10.82L24,24L6.23,33.18z"/>
-            <circle cx="24" cy="24" r="8" fill="#fff"/>
-            <circle cx="24" cy="24" r="6" fill="#2196F3"/>
-          </svg>
-        );
-      case 'edge':
-        // Microsoft Edge logo - blue wave design
-        return (
-          <svg className="w-8 h-8" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="edge-gradient-hist-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#0078D4"/>
-                <stop offset="100%" stopColor="#1DB954"/>
-              </linearGradient>
-              <linearGradient id="edge-gradient-hist-2" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#1DB954"/>
-                <stop offset="100%" stopColor="#0078D4"/>
-              </linearGradient>
-            </defs>
-            <path fill="url(#edge-gradient-hist-1)" d="M24 4C12.95 4 4 12.95 4 24c0 6.08 2.72 11.52 7 15.2V24c0-7.18 5.82-13 13-13s13 5.82 13 13c0 3.31-1.24 6.33-3.28 8.63C38.28 29.52 44 27.31 44 24c0-11.05-8.95-20-20-20z"/>
-            <path fill="url(#edge-gradient-hist-2)" d="M24 11c-7.18 0-13 5.82-13 13v15.2c3.48 2.68 7.82 4.28 12.5 4.28 8.56 0 15.72-5.72 18-13.48-2.95 3.3-7.22 5.38-12 5.38-8.84 0-16-7.16-16-16 0-4.42 1.79-8.42 4.68-11.32C20.18 8.06 22.08 8 24 8c-0.01 0 0 3 0 3z"/>
-            <circle cx="30" cy="24" r="6" fill="#fff"/>
-          </svg>
-        );
+        return '/icons/browser-chrome.svg';
+      case 'firefox':
+        return '/icons/browser-firefox.svg';
       case 'safari':
-        return <span className="text-3xl">🧭</span>;
-      case 'brave':
-        return <span className="text-3xl">🦁</span>;
+        return '/icons/browser-safari.svg';
+      case 'edge':
+        return '/icons/browser-edge.svg';
       case 'opera':
-        return <span className="text-3xl">🔴</span>;
+        return '/icons/browser-opera.svg';
+      case 'brave':
+        return '/icons/browser-brave.svg';
+      default:
+        return '/icons/browser-default.svg';
+    }
+  };
+
+  const getBrowserIcon = (sourceType) => {
+    const type = sourceType?.toLowerCase();
+    
+    // Browser types use Image component with SVG files
+    if (['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave'].includes(type)) {
+      return (
+        <Image
+          src={getBrowserIconPath(type)}
+          alt={type}
+          width={32}
+          height={32}
+          className="w-8 h-8"
+        />
+      );
+    }
+    
+    // Non-browser types use emojis
+    switch (type) {
       case 'vivaldi':
         return <span className="text-3xl">🎨</span>;
       case 'github':
@@ -175,7 +173,15 @@ export default function HistoryPage() {
       case 'rollback':
         return <span className="text-3xl">⏪</span>;
       default:
-        return <span className="text-3xl">📄</span>;
+        return (
+          <Image
+            src="/icons/browser-default.svg"
+            alt="Unknown"
+            width={32}
+            height={32}
+            className="w-8 h-8"
+          />
+        );
     }
   };
 
