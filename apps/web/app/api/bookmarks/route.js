@@ -15,11 +15,16 @@
  * - Tombstones are synced across browsers
  * - If a tombstone's deletedAt is newer than a bookmark's dateAdded, the bookmark is considered deleted
  * - This allows deletions to sync across browsers
+ *
+ * External sync:
+ * - After saving to Supabase, bookmarks are synced to all connected external sources (GitHub, Dropbox, etc.)
+ * - This happens asynchronously to not block the response
  */
 
 import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
 import crypto from 'crypto';
+import { syncBookmarksToGitHub } from '@marksyncr/sources/oauth/github-sync';
 
 /**
  * Handle CORS preflight requests
@@ -330,6 +335,102 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
   };
 }
 
+/**
+ * Sync bookmarks to all connected external sources (GitHub, Dropbox, etc.)
+ * This runs asynchronously after saving to Supabase
+ * @param {object} supabase - Supabase client
+ * @param {string} userId - User ID
+ * @param {Array} bookmarks - Bookmarks to sync
+ * @param {Array} tombstones - Tombstones for deleted bookmarks
+ * @param {string} checksum - Checksum of the bookmark data
+ */
+async function syncToExternalSources(supabase, userId, bookmarks, tombstones, checksum) {
+  try {
+    // Get all connected sync sources for this user
+    const { data: sources, error: sourcesError } = await supabase
+      .from('sync_sources')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('connected', true);
+
+    if (sourcesError) {
+      console.error('[External Sync] Failed to fetch sync sources:', sourcesError);
+      return;
+    }
+
+    if (!sources || sources.length === 0) {
+      console.log('[External Sync] No connected external sources found');
+      return;
+    }
+
+    console.log(`[External Sync] Found ${sources.length} connected sources`);
+
+    // Sync to each connected source
+    for (const source of sources) {
+      try {
+        if (source.source_type === 'github') {
+          await syncToGitHub(source, bookmarks, tombstones, checksum);
+        } else if (source.source_type === 'dropbox') {
+          // TODO: Implement Dropbox sync
+          console.log('[External Sync] Dropbox sync not yet implemented');
+        } else if (source.source_type === 'google_drive') {
+          // TODO: Implement Google Drive sync
+          console.log('[External Sync] Google Drive sync not yet implemented');
+        }
+      } catch (sourceError) {
+        console.error(`[External Sync] Failed to sync to ${source.source_type}:`, sourceError);
+        // Continue with other sources even if one fails
+      }
+    }
+  } catch (error) {
+    console.error('[External Sync] Error syncing to external sources:', error);
+  }
+}
+
+/**
+ * Sync bookmarks to a GitHub repository
+ * @param {object} source - Sync source configuration from database
+ * @param {Array} bookmarks - Bookmarks to sync
+ * @param {Array} tombstones - Tombstones for deleted bookmarks
+ * @param {string} checksum - Checksum of the bookmark data
+ */
+async function syncToGitHub(source, bookmarks, tombstones, checksum) {
+  const { access_token, repository, branch, file_path } = source;
+
+  if (!access_token) {
+    console.error('[GitHub Sync] No access token found for GitHub source');
+    return;
+  }
+
+  if (!repository) {
+    console.error('[GitHub Sync] No repository configured for GitHub source');
+    return;
+  }
+
+  console.log(`[GitHub Sync] Syncing ${bookmarks.length} bookmarks to ${repository}`);
+
+  try {
+    const result = await syncBookmarksToGitHub(
+      access_token,
+      repository,
+      branch || 'main',
+      file_path || 'bookmarks.json',
+      bookmarks,
+      tombstones,
+      checksum
+    );
+
+    console.log(`[GitHub Sync] Successfully synced to ${repository}:`, {
+      created: result.created,
+      bookmarkCount: result.bookmarkCount,
+      sha: result.sha,
+    });
+  } catch (error) {
+    console.error(`[GitHub Sync] Failed to sync to ${repository}:`, error);
+    throw error;
+  }
+}
+
 export async function POST(request) {
   const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
   
@@ -445,6 +546,11 @@ export async function POST(request) {
         { status: 500, headers }
       );
     }
+
+    // Sync to external sources (GitHub, Dropbox, etc.) asynchronously
+    // This runs in the background and doesn't block the response
+    syncToExternalSources(supabase, user.id, finalBookmarks, mergedTombstones, checksum)
+      .catch(err => console.error('[External Sync] Background sync failed:', err));
 
     return NextResponse.json({
       synced: normalizedBookmarks.length,

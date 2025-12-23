@@ -118,56 +118,118 @@ function StatusIndicator({ status }) {
   );
 }
 
-// Source selector component
-function SourceSelector({ sources, selectedSource, onSelect, onConnect, onDisconnect }) {
-  const selectedSourceObj = sources.find((s) => s.id === selectedSource);
+// Service icons
+const GitHubIcon = ({ className = '' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+  </svg>
+);
+
+const DropboxIcon = ({ className = '' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75-6 3.75-6-3.75zm18-3.75l6 3.75-6 3.75-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z"/>
+  </svg>
+);
+
+const GoogleDriveIcon = ({ className = '' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M7.71 3.5L1.15 15l3.43 5.5h6.56l3.43-5.5L7.71 3.5zm1.44 1.5l5.14 8.5H4.29L9.15 5zm6.56 0L22.85 15l-3.43 5.5H12.86l3.43-5.5-1.58-2.5 1.58-2.5L22.85 15l-3.43-5.5L13.71 5z"/>
+  </svg>
+);
+
+const CloudIcon = ({ className = '' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+  </svg>
+);
+
+const ExternalLinkIcon = ({ className = '' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+  </svg>
+);
+
+// Connected services display component
+function ConnectedServices({ sources }) {
+  const getServiceIcon = (sourceType) => {
+    switch (sourceType) {
+      case 'github':
+        return GitHubIcon;
+      case 'dropbox':
+        return DropboxIcon;
+      case 'google_drive':
+      case 'google-drive':
+        return GoogleDriveIcon;
+      default:
+        return CloudIcon;
+    }
+  };
+
+  const getServiceName = (source) => {
+    if (source.source_type === 'github' && source.repository) {
+      return `GitHub: ${source.repository}`;
+    }
+    return source.name || source.source_type;
+  };
+
+  const connectedSources = sources.filter(s => s.connected);
+  const hasConnectedSources = connectedSources.length > 0;
+
+  const openDashboard = () => {
+    window.open('https://marksyncr.com/dashboard', '_blank');
+  };
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-slate-700">Sync Source</label>
-      <select
-        value={selectedSource || ''}
-        onChange={(e) => onSelect(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-      >
-        <option value="">Select a source...</option>
-        {sources.map((source) => (
-          <option key={source.id} value={source.id}>
-            {source.name} {source.connected ? '✓' : ''}
-          </option>
-        ))}
-      </select>
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-slate-700">Connected Services</label>
+        <button
+          onClick={openDashboard}
+          className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
+        >
+          Manage
+          <ExternalLinkIcon className="h-3 w-3" />
+        </button>
+      </div>
 
-      {/* Connection status and button */}
-      {selectedSource && selectedSourceObj && (
-        <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
-          <div className="flex items-center space-x-2">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                selectedSourceObj.connected ? 'bg-green-500' : 'bg-slate-400'
-              }`}
-            />
-            <span className="text-sm text-slate-600">
-              {selectedSourceObj.connected ? 'Connected' : 'Not connected'}
-            </span>
-          </div>
-          {selectedSourceObj.connected ? (
-            <button
-              onClick={() => onDisconnect(selectedSource)}
-              className="text-sm text-red-600 hover:text-red-700"
-            >
-              Disconnect
-            </button>
-          ) : (
-            <button
-              onClick={() => onConnect(selectedSource)}
-              className="rounded-lg bg-primary-600 px-3 py-1 text-sm text-white hover:bg-primary-700"
-            >
-              Connect
-            </button>
-          )}
+      {hasConnectedSources ? (
+        <div className="space-y-2">
+          {connectedSources.map((source) => {
+            const Icon = getServiceIcon(source.source_type);
+            return (
+              <div
+                key={source.id}
+                className="flex items-center justify-between rounded-lg bg-slate-50 p-3"
+              >
+                <div className="flex items-center space-x-2">
+                  <Icon className="h-4 w-4 text-slate-600" />
+                  <span className="text-sm text-slate-700">{getServiceName(source)}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-xs text-green-600">Connected</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
+          <CloudIcon className="mx-auto h-8 w-8 text-slate-400" />
+          <p className="mt-2 text-sm text-slate-500">No services connected</p>
+          <button
+            onClick={openDashboard}
+            className="mt-2 rounded-lg bg-primary-600 px-3 py-1.5 text-sm text-white hover:bg-primary-700"
+          >
+            Connect Services
+          </button>
         </div>
       )}
+
+      {/* Info text */}
+      <p className="text-xs text-slate-500">
+        Bookmarks sync automatically to all connected services.
+      </p>
     </div>
   );
 }
@@ -261,17 +323,13 @@ export function Popup() {
   const {
     status,
     lastSync,
-    selectedSource,
     sources,
     stats,
     error,
-    setSelectedSource,
     triggerSync,
     forcePush,
     forcePull,
     initialize,
-    connectSource,
-    disconnectSource,
     // Pro features
     subscription,
     tags,
@@ -633,19 +691,13 @@ ${content}
             {/* Stats */}
             <SyncStats stats={stats} />
 
-            {/* Source selector */}
-            <SourceSelector
-              sources={sources}
-              selectedSource={selectedSource}
-              onSelect={setSelectedSource}
-              onConnect={connectSource}
-              onDisconnect={disconnectSource}
-            />
+            {/* Connected services display */}
+            <ConnectedServices sources={sources} />
 
             {/* Sync button */}
             <button
               onClick={handleSync}
-              disabled={status === 'syncing' || !selectedSource}
+              disabled={status === 'syncing' || !isAuthenticated}
               className="flex w-full items-center justify-center space-x-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <SyncIcon className="h-5 w-5" spinning={status === 'syncing'} />
@@ -656,7 +708,7 @@ ${content}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleForcePush}
-                disabled={status === 'syncing' || !selectedSource}
+                disabled={status === 'syncing' || !isAuthenticated}
                 className="flex items-center justify-center space-x-1 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
                 title="Overwrite cloud with local bookmarks"
               >
@@ -665,7 +717,7 @@ ${content}
               </button>
               <button
                 onClick={handleForcePull}
-                disabled={status === 'syncing' || !selectedSource}
+                disabled={status === 'syncing' || !isAuthenticated}
                 className="flex items-center justify-center space-x-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 title="Overwrite local with cloud bookmarks"
               >
