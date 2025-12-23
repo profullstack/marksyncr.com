@@ -1229,6 +1229,8 @@ async function forcePull() {
     }
     
     const cloudBookmarks = versionData.version.bookmarkData;
+    const browserType = detectBrowser();
+    console.log(`[MarkSyncr] Force Pull: browser=${browserType}`);
     console.log('[MarkSyncr] Retrieved cloud bookmarks:', cloudBookmarks);
     
     // Get current browser bookmarks to find root folders
@@ -1236,43 +1238,111 @@ async function forcePull() {
     const rootFolders = {};
     
     if (currentTree[0]?.children) {
+      console.log('[MarkSyncr] Force Pull: Local root folders:', currentTree[0].children.map(c => ({ id: c.id, title: c.title })));
+      
       for (const root of currentTree[0].children) {
         const title = root.title?.toLowerCase() || '';
-        if (title.includes('toolbar') || title.includes('bar')) {
+        const id = root.id;
+        
+        // Chrome/Opera/Edge/Brave use numeric IDs: '1' for bookmarks bar, '2' for other bookmarks
+        // Firefox uses string IDs: 'toolbar_____', 'menu________', 'unfiled_____'
+        if (title.includes('toolbar') || title.includes('bar') || id === '1') {
           rootFolders.toolbar = root;
-        } else if (title.includes('menu')) {
+          console.log(`[MarkSyncr] Force Pull: Found toolbar folder: id=${id}, title="${root.title}"`);
+        } else if (title.includes('menu') || id === 'menu________') {
           rootFolders.menu = root;
-        } else if (title.includes('other') || title.includes('unsorted')) {
+          console.log(`[MarkSyncr] Force Pull: Found menu folder: id=${id}, title="${root.title}"`);
+        } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
           rootFolders.other = root;
+          console.log(`[MarkSyncr] Force Pull: Found other folder: id=${id}, title="${root.title}"`);
         }
       }
     }
     
-    // Clear existing bookmarks in each root folder and recreate from cloud
-    let importedCount = 0;
-    let foldersCreated = 0;
+    console.log('[MarkSyncr] Force Pull: Detected root folders:', Object.keys(rootFolders));
     
+    // Clear existing bookmarks in each root folder
     for (const [rootKey, rootFolder] of Object.entries(rootFolders)) {
       if (!rootFolder) continue;
       
-      const cloudRoot = cloudBookmarks.roots?.[rootKey];
-      if (!cloudRoot?.children) continue;
-      
-      // Remove existing children
-      if (rootFolder.children) {
-        for (const child of rootFolder.children) {
+      // Get fresh children list (in case it changed)
+      try {
+        const children = await browser.bookmarks.getChildren(rootFolder.id);
+        console.log(`[MarkSyncr] Force Pull: Clearing ${children.length} items from ${rootKey} (${rootFolder.title})`);
+        
+        for (const child of children) {
           try {
             await browser.bookmarks.removeTree(child.id);
           } catch (err) {
             console.warn('[MarkSyncr] Failed to remove bookmark:', child.id, err);
           }
         }
+      } catch (err) {
+        console.warn(`[MarkSyncr] Failed to get children for ${rootKey}:`, err);
+      }
+    }
+    
+    // Recreate bookmarks from cloud data
+    // Handle the case where cloud has "menu" but browser doesn't (e.g., Opera importing from Firefox)
+    let importedCount = 0;
+    let foldersCreated = 0;
+    
+    // Define the mapping from cloud roots to local roots
+    // If a cloud root doesn't have a matching local root, fall back to 'other'
+    const cloudRoots = cloudBookmarks.roots || {};
+    const rootMapping = {
+      toolbar: rootFolders.toolbar || rootFolders.other,
+      menu: rootFolders.menu || rootFolders.other, // Fall back to 'other' if no menu (Opera, Chrome)
+      other: rootFolders.other || rootFolders.toolbar,
+    };
+    
+    console.log('[MarkSyncr] Force Pull: Root mapping:', {
+      toolbar: rootMapping.toolbar?.title || 'none',
+      menu: rootMapping.menu?.title || 'none',
+      other: rootMapping.other?.title || 'none',
+    });
+    
+    // Track which cloud roots we've processed to avoid duplicates
+    const processedCloudRoots = new Set();
+    
+    for (const [cloudRootKey, cloudRoot] of Object.entries(cloudRoots)) {
+      if (!cloudRoot?.children || cloudRoot.children.length === 0) {
+        console.log(`[MarkSyncr] Force Pull: Skipping empty cloud root: ${cloudRootKey}`);
+        continue;
+      }
+      
+      const targetFolder = rootMapping[cloudRootKey];
+      if (!targetFolder) {
+        console.warn(`[MarkSyncr] Force Pull: No target folder for cloud root: ${cloudRootKey}`);
+        continue;
+      }
+      
+      // If this target folder was already used for a different cloud root,
+      // we need to append to it rather than replace
+      const isSharedTarget = processedCloudRoots.has(targetFolder.id);
+      
+      console.log(`[MarkSyncr] Force Pull: Importing ${cloudRoot.children.length} items from cloud.${cloudRootKey} to ${targetFolder.title} (shared=${isSharedTarget})`);
+      
+      // Get current index to append after existing items if this is a shared target
+      let startIndex = 0;
+      if (isSharedTarget) {
+        try {
+          const existingChildren = await browser.bookmarks.getChildren(targetFolder.id);
+          startIndex = existingChildren.length;
+          console.log(`[MarkSyncr] Force Pull: Appending at index ${startIndex} (shared target)`);
+        } catch (err) {
+          console.warn('[MarkSyncr] Failed to get existing children count:', err);
+        }
       }
       
       // Recreate from cloud data
-      const result = await recreateBookmarks(rootFolder.id, cloudRoot.children);
+      const result = await recreateBookmarks(targetFolder.id, cloudRoot.children, startIndex);
       importedCount += result.bookmarks;
       foldersCreated += result.folders;
+      
+      processedCloudRoots.add(targetFolder.id);
+      
+      console.log(`[MarkSyncr] Force Pull: Imported ${result.bookmarks} bookmarks, ${result.folders} folders from ${cloudRootKey}`);
     }
     
     // Update last sync time
@@ -1281,6 +1351,8 @@ async function forcePull() {
     });
     
     const stats = { total: importedCount, folders: foldersCreated, synced: importedCount };
+    
+    console.log(`[MarkSyncr] Force Pull complete: ${importedCount} bookmarks, ${foldersCreated} folders`);
     
     return {
       success: true,
