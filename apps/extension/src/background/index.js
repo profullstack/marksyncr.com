@@ -456,6 +456,9 @@ async function initialize() {
     
     // Check alarm health every 2 minutes
     setInterval(async () => {
+      const { settings } = await browser.storage.local.get('settings');
+      const expectedInterval = settings?.syncInterval || DEFAULT_SYNC_INTERVAL;
+      
       const alarm = await browser.alarms.get(SYNC_ALARM_NAME);
       if (!alarm) {
         console.warn('[MarkSyncr] Firefox: Alarm not found, recreating...');
@@ -464,7 +467,15 @@ async function initialize() {
         const nextFire = new Date(alarm.scheduledTime);
         const now = new Date();
         const minutesUntilFire = Math.round((nextFire - now) / 60000);
-        console.log(`[MarkSyncr] Firefox: Alarm health check OK - next fire in ${minutesUntilFire} minutes`);
+        
+        // Check if alarm interval matches expected interval
+        if (alarm.periodInMinutes !== expectedInterval) {
+          console.warn(`[MarkSyncr] Firefox: Alarm interval mismatch (${alarm.periodInMinutes} vs ${expectedInterval}), recreating...`);
+          await browser.alarms.clear(SYNC_ALARM_NAME);
+          await setupAutoSync();
+        } else {
+          console.log(`[MarkSyncr] Firefox: Alarm health check OK - next fire in ${minutesUntilFire} minutes (interval: ${alarm.periodInMinutes})`);
+        }
       }
     }, 2 * 60 * 1000); // Every 2 minutes
   }
