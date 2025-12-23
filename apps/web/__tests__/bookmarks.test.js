@@ -1348,3 +1348,284 @@ describe('Server-Side Bookmark Merging', () => {
     });
   });
 });
+
+describe('Tombstone Tracking for Deletion Sync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  /**
+   * Helper to create a mock that handles tombstone tracking
+   */
+  function createTombstoneMockSupabase(options = {}) {
+    const {
+      userExists = true,
+      existingBookmarks = [],
+      existingTombstones = [],
+      existingVersion = 0,
+      upsertSuccess = true,
+    } = options;
+
+    // Mock for ensureUserExists - user check
+    const usersSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: userExists ? { id: 'user-123' } : null,
+          error: userExists ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for user insert (when user doesn't exist)
+    const usersInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for subscriptions insert
+    const subscriptionsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for getting existing bookmarks from cloud_bookmarks
+    const bookmarksSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? {
+            bookmark_data: existingBookmarks,
+            tombstones: existingTombstones,
+            version: existingVersion,
+            checksum: 'existing-checksum',
+          } : null,
+          error: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for upsert
+    const upsertMock = vi.fn().mockImplementation((data) => {
+      return {
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: upsertSuccess ? {
+              version: existingVersion + 1,
+              checksum: 'new-checksum',
+              bookmark_data: data.bookmark_data,
+              tombstones: data.tombstones,
+            } : null,
+            error: upsertSuccess ? null : { message: 'Upsert failed' },
+          }),
+        }),
+      };
+    });
+
+    return {
+      from: vi.fn().mockImplementation((table) => {
+        if (table === 'users') {
+          return { select: usersSelectMock, insert: usersInsertMock };
+        }
+        if (table === 'subscriptions') {
+          return { insert: subscriptionsInsertMock };
+        }
+        return {
+          select: bookmarksSelectMock,
+          upsert: upsertMock,
+        };
+      }),
+    };
+  }
+
+  describe('POST /api/bookmarks - Tombstone Handling', () => {
+    it('should accept tombstones in the request body', async () => {
+      const bookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example' },
+      ];
+      const tombstones = [
+        { url: 'https://deleted.com', deletedAt: Date.now() },
+      ];
+
+      mockSupabase = createTombstoneMockSupabase({ existingVersion: 0 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks, tombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should merge incoming tombstones with existing tombstones', async () => {
+      const existingTombstones = [
+        { url: 'https://old-deleted.com', deletedAt: 1000 },
+      ];
+      const incomingTombstones = [
+        { url: 'https://new-deleted.com', deletedAt: 2000 },
+      ];
+
+      mockSupabase = createTombstoneMockSupabase({ existingTombstones, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: incomingTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should remove bookmarks that have tombstones newer than their dateAdded', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://to-delete.com', title: 'To Delete', dateAdded: 1000 },
+        { id: '2', url: 'https://keep.com', title: 'Keep', dateAdded: 3000 },
+      ];
+      const incomingTombstones = [
+        { url: 'https://to-delete.com', deletedAt: 2000 }, // Newer than dateAdded (1000)
+      ];
+
+      mockSupabase = createTombstoneMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: incomingTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should have 1 bookmark (keep.com) after applying tombstone
+      expect(data.merged).toBe(1);
+    });
+
+    it('should NOT remove bookmarks if tombstone is older than dateAdded', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://re-added.com', title: 'Re-added', dateAdded: 3000 },
+      ];
+      const incomingTombstones = [
+        { url: 'https://re-added.com', deletedAt: 1000 }, // Older than dateAdded (3000)
+      ];
+
+      mockSupabase = createTombstoneMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: incomingTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should still have 1 bookmark (re-added.com) because tombstone is older
+      expect(data.merged).toBe(1);
+    });
+
+    it('should update tombstone timestamp if newer deletion is received', async () => {
+      const existingTombstones = [
+        { url: 'https://deleted.com', deletedAt: 1000 },
+      ];
+      const incomingTombstones = [
+        { url: 'https://deleted.com', deletedAt: 2000 }, // Newer
+      ];
+
+      mockSupabase = createTombstoneMockSupabase({ existingTombstones, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: incomingTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('GET /api/bookmarks - Tombstone Handling', () => {
+    it('should return tombstones along with bookmarks', async () => {
+      const mockBookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example' },
+      ];
+      const mockTombstones = [
+        { url: 'https://deleted.com', deletedAt: Date.now() },
+      ];
+
+      mockSupabase.from = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: {
+                bookmark_data: mockBookmarks,
+                tombstones: mockTombstones,
+                version: 1,
+                checksum: 'abc123',
+                last_modified: '2024-01-01T00:00:00Z',
+              },
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: { authorization: 'Bearer valid-token' },
+      });
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.bookmarks).toEqual(mockBookmarks);
+      expect(data.tombstones).toEqual(mockTombstones);
+    });
+
+    it('should return empty tombstones array when none exist', async () => {
+      const mockBookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example' },
+      ];
+
+      mockSupabase.from = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: {
+                bookmark_data: mockBookmarks,
+                version: 1,
+                checksum: 'abc123',
+                last_modified: '2024-01-01T00:00:00Z',
+              },
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'GET',
+        headers: { authorization: 'Bearer valid-token' },
+      });
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.tombstones).toEqual([]);
+    });
+  });
+});

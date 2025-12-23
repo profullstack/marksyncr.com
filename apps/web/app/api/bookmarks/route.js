@@ -6,8 +6,15 @@
  *
  * The cloud_bookmarks table stores ALL bookmarks as a single JSONB blob per user:
  * - bookmark_data: JSONB containing array of bookmarks
+ * - tombstones: JSONB containing array of deleted bookmark URLs with timestamps
  * - checksum: Hash of the bookmark data for change detection
  * - version: Incremented on each update
+ *
+ * Tombstone tracking:
+ * - When a bookmark is deleted, a tombstone is created with the URL and deletion timestamp
+ * - Tombstones are synced across browsers
+ * - If a tombstone's deletedAt is newer than a bookmark's dateAdded, the bookmark is considered deleted
+ * - This allows deletions to sync across browsers
  */
 
 import { NextResponse } from 'next/server';
@@ -117,13 +124,17 @@ export async function GET(request) {
     const rawBookmarks = cloudBookmarks?.bookmark_data;
     const bookmarksArray = extractBookmarksFromNested(rawBookmarks);
     
+    // Extract tombstones (deleted bookmark URLs)
+    const tombstones = Array.isArray(cloudBookmarks?.tombstones) ? cloudBookmarks.tombstones : [];
+    
     console.log(`[Bookmarks API GET] User: ${user.id}`);
     console.log(`[Bookmarks API GET] Raw data type: ${Array.isArray(rawBookmarks) ? 'array' : typeof rawBookmarks}`);
-    console.log(`[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks`);
+    console.log(`[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks, ${tombstones.length} tombstones`);
     console.log(`[Bookmarks API GET] Version: ${cloudBookmarks?.version || 0}`);
 
     return NextResponse.json({
       bookmarks: bookmarksArray,
+      tombstones,
       count: bookmarksArray.length,
       version: cloudBookmarks?.version || 0,
       checksum: cloudBookmarks?.checksum || null,
@@ -190,6 +201,70 @@ function extractBookmarksFromNested(data) {
   }
   
   return [];
+}
+
+/**
+ * Merge tombstones (deleted bookmark records)
+ * Uses URL as unique identifier
+ * Newer deletions (by deletedAt) win
+ */
+function mergeTombstones(existingTombstones, incomingTombstones) {
+  const tombstoneMap = new Map();
+  
+  // Ensure arrays
+  const existingArray = Array.isArray(existingTombstones) ? existingTombstones : [];
+  const incomingArray = Array.isArray(incomingTombstones) ? incomingTombstones : [];
+  
+  // Add existing tombstones
+  for (const tombstone of existingArray) {
+    if (tombstone && tombstone.url) {
+      tombstoneMap.set(tombstone.url, tombstone);
+    }
+  }
+  
+  // Merge incoming tombstones (newer wins)
+  for (const incoming of incomingArray) {
+    if (!incoming || !incoming.url) continue;
+    
+    const existing = tombstoneMap.get(incoming.url);
+    if (!existing || (incoming.deletedAt > existing.deletedAt)) {
+      tombstoneMap.set(incoming.url, incoming);
+    }
+  }
+  
+  return Array.from(tombstoneMap.values());
+}
+
+/**
+ * Apply tombstones to bookmarks - remove bookmarks that have been deleted
+ * A bookmark is considered deleted if there's a tombstone with deletedAt > bookmark.dateAdded
+ */
+function applyTombstones(bookmarks, tombstones) {
+  if (!tombstones || tombstones.length === 0) {
+    return bookmarks;
+  }
+  
+  // Create a map of tombstones by URL for quick lookup
+  const tombstoneMap = new Map();
+  for (const tombstone of tombstones) {
+    if (tombstone && tombstone.url) {
+      tombstoneMap.set(tombstone.url, tombstone);
+    }
+  }
+  
+  // Filter out bookmarks that have been deleted
+  return bookmarks.filter(bookmark => {
+    const tombstone = tombstoneMap.get(bookmark.url);
+    if (!tombstone) {
+      return true; // No tombstone, keep the bookmark
+    }
+    
+    // If tombstone is newer than bookmark, the bookmark was deleted
+    const bookmarkDate = bookmark.dateAdded || 0;
+    const tombstoneDate = tombstone.deletedAt || 0;
+    
+    return bookmarkDate > tombstoneDate; // Keep if bookmark is newer (re-added after deletion)
+  });
 }
 
 /**
@@ -268,7 +343,7 @@ export async function POST(request) {
       );
     }
 
-    const { bookmarks, source = 'browser' } = await request.json();
+    const { bookmarks, tombstones: incomingTombstones = [], source = 'browser' } = await request.json();
 
     if (!Array.isArray(bookmarks)) {
       return NextResponse.json(
@@ -317,30 +392,43 @@ export async function POST(request) {
     console.log(`[Bookmarks API] Raw existingData:`, JSON.stringify(existingData, null, 2)?.substring(0, 500));
     
     const existingBookmarks = existingData?.bookmark_data || [];
+    const existingTombstones = existingData?.tombstones || [];
     const existingVersion = existingData?.version || 0;
 
     // Debug logging
     console.log(`[Bookmarks API] Source: ${source}`);
     console.log(`[Bookmarks API] Incoming bookmarks: ${normalizedBookmarks.length}`);
+    console.log(`[Bookmarks API] Incoming tombstones: ${incomingTombstones.length}`);
     console.log(`[Bookmarks API] Existing cloud bookmarks: ${Array.isArray(existingBookmarks) ? existingBookmarks.length : 'NOT AN ARRAY: ' + typeof existingBookmarks}`);
+    console.log(`[Bookmarks API] Existing tombstones: ${existingTombstones.length}`);
     console.log(`[Bookmarks API] Existing version: ${existingVersion}`);
+
+    // Merge tombstones first
+    const mergedTombstones = mergeTombstones(existingTombstones, incomingTombstones);
+    console.log(`[Bookmarks API] Merged tombstones: ${mergedTombstones.length}`);
 
     // Merge incoming bookmarks with existing
     const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
     
+    // Apply tombstones to remove deleted bookmarks
+    const finalBookmarks = applyTombstones(merged, mergedTombstones);
+    const deleted = merged.length - finalBookmarks.length;
+    
     console.log(`[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`);
+    console.log(`[Bookmarks API] After applying tombstones: ${finalBookmarks.length} (${deleted} deleted)`);
 
-    // Generate checksum for the merged bookmark data
-    const checksum = generateChecksum(merged);
+    // Generate checksum for the final bookmark data
+    const checksum = generateChecksum(finalBookmarks);
 
     const newVersion = existingVersion + 1;
 
-    // Upsert merged bookmarks (single row per user with JSONB data)
+    // Upsert merged bookmarks and tombstones (single row per user with JSONB data)
     const { data, error: upsertError } = await supabase
       .from('cloud_bookmarks')
       .upsert({
         user_id: user.id,
-        bookmark_data: merged,
+        bookmark_data: finalBookmarks,
+        tombstones: mergedTombstones,
         checksum,
         version: newVersion,
         last_modified: new Date().toISOString(),
@@ -360,10 +448,12 @@ export async function POST(request) {
 
     return NextResponse.json({
       synced: normalizedBookmarks.length,
-      merged: merged.length,
+      merged: finalBookmarks.length,
       added,
       updated,
-      total: merged.length,
+      deleted,
+      tombstones: mergedTombstones.length,
+      total: finalBookmarks.length,
       version: data.version,
       checksum: data.checksum,
       message: 'Bookmarks synced successfully',
