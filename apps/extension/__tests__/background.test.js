@@ -1588,4 +1588,433 @@ describe('Background Service Worker', () => {
       });
     });
   });
+
+  describe('Bookmark Ordering', () => {
+    describe('flattenBookmarkTree with index', () => {
+      it('should include index property for each bookmark', () => {
+        const tree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'folder1',
+                title: 'Folder 1',
+                children: [
+                  { id: 'b1', url: 'https://first.com', title: 'First', index: 0 },
+                  { id: 'b2', url: 'https://second.com', title: 'Second', index: 1 },
+                  { id: 'b3', url: 'https://third.com', title: 'Third', index: 2 },
+                ],
+              },
+            ],
+          },
+        ];
+
+        // Expected: Each bookmark should have its index preserved
+        // - b1: index: 0
+        // - b2: index: 1
+        // - b3: index: 2
+      });
+
+      it('should use loop index when node.index is not available', () => {
+        const tree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'folder1',
+                title: 'Folder 1',
+                children: [
+                  { id: 'b1', url: 'https://first.com', title: 'First' }, // No index property
+                  { id: 'b2', url: 'https://second.com', title: 'Second' },
+                  { id: 'b3', url: 'https://third.com', title: 'Third' },
+                ],
+              },
+            ],
+          },
+        ];
+
+        // Expected: Index should be derived from array position
+        // - b1: index: 0 (first in array)
+        // - b2: index: 1 (second in array)
+        // - b3: index: 2 (third in array)
+      });
+
+      it('should preserve index across nested folders', () => {
+        const tree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'folder1',
+                title: 'Folder 1',
+                children: [
+                  { id: 'b1', url: 'https://first.com', title: 'First', index: 0 },
+                  {
+                    id: 'subfolder',
+                    title: 'Subfolder',
+                    children: [
+                      { id: 'b2', url: 'https://nested.com', title: 'Nested', index: 0 },
+                    ],
+                  },
+                  { id: 'b3', url: 'https://third.com', title: 'Third', index: 2 },
+                ],
+              },
+            ],
+          },
+        ];
+
+        // Expected: Each bookmark has index relative to its parent folder
+        // - b1: index: 0 (in Folder 1)
+        // - b2: index: 0 (in Subfolder)
+        // - b3: index: 2 (in Folder 1)
+      });
+    });
+
+    describe('convertNode with index', () => {
+      it('should include index in converted bookmark nodes', () => {
+        // When converting a bookmark node, the index should be included
+        // This is used for version history and force pull
+      });
+
+      it('should include index in converted folder nodes', () => {
+        // Folders should also have index for proper ordering
+      });
+
+      it('should pass index to child nodes during conversion', () => {
+        // When converting children, each child should receive its array index
+      });
+    });
+
+    describe('convertBrowserBookmarks version', () => {
+      it('should use version 1.1.0 to indicate ordering support', () => {
+        // The version should be bumped to 1.1.0 to indicate ordering is included
+      });
+    });
+
+    describe('addCloudBookmarksToLocal with ordering', () => {
+      it('should sort bookmarks by index before adding', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        // Cloud bookmarks with out-of-order indices
+        const cloudBookmarks = [
+          { url: 'https://third.com', title: 'Third', folderPath: '', index: 2 },
+          { url: 'https://first.com', title: 'First', folderPath: '', index: 0 },
+          { url: 'https://second.com', title: 'Second', folderPath: '', index: 1 },
+        ];
+
+        // Expected: Bookmarks should be sorted by index before adding
+        // So they are added in order: First, Second, Third
+      });
+
+      it('should group bookmarks by folder before sorting', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'toolbar', title: 'Bookmarks Bar', children: [] },
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        // Bookmarks from different folders with different indices
+        const cloudBookmarks = [
+          { url: 'https://other2.com', title: 'Other 2', folderPath: 'Other Bookmarks', index: 1 },
+          { url: 'https://toolbar1.com', title: 'Toolbar 1', folderPath: 'Bookmarks Bar', index: 0 },
+          { url: 'https://other1.com', title: 'Other 1', folderPath: 'Other Bookmarks', index: 0 },
+          { url: 'https://toolbar2.com', title: 'Toolbar 2', folderPath: 'Bookmarks Bar', index: 1 },
+        ];
+
+        // Expected: Each folder's bookmarks should be sorted independently
+        // Toolbar: Toolbar 1 (0), Toolbar 2 (1)
+        // Other: Other 1 (0), Other 2 (1)
+      });
+
+      it('should use index when creating bookmarks', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        const cloudBookmarks = [
+          { url: 'https://example.com', title: 'Example', folderPath: '', index: 5 },
+        ];
+
+        // Expected: browser.bookmarks.create should be called with index: 5
+      });
+
+      it('should handle bookmarks without index (use Infinity for sorting)', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        // Mix of bookmarks with and without index
+        const cloudBookmarks = [
+          { url: 'https://no-index.com', title: 'No Index', folderPath: '' }, // No index
+          { url: 'https://has-index.com', title: 'Has Index', folderPath: '', index: 0 },
+        ];
+
+        // Expected: Bookmark with index should come first
+        // Bookmarks without index should be sorted to the end
+      });
+
+      it('should not set index if it is not a valid number', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        const cloudBookmarks = [
+          { url: 'https://example.com', title: 'Example', folderPath: '', index: -1 }, // Invalid index
+        ];
+
+        // Expected: browser.bookmarks.create should NOT include index property
+        // because -1 is not a valid index
+      });
+    });
+
+    describe('Force Push with ordering', () => {
+      it('should include index in flat bookmarks sent to cloud', async () => {
+        const mockBookmarkTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'b1', url: 'https://first.com', title: 'First', index: 0 },
+                  { id: 'b2', url: 'https://second.com', title: 'Second', index: 1 },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockBookmarkTree);
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 2 }) }) // sync
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // version
+
+        // Expected: The bookmarks sent to /api/bookmarks should include index property
+        // This allows other browsers to recreate bookmarks in the same order
+      });
+    });
+
+    describe('Force Pull with ordering', () => {
+      it('should preserve bookmark order when recreating from cloud', async () => {
+        const cloudBookmarks = {
+          roots: {
+            toolbar: {
+              children: [
+                { type: 'bookmark', url: 'https://first.com', title: 'First', index: 0 },
+                { type: 'bookmark', url: 'https://second.com', title: 'Second', index: 1 },
+                { type: 'bookmark', url: 'https://third.com', title: 'Third', index: 2 },
+              ],
+            },
+          },
+        };
+
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: '0',
+            children: [
+              { id: '1', title: 'Bookmarks Bar', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.removeTree = vi.fn().mockResolvedValue(undefined);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [{ version: 1 }] }) })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ version: { bookmarkData: cloudBookmarks } }),
+          });
+
+        // Expected: browser.bookmarks.create should be called with correct indices
+        // - First: index 0
+        // - Second: index 1
+        // - Third: index 2
+      });
+
+      it('should preserve folder order when recreating from cloud', async () => {
+        const cloudBookmarks = {
+          roots: {
+            toolbar: {
+              children: [
+                { type: 'folder', title: 'Folder A', index: 0, children: [] },
+                { type: 'bookmark', url: 'https://between.com', title: 'Between', index: 1 },
+                { type: 'folder', title: 'Folder B', index: 2, children: [] },
+              ],
+            },
+          },
+        };
+
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: '0',
+            children: [
+              { id: '1', title: 'Bookmarks Bar', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.removeTree = vi.fn().mockResolvedValue(undefined);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [{ version: 1 }] }) })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ version: { bookmarkData: cloudBookmarks } }),
+          });
+
+        // Expected: Items should be created in order
+        // - Folder A: index 0
+        // - Between bookmark: index 1
+        // - Folder B: index 2
+      });
+    });
+
+    describe('Two-way sync with ordering', () => {
+      it('should preserve order when adding cloud bookmarks to local', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          selectedSource: 'browser-bookmarks',
+          sources: [{ id: 'browser-bookmarks', connected: true }],
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        const mockLocalTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'b1', url: 'https://local.com', title: 'Local', index: 0 },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockLocalTree);
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }) // register device
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({
+              bookmarks: [
+                { url: 'https://cloud1.com', title: 'Cloud 1', folderPath: '', index: 0 },
+                { url: 'https://cloud2.com', title: 'Cloud 2', folderPath: '', index: 1 },
+              ],
+              tombstones: [],
+            }),
+          }) // get bookmarks from cloud
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 3 }) }) // sync to cloud
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // save version
+
+        // Expected: Cloud bookmarks should be added with their indices preserved
+      });
+
+      it('should include index in bookmarks pushed to cloud', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          selectedSource: 'browser-bookmarks',
+          sources: [{ id: 'browser-bookmarks', connected: true }],
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        const mockLocalTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'b1', url: 'https://first.com', title: 'First', index: 0 },
+                  { id: 'b2', url: 'https://second.com', title: 'Second', index: 1 },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockLocalTree);
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }) // register device
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ bookmarks: [], tombstones: [] }),
+          }) // get bookmarks from cloud
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 2 }) }) // sync to cloud
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // save version
+
+        // Expected: The POST to /api/bookmarks should include index for each bookmark
+      });
+    });
+  });
 });

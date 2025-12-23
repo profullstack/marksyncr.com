@@ -634,13 +634,14 @@ function scheduleSync(reason) {
 /**
  * Flatten bookmark tree to array for API sync
  * @param {Array} tree - Browser bookmark tree
- * @returns {Array} - Flat array of bookmarks
+ * @returns {Array} - Flat array of bookmarks with ordering information
  */
 function flattenBookmarkTree(tree) {
   const bookmarks = [];
 
   function traverse(nodes, path = '') {
-    for (const node of nodes) {
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
       if (node.url) {
         bookmarks.push({
           id: node.id,
@@ -649,6 +650,8 @@ function flattenBookmarkTree(tree) {
           title: node.title ?? '',
           folderPath: path,
           dateAdded: node.dateAdded,
+          // Track the index within the parent folder for ordering
+          index: node.index ?? i,
         });
       } else if (node.children) {
         const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
@@ -900,8 +903,8 @@ function mergeTombstonesLocal(localTombstones, cloudTombstones) {
 }
 
 /**
- * Add bookmarks from cloud to local browser
- * @param {Array} cloudBookmarks - Bookmarks from cloud to add locally
+ * Add bookmarks from cloud to local browser, respecting ordering
+ * @param {Array} cloudBookmarks - Bookmarks from cloud to add locally (with index property)
  */
 async function addCloudBookmarksToLocal(cloudBookmarks) {
   // Get current browser bookmarks to find root folders
@@ -982,56 +985,88 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
     return currentParentId;
   }
   
-  // Add each bookmark
+  // Group bookmarks by their target folder path for proper ordering
+  const bookmarksByFolder = new Map();
+  
+  for (const bookmark of cloudBookmarks) {
+    // Determine which root folder to use based on folderPath
+    let rootFolderKey = 'other';
+    let folderPath = bookmark.folderPath || '';
+    
+    // Check if folderPath starts with a known root
+    // Handle various browser naming conventions:
+    // - Chrome: "Bookmarks Bar", "Other Bookmarks"
+    // - Firefox: "Bookmarks Toolbar", "Bookmarks Menu", "Other Bookmarks"
+    // - Opera: "Bookmarks bar", "Other bookmarks", "Speed Dial" (Opera-specific)
+    const lowerPath = folderPath.toLowerCase();
+    
+    if (lowerPath.startsWith('bookmarks bar') ||
+        lowerPath.startsWith('bookmarks toolbar') ||
+        lowerPath.startsWith('speed dial')) {
+      rootFolderKey = 'toolbar';
+      folderPath = folderPath.split('/').slice(1).join('/');
+    } else if (lowerPath.startsWith('bookmarks menu')) {
+      rootFolderKey = 'menu';
+      folderPath = folderPath.split('/').slice(1).join('/');
+    } else if (lowerPath.startsWith('other bookmarks') ||
+               lowerPath.startsWith('unsorted bookmarks')) {
+      rootFolderKey = 'other';
+      folderPath = folderPath.split('/').slice(1).join('/');
+    }
+    
+    const fullPath = `${rootFolderKey}:${folderPath}`;
+    if (!bookmarksByFolder.has(fullPath)) {
+      bookmarksByFolder.set(fullPath, []);
+    }
+    bookmarksByFolder.get(fullPath).push({
+      ...bookmark,
+      _rootFolderKey: rootFolderKey,
+      _folderPath: folderPath,
+    });
+  }
+  
+  // Sort bookmarks within each folder by their index
+  for (const [path, bookmarks] of bookmarksByFolder) {
+    bookmarks.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
+  }
+  
+  // Add bookmarks in order
   let addedCount = 0;
   let skippedCount = 0;
   
-  for (const bookmark of cloudBookmarks) {
-    try {
-      // Determine which root folder to use based on folderPath
-      let rootFolder = rootFolders.other || rootFolders.toolbar;
-      let folderPath = bookmark.folderPath || '';
-      
-      // Check if folderPath starts with a known root
-      // Handle various browser naming conventions:
-      // - Chrome: "Bookmarks Bar", "Other Bookmarks"
-      // - Firefox: "Bookmarks Toolbar", "Bookmarks Menu", "Other Bookmarks"
-      // - Opera: "Bookmarks bar", "Other bookmarks", "Speed Dial" (Opera-specific)
-      const lowerPath = folderPath.toLowerCase();
-      
-      if (lowerPath.startsWith('bookmarks bar') ||
-          lowerPath.startsWith('bookmarks toolbar') ||
-          lowerPath.startsWith('speed dial')) {
-        rootFolder = rootFolders.toolbar || rootFolders.other;
-        folderPath = folderPath.split('/').slice(1).join('/');
-      } else if (lowerPath.startsWith('bookmarks menu')) {
-        rootFolder = rootFolders.menu || rootFolders.other;
-        folderPath = folderPath.split('/').slice(1).join('/');
-      } else if (lowerPath.startsWith('other bookmarks') ||
-                 lowerPath.startsWith('unsorted bookmarks')) {
-        rootFolder = rootFolders.other || rootFolders.toolbar;
-        folderPath = folderPath.split('/').slice(1).join('/');
-      }
-      
-      if (!rootFolder) {
-        console.warn(`[MarkSyncr] No root folder found for bookmark: ${bookmark.url}, folderPath: ${bookmark.folderPath}`);
+  for (const [path, bookmarks] of bookmarksByFolder) {
+    for (const bookmark of bookmarks) {
+      try {
+        const rootFolder = rootFolders[bookmark._rootFolderKey] || rootFolders.other || rootFolders.toolbar;
+        
+        if (!rootFolder) {
+          console.warn(`[MarkSyncr] No root folder found for bookmark: ${bookmark.url}, folderPath: ${bookmark.folderPath}`);
+          skippedCount++;
+          continue;
+        }
+        
+        // Get or create the target folder
+        const targetFolderId = await getOrCreateFolder(bookmark._folderPath, rootFolder.id);
+        
+        // Create the bookmark with index to preserve order
+        // Note: When adding new bookmarks, we use the index if available
+        const createOptions = {
+          parentId: targetFolderId,
+          title: bookmark.title ?? '',
+          url: bookmark.url,
+        };
+        
+        // Only set index if it's a valid number
+        if (typeof bookmark.index === 'number' && bookmark.index >= 0) {
+          createOptions.index = bookmark.index;
+        }
+        
+        await browser.bookmarks.create(createOptions);
+        addedCount++;
+      } catch (err) {
+        console.warn('[MarkSyncr] Failed to add bookmark from cloud:', bookmark.url, err);
         skippedCount++;
-        continue;
       }
-      
-      // Get or create the target folder
-      const targetFolderId = await getOrCreateFolder(folderPath, rootFolder.id);
-      
-      // Create the bookmark
-      await browser.bookmarks.create({
-        parentId: targetFolderId,
-        title: bookmark.title ?? '',
-        url: bookmark.url,
-      });
-      addedCount++;
-    } catch (err) {
-      console.warn('[MarkSyncr] Failed to add bookmark from cloud:', bookmark.url, err);
-      skippedCount++;
     }
   }
   
@@ -1039,13 +1074,13 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
 }
 
 /**
- * Convert browser bookmark tree to MarkSyncr format
+ * Convert browser bookmark tree to MarkSyncr format with ordering
  * @param {Array} tree - Browser bookmark tree
- * @returns {object} - MarkSyncr bookmark data
+ * @returns {object} - MarkSyncr bookmark data with ordering information
  */
 function convertBrowserBookmarks(tree) {
   const result = {
-    version: '1.0.0',
+    version: '1.1.0', // Bumped version to indicate ordering support
     exportedAt: new Date().toISOString(),
     browser: detectBrowser(),
     roots: {
@@ -1060,15 +1095,16 @@ function convertBrowserBookmarks(tree) {
   // Firefox: [{ children: [Bookmarks Menu, Bookmarks Toolbar, Other Bookmarks, Mobile Bookmarks] }]
 
   if (tree[0]?.children) {
-    for (const root of tree[0].children) {
+    for (let i = 0; i < tree[0].children.length; i++) {
+      const root = tree[0].children[i];
       const title = root.title?.toLowerCase() || '';
 
       if (title.includes('toolbar') || title.includes('bar')) {
-        result.roots.toolbar = convertNode(root);
+        result.roots.toolbar = convertNode(root, i);
       } else if (title.includes('menu')) {
-        result.roots.menu = convertNode(root);
+        result.roots.menu = convertNode(root, i);
       } else if (title.includes('other') || title.includes('unsorted')) {
-        result.roots.other = convertNode(root);
+        result.roots.other = convertNode(root, i);
       }
       // Skip mobile bookmarks for now
     }
@@ -1078,11 +1114,12 @@ function convertBrowserBookmarks(tree) {
 }
 
 /**
- * Convert a bookmark node recursively
+ * Convert a bookmark node recursively, preserving order information
  * @param {object} node - Browser bookmark node
- * @returns {object} - MarkSyncr bookmark node
+ * @param {number} index - Index of this node within its parent (for ordering)
+ * @returns {object} - MarkSyncr bookmark node with ordering
  */
-function convertNode(node) {
+function convertNode(node, index = 0) {
   if (node.url) {
     // It's a bookmark
     return {
@@ -1090,6 +1127,8 @@ function convertNode(node) {
       title: node.title || '',
       url: node.url,
       dateAdded: node.dateAdded ? new Date(node.dateAdded).toISOString() : undefined,
+      // Include index for ordering - use node.index if available, otherwise use passed index
+      index: node.index ?? index,
     };
   }
 
@@ -1097,8 +1136,11 @@ function convertNode(node) {
   return {
     type: 'folder',
     title: node.title || '',
-    children: (node.children || []).map(convertNode),
+    // Pass index to children for proper ordering
+    children: (node.children || []).map((child, i) => convertNode(child, i)),
     dateAdded: node.dateAdded ? new Date(node.dateAdded).toISOString() : undefined,
+    // Include index for folder ordering
+    index: node.index ?? index,
   };
 }
 
