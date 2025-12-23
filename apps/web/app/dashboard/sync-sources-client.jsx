@@ -49,6 +49,10 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
     return connectedSources.some((s) => s.provider === sourceId);
   };
 
+  const getSourceDetails = (sourceId) => {
+    return connectedSources.find((s) => s.provider === sourceId);
+  };
+
   const handleConnect = async (source) => {
     setError(null);
     setConnectingSource(source.id);
@@ -120,6 +124,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {sources.map((source) => {
           const connected = isConnected(source.id);
+          const sourceDetails = getSourceDetails(source.id);
           const isLoading = connectingSource === source.id && isPending;
 
           return (
@@ -194,6 +199,47 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                   </Link>
                 )}
               </div>
+              
+              {/* Repository details for connected sources */}
+              {connected && sourceDetails?.repository && (
+                <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                  <div className="flex items-center space-x-2 text-xs text-slate-600">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <span className="font-medium">{sourceDetails.repository}</span>
+                  </div>
+                  {sourceDetails.file_path && (
+                    <div className="mt-1 flex items-center space-x-2 text-xs text-slate-500">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>{sourceDetails.file_path}</span>
+                    </div>
+                  )}
+                  {sourceDetails.branch && (
+                    <div className="mt-1 flex items-center space-x-2 text-xs text-slate-500">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span>Branch: {sourceDetails.branch}</span>
+                    </div>
+                  )}
+                  {source.id === 'github' && sourceDetails.repository && (
+                    <a
+                      href={`https://github.com/${sourceDetails.repository}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center text-xs text-primary-600 hover:text-primary-700"
+                    >
+                      View on GitHub
+                      <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
