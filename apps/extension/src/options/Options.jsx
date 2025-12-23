@@ -254,21 +254,26 @@ export function Options() {
 
         // Recursively create bookmarks
         const createBookmarks = async (items, parentId) => {
+          if (!items || !Array.isArray(items)) return;
+          
           for (const item of items) {
+            // Skip null/undefined items
+            if (!item) continue;
+            
             if (item.type === 'folder' || item.children) {
               const folder = await new Promise((resolve) => {
                 chrome.bookmarks.create({
-                  title: item.title,
+                  title: item.title || 'Untitled Folder',
                   parentId,
                 }, resolve);
               });
-              if (item.children) {
+              if (folder && item.children) {
                 await createBookmarks(item.children, folder.id);
               }
             } else if (item.url) {
               await new Promise((resolve) => {
                 chrome.bookmarks.create({
-                  title: item.title,
+                  title: item.title || 'Untitled',
                   url: item.url,
                   parentId,
                 }, resolve);
