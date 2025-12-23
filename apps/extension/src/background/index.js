@@ -506,15 +506,24 @@ function convertNode(node) {
  * @returns {string}
  */
 function detectBrowser() {
-  if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-    // Could be Chrome, Edge, or other Chromium browsers
-    const ua = navigator.userAgent;
-    if (ua.includes('Edg/')) return 'edge';
-    if (ua.includes('OPR/')) return 'opera';
-    if (ua.includes('Brave')) return 'brave';
-    return 'chrome';
-  }
-  return 'firefox';
+  const ua = navigator.userAgent;
+  
+  // Check Firefox first - Firefox has "Firefox/" in user agent
+  if (ua.includes('Firefox/')) return 'firefox';
+  
+  // Check other Chromium-based browsers
+  if (ua.includes('Edg/')) return 'edge';
+  if (ua.includes('OPR/') || ua.includes('Opera/')) return 'opera';
+  if (ua.includes('Brave')) return 'brave';
+  if (ua.includes('Vivaldi/')) return 'vivaldi';
+  
+  // Default to Chrome for other Chromium browsers
+  if (ua.includes('Chrome/')) return 'chrome';
+  
+  // Safari (though we don't have a Safari extension yet)
+  if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'safari';
+  
+  return 'unknown';
 }
 
 /**
