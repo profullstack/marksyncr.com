@@ -11,6 +11,7 @@ const mockBrowser = {
     local: {
       get: vi.fn(),
       set: vi.fn(),
+      remove: vi.fn(),
     },
   },
   bookmarks: {
@@ -287,20 +288,72 @@ describe('Background Service Worker', () => {
       // performSync should call both /api/bookmarks and /api/versions
     });
 
-    it('should skip cloud sync when user is not logged in', async () => {
+    it('should return requiresAuth error when user is not logged in', async () => {
       mockBrowser.storage.local.get.mockResolvedValue({
         selectedSource: 'browser-bookmarks',
         sources: [{ id: 'browser-bookmarks', connected: true }],
-        authToken: null,
+        session: null,
       });
 
       mockBrowser.bookmarks.getTree.mockResolvedValue(mockBookmarkTree);
 
-      // performSync should succeed without calling API
-      // fetch should not be called
+      // performSync should return { success: false, requiresAuth: true, error: 'Please log in...' }
+      // This is the new behavior - sync requires authentication
     });
 
-    it('should continue with local sync if cloud sync fails', async () => {
+    it('should attempt token refresh when token is invalid', async () => {
+      // First call returns session with expired token
+      mockBrowser.storage.local.get.mockResolvedValue({
+        selectedSource: 'browser-bookmarks',
+        sources: [{ id: 'browser-bookmarks', connected: true }],
+        session: {
+          access_token: 'expired-token',
+          refresh_token: 'valid-refresh-token'
+        },
+      });
+
+      mockBrowser.bookmarks.getTree.mockResolvedValue(mockBookmarkTree);
+
+      // First fetch (validate token) returns 401
+      // Second fetch (refresh token) returns new session
+      // Third fetch (sync bookmarks) succeeds
+      global.fetch
+        .mockResolvedValueOnce({ ok: false, status: 401 }) // validate token fails
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            session: { access_token: 'new-token', refresh_token: 'new-refresh' }
+          })
+        }) // refresh succeeds
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 2 }) }) // sync succeeds
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // version save succeeds
+
+      // performSync should succeed after refreshing token
+    });
+
+    it('should clear session and return requiresAuth when refresh fails', async () => {
+      mockBrowser.storage.local.get.mockResolvedValue({
+        selectedSource: 'browser-bookmarks',
+        sources: [{ id: 'browser-bookmarks', connected: true }],
+        session: {
+          access_token: 'expired-token',
+          refresh_token: 'invalid-refresh-token'
+        },
+      });
+
+      mockBrowser.bookmarks.getTree.mockResolvedValue(mockBookmarkTree);
+
+      // First fetch (validate token) returns 401
+      // Second fetch (refresh token) also fails
+      global.fetch
+        .mockResolvedValueOnce({ ok: false, status: 401 }) // validate token fails
+        .mockResolvedValueOnce({ ok: false, status: 401 }); // refresh also fails
+
+      // performSync should return { success: false, requiresAuth: true }
+      // browser.storage.local.remove should be called to clear session
+    });
+
+    it('should return error if cloud sync fails', async () => {
       mockBrowser.storage.local.get.mockResolvedValue({
         selectedSource: 'browser-bookmarks',
         sources: [{ id: 'browser-bookmarks', connected: true }],

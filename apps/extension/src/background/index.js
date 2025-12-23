@@ -26,19 +26,138 @@ function getApiBaseUrl() {
 }
 
 /**
+ * Get stored session
+ */
+async function getSession() {
+  const { session } = await browser.storage.local.get('session');
+  return session || null;
+}
+
+/**
  * Get stored access token
  */
 async function getAccessToken() {
-  const { session } = await browser.storage.local.get('session');
+  const session = await getSession();
   return session?.access_token || null;
 }
 
 /**
+ * Store session data
+ */
+async function storeSession(session) {
+  await browser.storage.local.set({ session });
+}
+
+/**
+ * Clear session data
+ */
+async function clearSession() {
+  await browser.storage.local.remove(['session', 'user', 'isLoggedIn']);
+}
+
+/**
+ * Try to refresh the access token using the refresh token
+ * @returns {Promise<boolean>} - True if refresh was successful
+ */
+async function tryRefreshToken() {
+  const session = await getSession();
+  if (!session?.refresh_token) {
+    console.log('[MarkSyncr] No refresh token available');
+    return false;
+  }
+  
+  try {
+    const baseUrl = getApiBaseUrl();
+    console.log('[MarkSyncr] Attempting to refresh token...');
+    
+    const response = await fetch(`${baseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+    
+    if (!response.ok) {
+      console.log('[MarkSyncr] Token refresh failed:', response.status);
+      return false;
+    }
+    
+    const data = await response.json();
+    if (data.session) {
+      console.log('[MarkSyncr] Token refreshed successfully');
+      await storeSession(data.session);
+      return true;
+    }
+    
+    return false;
+  } catch (err) {
+    console.error('[MarkSyncr] Token refresh error:', err);
+    return false;
+  }
+}
+
+/**
  * Check if user is logged in (has valid session token)
+ * Will attempt to refresh token if expired
  */
 async function isLoggedIn() {
   const token = await getAccessToken();
   return !!token;
+}
+
+/**
+ * Validate the current token by making a test request
+ * @returns {Promise<boolean>} - True if token is valid
+ */
+async function validateToken() {
+  const token = await getAccessToken();
+  if (!token) return false;
+  
+  try {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/api/auth/session`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ensure we have a valid token, refreshing if necessary
+ * @returns {Promise<boolean>} - True if we have a valid token
+ */
+async function ensureValidToken() {
+  // First check if we have a token at all
+  const token = await getAccessToken();
+  if (!token) {
+    console.log('[MarkSyncr] No access token found');
+    return false;
+  }
+  
+  // Validate the token
+  const isValid = await validateToken();
+  if (isValid) {
+    return true;
+  }
+  
+  // Token is invalid, try to refresh
+  console.log('[MarkSyncr] Token appears invalid, attempting refresh...');
+  const refreshed = await tryRefreshToken();
+  
+  if (!refreshed) {
+    // Refresh failed, clear session
+    console.log('[MarkSyncr] Token refresh failed, clearing session');
+    await clearSession();
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -264,37 +383,44 @@ async function performSync(sourceId) {
       return { success: false, error: 'Source not connected' };
     }
 
-    // Check if user is logged in (has session)
-    const loggedIn = await isLoggedIn();
-    console.log('[MarkSyncr] User logged in:', loggedIn);
+    // Ensure we have a valid token (will attempt refresh if expired)
+    console.log('[MarkSyncr] Validating authentication...');
+    const hasValidToken = await ensureValidToken();
+    console.log('[MarkSyncr] Has valid token:', hasValidToken);
     
-    // If user is logged in, sync to cloud
-    if (loggedIn) {
-      try {
-        // Flatten bookmarks for API
-        const flatBookmarks = flattenBookmarkTree(bookmarkTree);
-        
-        // Sync bookmarks to cloud
-        console.log(`[MarkSyncr] Syncing ${flatBookmarks.length} bookmarks to cloud...`);
-        const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
-        console.log('[MarkSyncr] Cloud sync result:', syncResult);
+    // Cloud sync requires authentication
+    if (!hasValidToken) {
+      console.log('[MarkSyncr] No valid token, cannot sync to cloud');
+      return {
+        success: false,
+        error: 'Please log in to sync bookmarks to the cloud',
+        requiresAuth: true,
+        stats
+      };
+    }
+    
+    // Sync to cloud
+    try {
+      // Flatten bookmarks for API
+      const flatBookmarks = flattenBookmarkTree(bookmarkTree);
+      
+      // Sync bookmarks to cloud
+      console.log(`[MarkSyncr] Syncing ${flatBookmarks.length} bookmarks to cloud...`);
+      const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
+      console.log('[MarkSyncr] Cloud sync result:', syncResult);
 
-        // Save version history
-        console.log('[MarkSyncr] Saving version history...');
-        const versionResult = await saveVersionToCloud(
-          bookmarkData,
-          detectBrowser(),
-          `${detectBrowser()}-extension`
-        );
-        console.log('[MarkSyncr] Version saved:', versionResult);
-      } catch (cloudErr) {
-        console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
-        // Return error so user knows cloud sync failed
-        return { success: false, error: `Cloud sync failed: ${cloudErr.message}` };
-      }
-    } else {
-      console.log('[MarkSyncr] User not logged in, skipping cloud sync');
-      // Still return success for local-only sync
+      // Save version history
+      console.log('[MarkSyncr] Saving version history...');
+      const versionResult = await saveVersionToCloud(
+        bookmarkData,
+        detectBrowser(),
+        `${detectBrowser()}-extension`
+      );
+      console.log('[MarkSyncr] Version saved:', versionResult);
+    } catch (cloudErr) {
+      console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
+      // Return error so user knows cloud sync failed
+      return { success: false, error: `Cloud sync failed: ${cloudErr.message}` };
     }
 
     console.log('[MarkSyncr] Sync completed:', stats);
