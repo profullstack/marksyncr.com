@@ -264,6 +264,65 @@ function SubscriptionCard({ subscription }) {
   );
 }
 
+/**
+ * Get browser icon based on browser name
+ * @param {string} browser - Browser name (chrome, firefox, safari, edge, etc.)
+ * @returns {JSX.Element} - Browser icon component
+ */
+function getBrowserIcon(browser) {
+  const browserLower = browser?.toLowerCase() || '';
+  
+  if (browserLower === 'chrome') {
+    return (
+      <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 4C14.06 4 5.7 10.42 3.34 19.27L13.85 24.5C15.28 20.7 19.3 18 24 18c2.76 0 5.26 1 7.2 2.64L40.36 11.5C36.34 6.86 30.52 4 24 4z"/>
+        <path fill="#FBBC05" d="M3.34 19.27C2.48 22.06 2 25 2 28c0 7.18 3.02 13.64 7.86 18.2L18.5 33.5l-4.65-9C12.7 26.3 12 25.2 12 24c0-.34.02-.68.06-1L3.34 19.27z"/>
+        <path fill="#34A853" d="M24 44c6.52 0 12.34-2.86 16.36-7.5l-9.16-9.14C29.26 29 26.76 30 24 30c-4.7 0-8.72-2.7-10.15-6.5l-3.99 6.7L9.86 46.2C13.64 48.98 18.52 44 24 44z"/>
+        <circle cx="24" cy="24" r="10" fill="#4285F4"/>
+        <circle cx="24" cy="24" r="6" fill="white"/>
+        <circle cx="24" cy="24" r="4" fill="#4285F4"/>
+      </svg>
+    );
+  }
+  
+  if (browserLower === 'firefox') {
+    return <span className="text-2xl">🦊</span>;
+  }
+  
+  if (browserLower === 'safari') {
+    return <span className="text-2xl">🧭</span>;
+  }
+  
+  if (browserLower === 'edge') {
+    return <span className="text-2xl">🌐</span>;
+  }
+  
+  if (browserLower === 'opera') {
+    return <span className="text-2xl">🔴</span>;
+  }
+  
+  if (browserLower === 'brave') {
+    return <span className="text-2xl">🦁</span>;
+  }
+  
+  // Default browser icon
+  return (
+    <svg
+      className="h-6 w-6 text-slate-500"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+      />
+    </svg>
+  );
+}
+
 function DevicesCard({ devices }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -297,11 +356,16 @@ function DevicesCard({ devices }) {
               key={device.id}
               className="flex items-center justify-between rounded-lg bg-slate-50 p-3"
             >
-              <div>
-                <p className="font-medium text-slate-900">{device.name}</p>
-                <p className="text-xs text-slate-500">
-                  {device.browser} • {device.os}
-                </p>
+              <div className="flex items-center">
+                <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-slate-200">
+                  {getBrowserIcon(device.browser)}
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">{device.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {device.browser} • {device.os}
+                  </p>
+                </div>
               </div>
               <span className="text-xs text-slate-400">
                 {new Date(device.last_seen_at).toLocaleDateString()}
