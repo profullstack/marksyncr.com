@@ -152,16 +152,20 @@ describe('SyncSourcesClient', () => {
   });
 
   describe('MarkSyncr Cloud', () => {
-    it('should show Pro plan required for free users', () => {
+    it('should be available for free users', () => {
       render(<SyncSourcesClient subscription={{ plan: 'free' }} connectedSources={[]} />);
 
-      expect(screen.getByText('Pro plan required')).toBeInTheDocument();
+      // MarkSyncr Cloud is now available on free tier
+      expect(screen.queryByText('Pro plan required')).not.toBeInTheDocument();
+      expect(screen.queryByText('Upgrade')).not.toBeInTheDocument();
     });
 
-    it('should show Upgrade link for free users', () => {
+    it('should allow connection for free users', () => {
       render(<SyncSourcesClient subscription={{ plan: 'free' }} connectedSources={[]} />);
 
-      expect(screen.getByText('Upgrade')).toBeInTheDocument();
+      // All 4 sources should have Connect buttons (GitHub, Dropbox, Google Drive, MarkSyncr Cloud)
+      const connectButtons = screen.getAllByText('Connect');
+      expect(connectButtons.length).toBe(4);
     });
 
     it('should allow connection for Pro users', () => {

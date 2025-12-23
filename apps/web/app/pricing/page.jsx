@@ -12,15 +12,16 @@ import {
 const plans = [
   {
     name: 'Free',
-    description: 'Perfect for personal use with your own storage',
+    description: 'Perfect for personal use',
     monthlyPrice: 0,
     yearlyPrice: 0,
     features: [
       'Unlimited bookmarks',
+      'MarkSyncr Cloud storage',
       'GitHub sync',
       'Dropbox sync',
       'Google Drive sync',
-      'Local file backup',
+      'Import/Export bookmarks',
       'Chrome & Firefox support',
       'Two-way sync',
       'Conflict resolution',
@@ -79,12 +80,12 @@ const faqs = [
   {
     question: 'What storage options are available on the Free plan?',
     answer:
-      'The Free plan supports syncing with GitHub repositories, Dropbox, Google Drive, and local files. You bring your own storage, and we handle the sync.',
+      'The Free plan supports syncing with GitHub repositories, Dropbox, Google Drive, and MarkSyncr Cloud. You can also import and export your bookmarks.',
   },
   {
     question: 'What is MarkSyncr Cloud?',
     answer:
-      'MarkSyncr Cloud is our managed storage solution for Pro and Team users. It provides the simplest sync experience with no setup required - just sign in and your bookmarks sync automatically.',
+      'MarkSyncr Cloud is our managed storage solution available to all users. It provides the simplest sync experience with no setup required - just sign in and your bookmarks sync automatically.',
   },
   {
     question: 'Can I switch between plans?',
@@ -346,8 +347,8 @@ export default function PricingPage() {
                   { feature: 'GitHub Sync', free: true, pro: true, team: true },
                   { feature: 'Dropbox Sync', free: true, pro: true, team: true },
                   { feature: 'Google Drive Sync', free: true, pro: true, team: true },
-                  { feature: 'Local File Backup', free: true, pro: true, team: true },
-                  { feature: 'MarkSyncr Cloud', free: false, pro: true, team: true },
+                  { feature: 'Import/Export', free: true, pro: true, team: true },
+                  { feature: 'MarkSyncr Cloud', free: true, pro: true, team: true },
                   { feature: 'Chrome Extension', free: true, pro: true, team: true },
                   { feature: 'Firefox Extension', free: true, pro: true, team: true },
                   { feature: 'Safari Extension', free: false, pro: true, team: true },

@@ -39,8 +39,8 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
       name: 'MarkSyncr Cloud',
       id: 'marksyncr-cloud',
       icon: 'cloud',
-      available: subscription?.plan !== 'free' && subscription?.status === 'active',
-      requiresPro: true,
+      available: true,
+      requiresPro: false,
       isInternal: true,
     },
   ];

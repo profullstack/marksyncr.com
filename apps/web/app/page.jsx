@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 
 // Feature card component
@@ -16,7 +17,10 @@ function FeatureCard({ icon, title, description }) {
 }
 
 // Pricing card component
-function PricingCard({ name, price, description, features, highlighted, cta }) {
+function PricingCard({ name, price, yearlyPrice, description, features, highlighted, cta, isYearly }) {
+  const displayPrice = isYearly && yearlyPrice ? yearlyPrice : price;
+  const isFree = price === 'Free';
+  
   return (
     <div
       className={`card relative ${highlighted ? 'border-primary-500 ring-2 ring-primary-500' : ''}`}
@@ -28,11 +32,16 @@ function PricingCard({ name, price, description, features, highlighted, cta }) {
       )}
       <h3 className="text-lg font-semibold text-slate-900">{name}</h3>
       <div className="mt-4 flex items-baseline">
-        <span className="text-4xl font-bold text-slate-900">{price}</span>
-        {price !== 'Free' && (
-          <span className="ml-1 text-slate-600">/month</span>
+        <span className="text-4xl font-bold text-slate-900">{displayPrice}</span>
+        {!isFree && (
+          <span className="ml-1 text-slate-600">/{isYearly ? 'year' : 'month'}</span>
         )}
       </div>
+      {!isFree && isYearly && yearlyPrice && (
+        <p className="mt-1 text-xs text-green-600 font-medium">
+          Save {Math.round((1 - (parseInt(yearlyPrice.replace('$', '')) / (parseInt(price.replace('$', '')) * 12))) * 100)}% vs monthly
+        </p>
+      )}
       <p className="mt-2 text-sm text-slate-600">{description}</p>
       <ul className="mt-6 space-y-3">
         {features.map((feature, index) => (
@@ -81,6 +90,8 @@ function SourceLogo({ name, icon }) {
 }
 
 export default function HomePage() {
+  const [isYearly, setIsYearly] = useState(false);
+  
   return (
     <div className="gradient-bg">
       {/* Navigation */}
@@ -394,10 +405,10 @@ export default function HomePage() {
               }
             />
             <SourceLogo
-              name="Local File"
+              name="Import/Export"
               icon={
                 <svg className="h-8 w-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
               }
             />
@@ -423,6 +434,35 @@ export default function HomePage() {
             <p className="mt-4 text-lg text-slate-600">
               Start free with your own storage, or upgrade for our managed cloud
             </p>
+            
+            {/* Billing Toggle */}
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <span className={`text-sm font-medium ${!isYearly ? 'text-slate-900' : 'text-slate-500'}`}>
+                Monthly
+              </span>
+              <button
+                onClick={() => setIsYearly(!isYearly)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  isYearly ? 'bg-primary-600' : 'bg-slate-200'
+                }`}
+                role="switch"
+                aria-checked={isYearly}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isYearly ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-sm font-medium ${isYearly ? 'text-slate-900' : 'text-slate-500'}`}>
+                Yearly
+              </span>
+              {isYearly && (
+                <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                  Save up to 75%
+                </span>
+              )}
+            </div>
           </div>
           <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <PricingCard
@@ -432,16 +472,18 @@ export default function HomePage() {
               features={[
                 'Unlimited bookmarks',
                 'GitHub, Dropbox, Google Drive sync',
-                'Local file backup',
+                'Import/Export bookmarks',
                 'Chrome & Firefox support',
                 'Two-way sync',
                 'Conflict resolution',
               ]}
               cta="Get Started"
+              isYearly={isYearly}
             />
             <PricingCard
               name="Pro"
               price="$5"
+              yearlyPrice="$15"
               description="Managed cloud storage with premium features"
               features={[
                 'Everything in Free',
@@ -453,10 +495,12 @@ export default function HomePage() {
               ]}
               highlighted
               cta="Start Free Trial"
+              isYearly={isYearly}
             />
             <PricingCard
               name="Team"
               price="$12"
+              yearlyPrice="$36"
               description="For teams who want to share bookmarks"
               features={[
                 'Everything in Pro',
@@ -467,6 +511,7 @@ export default function HomePage() {
                 'Dedicated support',
               ]}
               cta="Contact Sales"
+              isYearly={isYearly}
             />
           </div>
         </div>
