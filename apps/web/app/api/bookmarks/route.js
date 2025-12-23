@@ -141,16 +141,27 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
   // Create a map of existing bookmarks by URL
   const bookmarkMap = new Map();
   
+  // Ensure existingBookmarks is an array
+  const existingArray = Array.isArray(existingBookmarks) ? existingBookmarks : [];
+  
+  // Ensure incomingBookmarks is an array
+  const incomingArray = Array.isArray(incomingBookmarks) ? incomingBookmarks : [];
+  
   // Add existing bookmarks to map
-  for (const bookmark of existingBookmarks) {
-    bookmarkMap.set(bookmark.url, bookmark);
+  for (const bookmark of existingArray) {
+    if (bookmark && bookmark.url) {
+      bookmarkMap.set(bookmark.url, bookmark);
+    }
   }
   
   let added = 0;
   let updated = 0;
   
   // Merge incoming bookmarks
-  for (const incoming of incomingBookmarks) {
+  for (const incoming of incomingArray) {
+    if (!incoming || !incoming.url) {
+      continue; // Skip invalid bookmarks
+    }
     const existing = bookmarkMap.get(incoming.url);
     
     if (!existing) {
