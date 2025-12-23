@@ -1,0 +1,21 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="safari-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5AC8FA"/>
+      <stop offset="100%" stop-color="#007AFF"/>
+    </linearGradient>
+  </defs>
+  <circle cx="24" cy="24" r="20" fill="url(#safari-gradient)"/>
+  <circle cx="24" cy="24" r="17" fill="none" stroke="#fff" stroke-width="1"/>
+  <!-- Compass needle -->
+  <polygon points="24,8 26,24 24,40 22,24" fill="#fff"/>
+  <polygon points="24,8 26,24 24,24" fill="#FF3B30"/>
+  <polygon points="24,24 22,24 24,40" fill="#FF3B30"/>
+  <!-- Center dot -->
+  <circle cx="24" cy="24" r="3" fill="#fff"/>
+  <!-- Direction markers -->
+  <text x="24" y="14" text-anchor="middle" fill="#fff" font-size="4" font-weight="bold">N</text>
+  <text x="24" y="38" text-anchor="middle" fill="#fff" font-size="4" font-weight="bold">S</text>
+  <text x="10" y="26" text-anchor="middle" fill="#fff" font-size="4" font-weight="bold">W</text>
+  <text x="38" y="26" text-anchor="middle" fill="#fff" font-size="4" font-weight="bold">E</text>
+</svg>

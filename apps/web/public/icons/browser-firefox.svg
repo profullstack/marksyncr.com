@@ -1,0 +1,16 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="firefox-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9500"/>
+      <stop offset="100%" stop-color="#FF3D00"/>
+    </linearGradient>
+    <linearGradient id="firefox-gradient-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFBD4F"/>
+      <stop offset="100%" stop-color="#FF980E"/>
+    </linearGradient>
+  </defs>
+  <circle cx="24" cy="24" r="20" fill="url(#firefox-gradient-1)"/>
+  <path fill="url(#firefox-gradient-2)" d="M24 8c-8.84 0-16 7.16-16 16 0 4.42 1.79 8.42 4.68 11.32C14.68 32.42 19.1 30 24 30c4.9 0 9.32 2.42 11.32 5.32C38.21 32.42 40 28.42 40 24c0-8.84-7.16-16-16-16z"/>
+  <ellipse cx="24" cy="20" rx="8" ry="6" fill="#fff" opacity="0.3"/>
+  <path fill="#FF3D00" d="M32 16c-2 0-4 1-5 3-1-2-3-3-5-3-4 0-7 3-7 7s3 7 7 7c2 0 4-1 5-3 1 2 3 3 5 3 4 0 7-3 7-7s-3-7-7-7z"/>
+</svg>

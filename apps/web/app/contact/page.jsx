@@ -66,9 +66,9 @@ export default function ContactPage() {
             <Image
               src="/logo.svg"
               alt="MarkSyncr"
-              width={140}
-              height={32}
-              className="h-8 w-auto"
+              width={175}
+              height={40}
+              className="h-10 w-auto"
             />
           </Link>
           <div className="flex items-center space-x-4">

@@ -102,9 +102,9 @@ export default function HomePage() {
             <Image
               src="/logo.svg"
               alt="MarkSyncr"
-              width={140}
-              height={32}
-              className="h-8 w-auto"
+              width={175}
+              height={40}
+              className="h-10 w-auto"
             />
           </Link>
           <div className="hidden items-center space-x-8 md:flex">
@@ -540,9 +540,9 @@ export default function HomePage() {
               <Image
                 src="/logo.svg"
                 alt="MarkSyncr"
-                width={120}
-                height={28}
-                className="h-7 w-auto"
+                width={150}
+                height={35}
+                className="h-9 w-auto"
               />
             </Link>
             <div className="mt-4 flex space-x-6 md:mt-0">

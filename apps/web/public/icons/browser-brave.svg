@@ -1,0 +1,18 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brave-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FB542B"/>
+      <stop offset="100%" stop-color="#FF3D00"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield shape -->
+  <path fill="url(#brave-gradient)" d="M24 4L8 10v14c0 10 8 16 16 20 8-4 16-10 16-20V10L24 4z"/>
+  <!-- Inner shield -->
+  <path fill="#fff" d="M24 8L12 12.5v10.5c0 7.5 6 12 12 15 6-3 12-7.5 12-15V12.5L24 8z"/>
+  <!-- Lion face simplified -->
+  <path fill="url(#brave-gradient)" d="M24 14c-4 0-8 3-8 8 0 3 2 6 4 8l4 4 4-4c2-2 4-5 4-8 0-5-4-8-8-8z"/>
+  <!-- Lion details -->
+  <circle cx="20" cy="20" r="1.5" fill="#fff"/>
+  <circle cx="28" cy="20" r="1.5" fill="#fff"/>
+  <path fill="#fff" d="M24 24l-2 2h4l-2-2z"/>
+</svg>

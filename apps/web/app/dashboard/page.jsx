@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getUser, createClient } from '../../lib/supabase/server';
 import DashboardClient from './dashboard-client';
 import SyncSourcesClient from './sync-sources-client';
@@ -86,22 +87,15 @@ export default async function DashboardPage({ searchParams }) {
       {/* Header */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-2">
-            <svg
-              className="h-8 w-8 text-primary-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-            <span className="text-xl font-bold text-slate-900">MarkSyncr</span>
-          </div>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.svg"
+              alt="MarkSyncr"
+              width={175}
+              height={40}
+              className="h-10 w-auto"
+            />
+          </Link>
           <DashboardClient user={user} />
         </div>
       </header>
@@ -265,79 +259,59 @@ function SubscriptionCard({ subscription }) {
 }
 
 /**
- * Get browser icon based on browser name
- * @param {string} browser - Browser name (chrome, firefox, safari, edge, etc.)
- * @returns {JSX.Element} - Browser icon component
+ * Get browser icon path based on browser name
+ * @param {string} browser - Browser name (chrome, firefox, safari, edge, opera, brave, etc.)
+ * @returns {string} - Path to browser icon SVG
  */
-function getBrowserIcon(browser) {
+function getBrowserIconPath(browser) {
   const browserLower = browser?.toLowerCase() || '';
   
   if (browserLower === 'chrome') {
-    // Chrome logo - matches version history page
-    return (
-      <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="24" cy="24" r="20" fill="#4CAF50"/>
-        <path fill="#F44336" d="M24,4C12.95,4,4,12.95,4,24c0,3.31,0.81,6.43,2.23,9.18L24,24V4z"/>
-        <path fill="#FFEB3B" d="M24,4v20l17.77,9.18C43.19,30.43,44,27.31,44,24C44,12.95,35.05,4,24,4z"/>
-        <path fill="#4CAF50" d="M6.23,33.18C9.38,39.49,16.18,44,24,44c7.82,0,14.62-4.51,17.77-10.82L24,24L6.23,33.18z"/>
-        <circle cx="24" cy="24" r="8" fill="#fff"/>
-        <circle cx="24" cy="24" r="6" fill="#2196F3"/>
-      </svg>
-    );
+    return '/icons/browser-chrome.svg';
   }
   
   if (browserLower === 'firefox') {
-    return <span className="text-2xl">🦊</span>;
+    return '/icons/browser-firefox.svg';
   }
   
   if (browserLower === 'safari') {
-    return <span className="text-2xl">🧭</span>;
+    return '/icons/browser-safari.svg';
   }
   
   if (browserLower === 'edge') {
-    // Microsoft Edge logo - blue wave design
-    return (
-      <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="edge-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0078D4"/>
-            <stop offset="100%" stopColor="#1DB954"/>
-          </linearGradient>
-          <linearGradient id="edge-gradient-2" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#1DB954"/>
-            <stop offset="100%" stopColor="#0078D4"/>
-          </linearGradient>
-        </defs>
-        <path fill="url(#edge-gradient-1)" d="M24 4C12.95 4 4 12.95 4 24c0 6.08 2.72 11.52 7 15.2V24c0-7.18 5.82-13 13-13s13 5.82 13 13c0 3.31-1.24 6.33-3.28 8.63C38.28 29.52 44 27.31 44 24c0-11.05-8.95-20-20-20z"/>
-        <path fill="url(#edge-gradient-2)" d="M24 11c-7.18 0-13 5.82-13 13v15.2c3.48 2.68 7.82 4.28 12.5 4.28 8.56 0 15.72-5.72 18-13.48-2.95 3.3-7.22 5.38-12 5.38-8.84 0-16-7.16-16-16 0-4.42 1.79-8.42 4.68-11.32C20.18 8.06 22.08 8 24 8c-0.01 0 0 3 0 3z"/>
-        <circle cx="30" cy="24" r="6" fill="#fff"/>
-      </svg>
-    );
+    return '/icons/browser-edge.svg';
   }
   
   if (browserLower === 'opera') {
-    return <span className="text-2xl">🔴</span>;
+    return '/icons/browser-opera.svg';
   }
   
   if (browserLower === 'brave') {
-    return <span className="text-2xl">🦁</span>;
+    return '/icons/browser-brave.svg';
   }
   
   // Default browser icon
+  return '/icons/browser-default.svg';
+}
+
+/**
+ * Browser icon component using Image
+ * @param {Object} props - Component props
+ * @param {string} props.browser - Browser name
+ * @returns {JSX.Element} - Browser icon component
+ */
+function BrowserIcon({ browser }) {
+  const iconPath = getBrowserIconPath(browser);
+  const browserName = browser || 'Browser';
+  
   return (
-    <svg
-      className="h-6 w-6 text-slate-500"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-      />
-    </svg>
+    <Image
+      src={iconPath}
+      alt={browserName}
+      width={24}
+      height={24}
+      className="h-6 w-6"
+    />
   );
 }
 
@@ -349,19 +323,13 @@ function DevicesCard({ devices }) {
       </h2>
       {devices.length === 0 ? (
         <div className="text-center text-slate-500">
-          <svg
-            className="mx-auto mb-2 h-12 w-12 text-slate-300"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-            />
-          </svg>
+          <Image
+            src="/icons/browser-default.svg"
+            alt="No devices"
+            width={48}
+            height={48}
+            className="mx-auto mb-2 h-12 w-12 opacity-30"
+          />
           <p className="text-sm">No devices connected yet</p>
           <p className="mt-1 text-xs">
             Install the browser extension to get started
@@ -376,7 +344,7 @@ function DevicesCard({ devices }) {
             >
               <div className="flex items-center">
                 <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-slate-200">
-                  {getBrowserIcon(device.browser)}
+                  <BrowserIcon browser={device.browser} />
                 </div>
                 <div>
                   <p className="font-medium text-slate-900">{device.name}</p>
@@ -408,15 +376,13 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            {/* Chrome Logo - matches version history page */}
-            <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="24" cy="24" r="20" fill="#4CAF50"/>
-              <path fill="#F44336" d="M24,4C12.95,4,4,12.95,4,24c0,3.31,0.81,6.43,2.23,9.18L24,24V4z"/>
-              <path fill="#FFEB3B" d="M24,4v20l17.77,9.18C43.19,30.43,44,27.31,44,24C44,12.95,35.05,4,24,4z"/>
-              <path fill="#4CAF50" d="M6.23,33.18C9.38,39.49,16.18,44,24,44c7.82,0,14.62-4.51,17.77-10.82L24,24L6.23,33.18z"/>
-              <circle cx="24" cy="24" r="8" fill="#fff"/>
-              <circle cx="24" cy="24" r="6" fill="#2196F3"/>
-            </svg>
+            <Image
+              src="/icons/browser-chrome.svg"
+              alt="Chrome"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
           </div>
           <div>
             <p className="font-medium text-slate-900">Chrome Extension</p>
@@ -430,8 +396,13 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            {/* Firefox - Fox emoji */}
-            <span className="text-2xl">🦊</span>
+            <Image
+              src="/icons/browser-firefox.svg"
+              alt="Firefox"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
           </div>
           <div>
             <p className="font-medium text-slate-900">Firefox Add-on</p>
@@ -445,8 +416,13 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            {/* Safari - Compass emoji */}
-            <span className="text-2xl">🧭</span>
+            <Image
+              src="/icons/browser-safari.svg"
+              alt="Safari"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
           </div>
           <div>
             <p className="font-medium text-slate-900">Safari Extension</p>
@@ -458,19 +434,13 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            <svg
-              className="h-6 w-6 text-slate-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <Image
+              src="/icons/icon-clock.svg"
+              alt="History"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
           </div>
           <div>
             <p className="font-medium text-slate-900">Version History</p>
@@ -482,19 +452,13 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            <svg
-              className="h-6 w-6 text-slate-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-              />
-            </svg>
+            <Image
+              src="/icons/icon-book.svg"
+              alt="Documentation"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
           </div>
           <div>
             <p className="font-medium text-slate-900">Documentation</p>
