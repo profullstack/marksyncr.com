@@ -79,8 +79,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Update cleanup function to use time-based retention
-CREATE OR REPLACE FUNCTION public.cleanup_old_versions(
+-- Drop and recreate cleanup function with new parameter name
+DROP FUNCTION IF EXISTS public.cleanup_old_versions(UUID, INTEGER);
+
+CREATE FUNCTION public.cleanup_old_versions(
     p_user_id UUID,
     p_retention_days INTEGER DEFAULT 5
 )
