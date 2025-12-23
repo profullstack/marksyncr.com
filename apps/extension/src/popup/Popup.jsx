@@ -165,14 +165,24 @@ function ConnectedServices({ sources }) {
     }
   };
 
-  const getServiceName = (source) => {
-    if (source.source_type === 'github' && source.repository) {
-      return `GitHub: ${source.repository}`;
-    }
-    return source.name || source.source_type;
+  // Get source type - handle both 'type' (local) and 'provider' (server) properties
+  const getSourceType = (source) => {
+    return source.type || source.provider || source.id;
   };
 
-  const connectedSources = sources.filter(s => s.connected);
+  const getServiceName = (source) => {
+    const sourceType = getSourceType(source);
+    if (sourceType === 'github' && source.repository) {
+      return `GitHub: ${source.repository}`;
+    }
+    return source.name || sourceType;
+  };
+
+  // Filter to only external services (not browser-bookmarks or supabase-cloud)
+  const externalServices = ['github', 'dropbox', 'google-drive', 'google_drive'];
+  const connectedSources = sources.filter(s =>
+    s.connected && externalServices.includes(getSourceType(s))
+  );
   const hasConnectedSources = connectedSources.length > 0;
 
   const openDashboard = () => {
@@ -195,7 +205,8 @@ function ConnectedServices({ sources }) {
       {hasConnectedSources ? (
         <div className="space-y-2">
           {connectedSources.map((source) => {
-            const Icon = getServiceIcon(source.source_type);
+            const sourceType = getSourceType(source);
+            const Icon = getServiceIcon(sourceType);
             return (
               <div
                 key={source.id}

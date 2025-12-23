@@ -211,6 +211,10 @@ export const useStore = create(
             await get().fetchTags();
           }
 
+          // Refresh connected sources from server
+          console.log('[MarkSyncr Store] Refreshing sources after login...');
+          await get().refreshSources();
+
           return { success: true };
         } catch (err) {
           console.error('Login failed:', err);
@@ -301,6 +305,10 @@ export const useStore = create(
             if (subscription?.plan && ['pro', 'team'].includes(subscription.plan)) {
               await get().fetchTags();
             }
+
+            // Refresh connected sources from server
+            console.log('[MarkSyncr Store] Refreshing sources after auth check...');
+            await get().refreshSources();
 
             return true;
           }
