@@ -1,6 +1,7 @@
 /**
  * @fileoverview Import/Export component for bookmark data
- * Pro feature: Import from various services and export to multiple formats
+ * Free users: HTML and JSON import/export
+ * Pro users: Additional formats (Pocket, Raindrop, Pinboard, CSV, Markdown)
  */
 
 import { useState, useCallback, useMemo, useRef } from 'react';
@@ -9,27 +10,28 @@ import { useState, useCallback, useMemo, useRef } from 'react';
  * Import format options
  */
 const IMPORT_FORMATS = {
-  NETSCAPE_HTML: { id: 'netscape_html', name: 'Browser HTML', ext: '.html' },
-  POCKET: { id: 'pocket', name: 'Pocket', ext: '.html' },
-  RAINDROP: { id: 'raindrop', name: 'Raindrop.io', ext: '.json' },
-  PINBOARD: { id: 'pinboard', name: 'Pinboard', ext: '.json' },
-  CSV: { id: 'csv', name: 'CSV', ext: '.csv' },
+  NETSCAPE_HTML: { id: 'netscape_html', name: 'Browser HTML', ext: '.html', free: true },
+  JSON: { id: 'json', name: 'JSON', ext: '.json', free: true },
+  POCKET: { id: 'pocket', name: 'Pocket', ext: '.html', free: false },
+  RAINDROP: { id: 'raindrop', name: 'Raindrop.io', ext: '.json', free: false },
+  PINBOARD: { id: 'pinboard', name: 'Pinboard', ext: '.json', free: false },
+  CSV: { id: 'csv', name: 'CSV', ext: '.csv', free: false },
 };
 
 /**
  * Export format options
  */
 const EXPORT_FORMATS = {
-  HTML: { id: 'html', name: 'HTML (Browser)', ext: '.html', mime: 'text/html' },
-  JSON: { id: 'json', name: 'JSON', ext: '.json', mime: 'application/json' },
-  CSV: { id: 'csv', name: 'CSV', ext: '.csv', mime: 'text/csv' },
-  MARKDOWN: { id: 'markdown', name: 'Markdown', ext: '.md', mime: 'text/markdown' },
+  HTML: { id: 'html', name: 'HTML (Browser)', ext: '.html', mime: 'text/html', free: true },
+  JSON: { id: 'json', name: 'JSON', ext: '.json', mime: 'application/json', free: true },
+  CSV: { id: 'csv', name: 'CSV', ext: '.csv', mime: 'text/csv', free: false },
+  MARKDOWN: { id: 'markdown', name: 'Markdown', ext: '.md', mime: 'text/markdown', free: false },
 };
 
 /**
  * File upload dropzone component
  */
-export function FileDropzone({ onFileSelect, acceptedFormats, className = '' }) {
+export function FileDropzone({ onFileSelect, acceptedFormats, supportedText = 'HTML, JSON', className = '' }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -95,7 +97,7 @@ export function FileDropzone({ onFileSelect, acceptedFormats, className = '' }) 
         Drop your bookmark file here, or click to browse
       </p>
       <p className="mt-1 text-xs text-gray-400">
-        Supports: HTML, JSON, CSV
+        Supports: {supportedText}
       </p>
     </div>
   );
@@ -268,11 +270,19 @@ export function ImportPreview({ data, onConfirm, onCancel, className = '' }) {
 /**
  * Export options component
  */
-export function ExportOptions({ bookmarks, onExport, className = '' }) {
+export function ExportOptions({ bookmarks, onExport, isPro = false, onUpgradeClick, className = '' }) {
   const [selectedFormat, setSelectedFormat] = useState('html');
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeTags, setIncludeTags] = useState(true);
   const [selectedFolders, setSelectedFolders] = useState([]);
+
+  // Filter formats based on user plan
+  const availableFormats = Object.values(EXPORT_FORMATS).filter(
+    (format) => isPro || format.free
+  );
+  const proOnlyFormats = Object.values(EXPORT_FORMATS).filter(
+    (format) => !format.free
+  );
 
   const handleExport = () => {
     onExport({
@@ -291,7 +301,7 @@ export function ExportOptions({ bookmarks, onExport, className = '' }) {
           Export Format
         </label>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {Object.values(EXPORT_FORMATS).map((format) => (
+          {availableFormats.map((format) => (
             <button
               key={format.id}
               onClick={() => setSelectedFormat(format.id)}
@@ -307,6 +317,21 @@ export function ExportOptions({ bookmarks, onExport, className = '' }) {
             </button>
           ))}
         </div>
+        
+        {/* Pro-only formats */}
+        {!isPro && proOnlyFormats.length > 0 && (
+          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              Pro formats: {proOnlyFormats.map(f => f.name).join(', ')}
+            </p>
+            <button
+              onClick={onUpgradeClick}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Upgrade to Pro →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Options */}
@@ -419,48 +444,13 @@ export function ImportExport({
     }
   }, [bookmarks, onExport]);
 
-  // Show upgrade prompt for non-Pro users
-  if (!isPro) {
-    return (
-      <div className={`${className}`}>
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-6 w-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                Upgrade to Pro for Import/Export
-              </h4>
-              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                Import bookmarks from Pocket, Raindrop.io, Pinboard, and more. Export to HTML, JSON,
-                CSV, or Markdown.
-              </p>
-              <button
-                onClick={onUpgradeClick}
-                className="mt-2 inline-flex items-center px-3 py-1.5 text-xs font-medium 
-                           text-white bg-blue-600 rounded-md hover:bg-blue-700"
-              >
-                Upgrade to Pro
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Filter import formats based on user plan
+  const availableImportFormats = Object.values(IMPORT_FORMATS).filter(
+    (format) => isPro || format.free
+  );
+  const proOnlyImportFormats = Object.values(IMPORT_FORMATS).filter(
+    (format) => !format.free
+  );
 
   return (
     <div className={`${className}`}>
@@ -522,14 +512,15 @@ export function ImportExport({
             <>
               <FileDropzone
                 onFileSelect={handleFileSelect}
-                acceptedFormats=".html,.json,.csv"
+                acceptedFormats={isPro ? ".html,.json,.csv" : ".html,.json"}
+                supportedText={isPro ? "HTML, JSON, CSV" : "HTML, JSON"}
               />
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Supported Services
+                  Supported Formats
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.values(IMPORT_FORMATS).map((format) => (
+                  {availableImportFormats.map((format) => (
                     <div
                       key={format.id}
                       className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
@@ -553,6 +544,21 @@ export function ImportExport({
                     </div>
                   ))}
                 </div>
+                
+                {/* Pro-only import formats */}
+                {!isPro && proOnlyImportFormats.length > 0 && (
+                  <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Pro imports: {proOnlyImportFormats.map(f => f.name).join(', ')}
+                    </p>
+                    <button
+                      onClick={onUpgradeClick}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Upgrade to Pro →
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -561,7 +567,12 @@ export function ImportExport({
 
       {/* Export Tab */}
       {activeTab === 'export' && !isProcessing && (
-        <ExportOptions bookmarks={bookmarks} onExport={handleExport} />
+        <ExportOptions
+          bookmarks={bookmarks}
+          onExport={handleExport}
+          isPro={isPro}
+          onUpgradeClick={onUpgradeClick}
+        />
       )}
     </div>
   );

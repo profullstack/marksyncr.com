@@ -1,6 +1,7 @@
 /**
  * @fileoverview Import/Export module for bookmark data
- * Pro feature: Import from various services and export to multiple formats
+ * Free users: HTML and JSON import/export
+ * Pro users: Additional formats (Pocket, Raindrop, Pinboard, CSV, Markdown)
  */
 
 /**
@@ -8,6 +9,7 @@
  */
 export const IMPORT_FORMATS = {
   NETSCAPE_HTML: 'netscape_html',
+  JSON: 'json',
   POCKET: 'pocket',
   RAINDROP: 'raindrop',
   PINBOARD: 'pinboard',
@@ -311,6 +313,63 @@ export function parsePinboardJson(jsonString) {
 }
 
 /**
+ * Parse MarkSyncr JSON export (same format as GitHub repo sync)
+ * @param {string} jsonString - JSON content
+ * @returns {Object} Parsed bookmark data
+ */
+export function parseMarkSyncrJson(jsonString) {
+  const data = JSON.parse(jsonString);
+  
+  // Handle MarkSyncr export format
+  if (data.source === 'MarkSyncr' || data.version) {
+    const bookmarks = data.bookmarks || [];
+    
+    // Count total bookmarks
+    const countBookmarks = (items) => {
+      let count = 0;
+      for (const item of items) {
+        if (item.type === 'folder' || item.children) {
+          count += countBookmarks(item.children || []);
+        } else {
+          count++;
+        }
+      }
+      return count;
+    };
+    
+    return {
+      format: IMPORT_FORMATS.JSON,
+      bookmarks,
+      totalCount: countBookmarks(bookmarks),
+      importedAt: new Date().toISOString(),
+    };
+  }
+  
+  // Handle generic JSON array of bookmarks
+  if (Array.isArray(data)) {
+    const bookmarks = data.map(item => ({
+      id: generateId(),
+      title: item.title || 'Untitled',
+      url: item.url || item.href || item.link,
+      type: item.type || 'bookmark',
+      tags: item.tags || [],
+      notes: item.notes || item.description || '',
+      dateAdded: item.dateAdded || item.created || Date.now(),
+      children: item.children,
+    }));
+    
+    return {
+      format: IMPORT_FORMATS.JSON,
+      bookmarks,
+      totalCount: bookmarks.length,
+      importedAt: new Date().toISOString(),
+    };
+  }
+  
+  throw new Error('Invalid JSON bookmark format');
+}
+
+/**
  * Parse CSV bookmark file
  * @param {string} csvContent - CSV content
  * @returns {Object} Parsed bookmark data
@@ -547,7 +606,7 @@ export function detectImportFormat(content) {
   const trimmed = content.trim();
 
   // Check for Netscape HTML
-  if (trimmed.includes('<!DOCTYPE NETSCAPE-Bookmark-file-1>') || 
+  if (trimmed.includes('<!DOCTYPE NETSCAPE-Bookmark-file-1>') ||
       trimmed.includes('NETSCAPE-Bookmark-file')) {
     return IMPORT_FORMATS.NETSCAPE_HTML;
   }
@@ -561,6 +620,11 @@ export function detectImportFormat(content) {
   try {
     const data = JSON.parse(trimmed);
     
+    // MarkSyncr JSON format (has source or version)
+    if (data.source === 'MarkSyncr' || (data.version && data.bookmarks)) {
+      return IMPORT_FORMATS.JSON;
+    }
+    
     // Raindrop format has 'items' array
     if (data.items && Array.isArray(data.items)) {
       return IMPORT_FORMATS.RAINDROP;
@@ -569,6 +633,16 @@ export function detectImportFormat(content) {
     // Pinboard format is array of objects with 'href'
     if (Array.isArray(data) && data.length > 0 && data[0].href) {
       return IMPORT_FORMATS.PINBOARD;
+    }
+    
+    // Generic JSON array with url property (not Pinboard)
+    if (Array.isArray(data) && data.length > 0 && (data[0].url || data[0].link)) {
+      return IMPORT_FORMATS.JSON;
+    }
+    
+    // Object with bookmarks array
+    if (data.bookmarks && Array.isArray(data.bookmarks)) {
+      return IMPORT_FORMATS.JSON;
     }
   } catch {
     // Not JSON
@@ -641,6 +715,8 @@ export function parseImportFile(content, format = null) {
   switch (detectedFormat) {
     case IMPORT_FORMATS.NETSCAPE_HTML:
       return parseNetscapeHtml(content);
+    case IMPORT_FORMATS.JSON:
+      return parseMarkSyncrJson(content);
     case IMPORT_FORMATS.POCKET:
       return parsePocketExport(content);
     case IMPORT_FORMATS.RAINDROP:
@@ -679,6 +755,7 @@ export default {
   IMPORT_FORMATS,
   EXPORT_FORMATS,
   parseNetscapeHtml,
+  parseMarkSyncrJson,
   parsePocketExport,
   parseRaindropExport,
   parsePinboardJson,

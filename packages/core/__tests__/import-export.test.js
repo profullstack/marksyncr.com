@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   // Import parsers
   parseNetscapeHtml,
+  parseMarkSyncrJson,
   parsePocketExport,
   parseRaindropExport,
   parsePinboardJson,
@@ -19,6 +20,7 @@ import {
   // Utilities
   detectImportFormat,
   validateImportData,
+  parseImportFile,
   IMPORT_FORMATS,
   EXPORT_FORMATS,
 } from '../src/import-export.js';
@@ -27,6 +29,7 @@ describe('Import/Export Module', () => {
   describe('IMPORT_FORMATS', () => {
     it('should have all supported import formats', () => {
       expect(IMPORT_FORMATS.NETSCAPE_HTML).toBe('netscape_html');
+      expect(IMPORT_FORMATS.JSON).toBe('json');
       expect(IMPORT_FORMATS.POCKET).toBe('pocket');
       expect(IMPORT_FORMATS.RAINDROP).toBe('raindrop');
       expect(IMPORT_FORMATS.PINBOARD).toBe('pinboard');
@@ -276,6 +279,157 @@ describe('Import/Export Module', () => {
       const result = parsePinboardJson(json);
 
       expect(result.bookmarks).toHaveLength(0);
+    });
+  });
+
+  describe('parseMarkSyncrJson', () => {
+    it('should parse MarkSyncr JSON export format', () => {
+      const json = JSON.stringify({
+        version: '1.1',
+        source: 'MarkSyncr',
+        exportedAt: '2024-01-01T00:00:00Z',
+        bookmarks: [
+          {
+            id: '1',
+            title: 'Example 1',
+            url: 'https://example1.com',
+            type: 'bookmark',
+            dateAdded: 1609459200000,
+          },
+          {
+            id: '2',
+            title: 'Example 2',
+            url: 'https://example2.com',
+            type: 'bookmark',
+            tags: ['tag1', 'tag2'],
+            notes: 'Some notes',
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks).toHaveLength(2);
+      expect(result.bookmarks[0].title).toBe('Example 1');
+      expect(result.bookmarks[0].url).toBe('https://example1.com');
+      expect(result.bookmarks[1].tags).toEqual(['tag1', 'tag2']);
+      expect(result.bookmarks[1].notes).toBe('Some notes');
+      expect(result.format).toBe(IMPORT_FORMATS.JSON);
+      expect(result.totalCount).toBe(2);
+    });
+
+    it('should parse MarkSyncr JSON with nested folders', () => {
+      const json = JSON.stringify({
+        version: '1.1',
+        source: 'MarkSyncr',
+        bookmarks: [
+          {
+            id: '1',
+            title: 'Folder',
+            type: 'folder',
+            children: [
+              {
+                id: '2',
+                title: 'Nested Bookmark',
+                url: 'https://nested.com',
+                type: 'bookmark',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks).toHaveLength(1);
+      expect(result.bookmarks[0].title).toBe('Folder');
+      expect(result.bookmarks[0].type).toBe('folder');
+      expect(result.bookmarks[0].children).toHaveLength(1);
+      expect(result.bookmarks[0].children[0].title).toBe('Nested Bookmark');
+      // totalCount only counts actual bookmarks, not folders
+      expect(result.totalCount).toBe(1);
+    });
+
+    it('should parse generic JSON array of bookmarks', () => {
+      const json = JSON.stringify([
+        {
+          title: 'Bookmark 1',
+          url: 'https://example1.com',
+        },
+        {
+          title: 'Bookmark 2',
+          url: 'https://example2.com',
+          tags: ['work'],
+        },
+      ]);
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks).toHaveLength(2);
+      expect(result.bookmarks[0].title).toBe('Bookmark 1');
+      expect(result.bookmarks[0].url).toBe('https://example1.com');
+      expect(result.bookmarks[1].tags).toEqual(['work']);
+      expect(result.format).toBe(IMPORT_FORMATS.JSON);
+    });
+
+    it('should handle empty MarkSyncr export', () => {
+      const json = JSON.stringify({
+        version: '1.1',
+        source: 'MarkSyncr',
+        bookmarks: [],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks).toHaveLength(0);
+      expect(result.totalCount).toBe(0);
+    });
+
+    it('should handle empty JSON array', () => {
+      const json = JSON.stringify([]);
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks).toHaveLength(0);
+      expect(result.totalCount).toBe(0);
+    });
+
+    it('should throw error for invalid JSON format', () => {
+      const json = JSON.stringify({ invalid: 'data' });
+
+      expect(() => parseMarkSyncrJson(json)).toThrow('Invalid JSON bookmark format');
+    });
+
+    it('should throw error for non-JSON string', () => {
+      const notJson = 'this is not json';
+
+      expect(() => parseMarkSyncrJson(notJson)).toThrow();
+    });
+
+    it('should preserve all bookmark properties', () => {
+      const json = JSON.stringify({
+        source: 'MarkSyncr',
+        bookmarks: [
+          {
+            id: 'custom-id',
+            title: 'Full Bookmark',
+            url: 'https://example.com',
+            type: 'bookmark',
+            dateAdded: 1609459200000,
+            dateModified: 1609545600000,
+            tags: ['tag1', 'tag2'],
+            notes: 'Detailed notes',
+            favicon: 'https://example.com/favicon.ico',
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks[0].id).toBe('custom-id');
+      expect(result.bookmarks[0].dateAdded).toBe(1609459200000);
+      expect(result.bookmarks[0].dateModified).toBe(1609545600000);
+      expect(result.bookmarks[0].favicon).toBe('https://example.com/favicon.ico');
     });
   });
 
@@ -603,6 +757,29 @@ Example,https://example.com`;
       expect(detectImportFormat(content)).toBe(IMPORT_FORMATS.POCKET);
     });
 
+    it('should detect MarkSyncr JSON format with source property', () => {
+      const content = JSON.stringify({
+        source: 'MarkSyncr',
+        bookmarks: [{ title: 'Test', url: 'https://example.com' }],
+      });
+      expect(detectImportFormat(content)).toBe(IMPORT_FORMATS.JSON);
+    });
+
+    it('should detect MarkSyncr JSON format with version property', () => {
+      const content = JSON.stringify({
+        version: '1.1',
+        bookmarks: [{ title: 'Test', url: 'https://example.com' }],
+      });
+      expect(detectImportFormat(content)).toBe(IMPORT_FORMATS.JSON);
+    });
+
+    it('should detect generic JSON array with url property', () => {
+      const content = JSON.stringify([
+        { title: 'Test', url: 'https://example.com' },
+      ]);
+      expect(detectImportFormat(content)).toBe(IMPORT_FORMATS.JSON);
+    });
+
     it('should detect Raindrop JSON format', () => {
       const content = JSON.stringify({ items: [] });
       expect(detectImportFormat(content)).toBe(IMPORT_FORMATS.RAINDROP);
@@ -621,6 +798,50 @@ Example,https://example.com`;
     it('should return null for unknown format', () => {
       const content = 'random content that is not a bookmark file';
       expect(detectImportFormat(content)).toBe(null);
+    });
+  });
+
+  describe('parseImportFile', () => {
+    it('should parse MarkSyncr JSON format', () => {
+      const content = JSON.stringify({
+        source: 'MarkSyncr',
+        bookmarks: [
+          { title: 'Test', url: 'https://example.com' },
+        ],
+      });
+
+      const result = parseImportFile(content, IMPORT_FORMATS.JSON);
+
+      expect(result.bookmarks).toHaveLength(1);
+      expect(result.bookmarks[0].title).toBe('Test');
+      expect(result.format).toBe(IMPORT_FORMATS.JSON);
+    });
+
+    it('should auto-detect and parse MarkSyncr JSON format', () => {
+      const content = JSON.stringify({
+        source: 'MarkSyncr',
+        bookmarks: [
+          { title: 'Auto-detected', url: 'https://example.com' },
+        ],
+      });
+
+      const result = parseImportFile(content);
+
+      expect(result.bookmarks).toHaveLength(1);
+      expect(result.bookmarks[0].title).toBe('Auto-detected');
+      expect(result.format).toBe(IMPORT_FORMATS.JSON);
+    });
+
+    it('should parse Netscape HTML format', () => {
+      const content = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><A HREF="https://example.com">Example</A>
+</DL><p>`;
+
+      const result = parseImportFile(content, IMPORT_FORMATS.NETSCAPE_HTML);
+
+      expect(result.bookmarks).toBeDefined();
+      expect(result.format).toBe(IMPORT_FORMATS.NETSCAPE_HTML);
     });
   });
 
