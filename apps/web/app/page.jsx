@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 // Feature card component
 function FeatureCard({ icon, title, description }) {
@@ -97,22 +98,16 @@ export default function HomePage() {
       {/* Navigation */}
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-2">
-            <svg
-              className="h-8 w-8 text-primary-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
+          <Link href="/" className="flex items-center space-x-2">
+            <Image
+              src="/logo.svg"
+              alt="MarkSyncr"
+              width={32}
+              height={32}
+              className="h-8 w-8"
+            />
             <span className="text-xl font-bold text-slate-900">MarkSyncr</span>
-          </div>
+          </Link>
           <div className="hidden items-center space-x-8 md:flex">
             <Link
               href="#features"
@@ -542,22 +537,16 @@ export default function HomePage() {
       <footer className="border-t border-slate-200 bg-white py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between md:flex-row">
-            <div className="flex items-center space-x-2">
-              <svg
-                className="h-6 w-6 text-primary-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                />
-              </svg>
+            <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/logo.svg"
+                alt="MarkSyncr"
+                width={24}
+                height={24}
+                className="h-6 w-6"
+              />
               <span className="font-semibold text-slate-900">MarkSyncr</span>
-            </div>
+            </Link>
             <div className="mt-4 flex space-x-6 md:mt-0">
               <Link
                 href="/privacy"

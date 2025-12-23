@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   trackPageView,
   trackInitiateCheckout,
@@ -185,9 +186,13 @@ export default function PricingPage() {
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between items-center">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
+              <Image
+                src="/logo.svg"
+                alt="MarkSyncr"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
               <span className="text-xl font-bold text-gray-900">MarkSyncr</span>
             </Link>
             <div className="flex items-center space-x-4">
@@ -456,12 +461,16 @@ export default function PricingPage() {
       <footer className="bg-gray-900 text-gray-400 py-12 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
+            <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/logo.svg"
+                alt="MarkSyncr"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
               <span className="text-xl font-bold text-white">MarkSyncr</span>
-            </div>
+            </Link>
             <div className="mt-4 md:mt-0 flex space-x-6">
               <Link href="/privacy" className="hover:text-white transition">
                 Privacy
