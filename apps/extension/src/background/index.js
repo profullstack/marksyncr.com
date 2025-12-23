@@ -434,13 +434,18 @@ async function getLatestVersionFromCloud() {
  * Initialize the background service worker
  */
 async function initialize() {
-  console.log('[MarkSyncr] Background service worker initialized');
+  const browserInfo = detectBrowser();
+  console.log(`[MarkSyncr] Background service worker initialized (${browserInfo})`);
+  console.log(`[MarkSyncr] User agent: ${navigator.userAgent}`);
 
   // Set up alarm for automatic sync
   await setupAutoSync();
 
   // Listen for bookmark changes
   setupBookmarkListeners();
+  
+  // Log that initialization is complete
+  console.log('[MarkSyncr] Initialization complete');
 }
 
 /**
@@ -448,17 +453,34 @@ async function initialize() {
  */
 async function setupAutoSync() {
   try {
+    const browserInfo = detectBrowser();
     const { settings } = await browser.storage.local.get('settings');
     const interval = settings?.syncInterval || DEFAULT_SYNC_INTERVAL;
 
     // Auto-sync is enabled by default (when settings.autoSync is undefined or true)
     const autoSyncEnabled = settings?.autoSync !== false;
     
-    console.log(`[MarkSyncr] Auto-sync setup: enabled=${autoSyncEnabled}, interval=${interval} minutes`);
+    console.log(`[MarkSyncr] Auto-sync setup (${browserInfo}): enabled=${autoSyncEnabled}, interval=${interval} minutes`);
 
     if (autoSyncEnabled) {
-      // Clear existing alarm first
-      await browser.alarms.clear(SYNC_ALARM_NAME);
+      // Check if alarm already exists
+      const existingAlarm = await browser.alarms.get(SYNC_ALARM_NAME);
+      
+      if (existingAlarm) {
+        console.log(`[MarkSyncr] Existing alarm found:`, existingAlarm);
+        const nextFireTime = new Date(existingAlarm.scheduledTime);
+        console.log(`[MarkSyncr] Next fire time: ${nextFireTime.toISOString()}`);
+        
+        // Check if the alarm interval matches the settings
+        // If not, recreate the alarm
+        if (existingAlarm.periodInMinutes !== interval) {
+          console.log(`[MarkSyncr] Alarm interval mismatch (${existingAlarm.periodInMinutes} vs ${interval}), recreating...`);
+          await browser.alarms.clear(SYNC_ALARM_NAME);
+        } else {
+          console.log(`[MarkSyncr] Alarm already configured correctly, skipping recreation`);
+          return;
+        }
+      }
 
       // Create new alarm with both delayInMinutes and periodInMinutes
       // delayInMinutes: fire first alarm after 'interval' minutes
@@ -470,9 +492,18 @@ async function setupAutoSync() {
 
       console.log(`[MarkSyncr] Auto-sync alarm created: first fire in ${interval} minutes, then every ${interval} minutes`);
       
+      // Verify the alarm was created
+      const verifyAlarm = await browser.alarms.get(SYNC_ALARM_NAME);
+      if (verifyAlarm) {
+        const nextFireTime = new Date(verifyAlarm.scheduledTime);
+        console.log(`[MarkSyncr] Alarm verified - next fire: ${nextFireTime.toISOString()}`);
+      } else {
+        console.error(`[MarkSyncr] ERROR: Alarm was not created!`);
+      }
+      
       // Log all current alarms for debugging
       const alarms = await browser.alarms.getAll();
-      console.log('[MarkSyncr] Current alarms:', alarms);
+      console.log('[MarkSyncr] All current alarms:', JSON.stringify(alarms));
     } else {
       // Auto-sync disabled, clear any existing alarm
       await browser.alarms.clear(SYNC_ALARM_NAME);
@@ -1322,9 +1353,15 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
 });
 
-// Alarm handler
+// ==========================================
+// EVENT LISTENERS - Must be registered synchronously at top level
+// This is critical for Firefox MV3 where background scripts are event-driven
+// ==========================================
+
+// Alarm handler - registered synchronously for Firefox MV3 compatibility
 browser.alarms.onAlarm.addListener(async (alarm) => {
-  console.log('[MarkSyncr] Alarm fired:', alarm.name, 'at', new Date().toISOString());
+  const browserInfo = detectBrowser();
+  console.log(`[MarkSyncr] Alarm fired: ${alarm.name} at ${new Date().toISOString()} (${browserInfo})`);
   
   if (alarm.name === SYNC_ALARM_NAME) {
     console.log('[MarkSyncr] Auto-sync alarm triggered, starting sync...');
@@ -1345,7 +1382,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Extension install/update handler
+// Extension install/update handler - registered synchronously
 browser.runtime.onInstalled.addListener((details) => {
   console.log(`[MarkSyncr] Extension ${details.reason}:`, details);
 
@@ -1370,11 +1407,22 @@ browser.runtime.onInstalled.addListener((details) => {
       selectedSource: 'browser-bookmarks',
     });
   }
+  
+  // Re-setup auto-sync on install/update to ensure alarm is created
+  setupAutoSync().then(() => {
+    console.log('[MarkSyncr] Auto-sync setup completed after install/update');
+  });
 });
 
-// Startup handler
+// Startup handler - registered synchronously
 browser.runtime.onStartup.addListener(async () => {
-  console.log('[MarkSyncr] Browser started');
+  const browserInfo = detectBrowser();
+  console.log(`[MarkSyncr] Browser started (${browserInfo})`);
+
+  // Re-setup auto-sync on startup to ensure alarm exists
+  // This is important for Firefox where alarms may not persist across restarts
+  await setupAutoSync();
+  console.log('[MarkSyncr] Auto-sync alarm verified on startup');
 
   const { settings } = await browser.storage.local.get('settings');
 
@@ -1387,5 +1435,8 @@ browser.runtime.onStartup.addListener(async () => {
   }
 });
 
-// Initialize
+// Log that event listeners are registered (this runs synchronously)
+console.log('[MarkSyncr] Event listeners registered');
+
+// Initialize (async operations)
 initialize();

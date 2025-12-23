@@ -83,13 +83,29 @@ const DEFAULT_SETTINGS = {
  * Get browser API (Chrome or Firefox)
  */
 const getBrowserAPI = () => {
+  // Check for Chrome API first (Chrome, Edge, Opera, Brave, etc.)
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    console.log('[MarkSyncr Store] Using Chrome API');
+    return chrome;
+  }
+  // Check for Firefox/WebExtension polyfill API
+  if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
+    console.log('[MarkSyncr Store] Using Firefox/WebExtension API');
+    return browser;
+  }
+  // Fallback check for storage-only access (some contexts)
   if (typeof chrome !== 'undefined' && chrome.storage) {
+    console.log('[MarkSyncr Store] Using Chrome API (storage-only context)');
     return chrome;
   }
   if (typeof browser !== 'undefined' && browser.storage) {
+    console.log('[MarkSyncr Store] Using Firefox API (storage-only context)');
     return browser;
   }
-  // Return mock for development/testing
+  // Return mock for development/testing - THIS SHOULD NOT HAPPEN IN PRODUCTION
+  console.warn('[MarkSyncr Store] WARNING: Using mock browser API - extension features will not work!');
+  console.warn('[MarkSyncr Store] chrome:', typeof chrome, chrome ? Object.keys(chrome) : 'undefined');
+  console.warn('[MarkSyncr Store] browser:', typeof browser, typeof browser !== 'undefined' ? Object.keys(browser) : 'undefined');
   return {
     storage: {
       local: {
@@ -98,7 +114,10 @@ const getBrowserAPI = () => {
       },
     },
     runtime: {
-      sendMessage: async () => {},
+      sendMessage: async (message) => {
+        console.error('[MarkSyncr Store] Mock sendMessage called - this should not happen in production!', message);
+        return { success: false, error: 'Browser extension API not available. Please reload the extension.' };
+      },
     },
     bookmarks: {
       getTree: async () => [],
