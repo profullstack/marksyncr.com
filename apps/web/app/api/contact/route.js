@@ -1,7 +1,19 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization - only create Resend client when needed
+let resendClient = null;
+
+function getResendClient() {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is not configured');
+    }
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
 
 export async function POST(request) {
   try {
@@ -26,6 +38,7 @@ export async function POST(request) {
     }
 
     // Send email via Resend
+    const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: 'MarkSyncr Contact <noreply@marksyncr.com>',
       to: ['support@marksyncr.com'],

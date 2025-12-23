@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 
 // Create a mock send function that we can control
 const mockSend = vi.fn();
+
+// Set the environment variable before any imports
+process.env.RESEND_API_KEY = 'test-api-key';
 
 // Mock Resend module
 vi.mock('resend', () => {
@@ -16,10 +19,15 @@ vi.mock('resend', () => {
   };
 });
 
-// Import after mocking
-const { POST } = await import('../app/api/contact/route.js');
-
 describe('Contact API Route', () => {
+  let POST;
+
+  beforeAll(async () => {
+    // Import after setting env and mocking
+    const module = await import('../app/api/contact/route.js');
+    POST = module.POST;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });

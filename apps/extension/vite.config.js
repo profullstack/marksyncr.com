@@ -5,9 +5,9 @@ import { resolve } from 'path';
 const browser = process.env.BROWSER || 'chrome';
 
 export default defineConfig(({ mode }) => {
-  // Load env from apps/web/.env.local
-  const webEnvDir = resolve(__dirname, '../web');
-  const env = loadEnv(mode, webEnvDir, '');
+  // Load env from root .env.local
+  const rootEnvDir = resolve(__dirname, '../..');
+  const env = loadEnv(mode, rootEnvDir, '');
   
   return {
     plugins: [react()],
