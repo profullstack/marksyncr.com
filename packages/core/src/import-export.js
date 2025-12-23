@@ -318,16 +318,19 @@ export function parsePinboardJson(jsonString) {
  * @returns {Array} Items with IDs
  */
 const ensureIds = (items) => {
-  return items.map(item => {
-    const withId = {
-      ...item,
-      id: item.id || generateId(),
-    };
-    if (withId.children) {
-      withId.children = ensureIds(withId.children);
-    }
-    return withId;
-  });
+  if (!items || !Array.isArray(items)) return [];
+  return items
+    .filter(item => item != null) // Filter out null/undefined items
+    .map(item => {
+      const withId = {
+        ...item,
+        id: item.id || generateId(),
+      };
+      if (withId.children) {
+        withId.children = ensureIds(withId.children);
+      }
+      return withId;
+    });
 };
 
 /**
@@ -336,19 +339,19 @@ const ensureIds = (items) => {
  * @returns {Array} Nested folder structure
  */
 const convertFolderPathToNested = (flatBookmarks) => {
+  if (!flatBookmarks || !Array.isArray(flatBookmarks)) return [];
+  
   const root = [];
-  const folderMap = new Map();
   
   // Helper to get or create folder path
   const getOrCreateFolder = (pathParts, parentArray) => {
     if (pathParts.length === 0) return parentArray;
     
     const folderName = pathParts[0];
-    const fullPath = pathParts.slice(0, 1).join('/');
     
     // Look for existing folder in parent
     let folder = parentArray.find(item =>
-      (item.type === 'folder' || item.children) && item.title === folderName
+      item && (item.type === 'folder' || item.children) && item.title === folderName
     );
     
     if (!folder) {
@@ -370,6 +373,9 @@ const convertFolderPathToNested = (flatBookmarks) => {
   };
   
   for (const bookmark of flatBookmarks) {
+    // Skip null/undefined bookmarks
+    if (!bookmark) continue;
+    
     const folderPath = bookmark.folderPath || '';
     const pathParts = folderPath ? folderPath.split('/').filter(Boolean) : [];
     
@@ -402,13 +408,30 @@ const convertFolderPathToNested = (flatBookmarks) => {
 export function parseMarkSyncrJson(jsonString) {
   const data = JSON.parse(jsonString);
   
+  // Helper to count bookmarks safely
+  const countBookmarks = (items) => {
+    if (!items || !Array.isArray(items)) return 0;
+    let count = 0;
+    for (const item of items) {
+      if (!item) continue;
+      if (item.type === 'folder' || item.children) {
+        count += countBookmarks(item.children || []);
+      } else {
+        count++;
+      }
+    }
+    return count;
+  };
+  
   // Handle MarkSyncr export format or GitHub repo format
   if (data.source === 'MarkSyncr' || data.version) {
     const rawBookmarks = data.bookmarks || [];
     
     // Check if bookmarks use folderPath (GitHub repo format) or nested structure
-    const usesFolderPath = rawBookmarks.length > 0 &&
-      rawBookmarks.some(b => b.folderPath !== undefined && !b.children);
+    // Filter out null/undefined items before checking
+    const validBookmarks = rawBookmarks.filter(b => b != null);
+    const usesFolderPath = validBookmarks.length > 0 &&
+      validBookmarks.some(b => b.folderPath !== undefined && !b.children);
     
     let bookmarks;
     if (usesFolderPath) {
@@ -418,19 +441,6 @@ export function parseMarkSyncrJson(jsonString) {
       // Already nested structure, just ensure IDs
       bookmarks = ensureIds(rawBookmarks);
     }
-    
-    // Count total bookmarks
-    const countBookmarks = (items) => {
-      let count = 0;
-      for (const item of items) {
-        if (item.type === 'folder' || item.children) {
-          count += countBookmarks(item.children || []);
-        } else {
-          count++;
-        }
-      }
-      return count;
-    };
     
     return {
       format: IMPORT_FORMATS.JSON,
@@ -442,15 +452,18 @@ export function parseMarkSyncrJson(jsonString) {
   
   // Handle generic JSON array of bookmarks
   if (Array.isArray(data)) {
+    // Filter out null/undefined items before checking
+    const validData = data.filter(b => b != null);
+    
     // Check if it uses folderPath
-    const usesFolderPath = data.length > 0 &&
-      data.some(b => b.folderPath !== undefined && !b.children);
+    const usesFolderPath = validData.length > 0 &&
+      validData.some(b => b.folderPath !== undefined && !b.children);
     
     let bookmarks;
     if (usesFolderPath) {
       bookmarks = convertFolderPathToNested(data);
     } else {
-      bookmarks = data.map(item => ({
+      bookmarks = validData.map(item => ({
         id: item.id || generateId(),
         title: item.title || 'Untitled',
         url: item.url || item.href || item.link,
@@ -461,19 +474,6 @@ export function parseMarkSyncrJson(jsonString) {
         children: item.children ? ensureIds(item.children) : undefined,
       }));
     }
-    
-    // Count bookmarks
-    const countBookmarks = (items) => {
-      let count = 0;
-      for (const item of items) {
-        if (item.type === 'folder' || item.children) {
-          count += countBookmarks(item.children || []);
-        } else {
-          count++;
-        }
-      }
-      return count;
-    };
     
     return {
       format: IMPORT_FORMATS.JSON,

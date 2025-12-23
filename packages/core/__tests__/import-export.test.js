@@ -595,6 +595,49 @@ describe('Import/Export Module', () => {
       const folder2 = folders.find(f => f.title === 'Folder2');
       expect(folder2.children.find(c => c.title === 'D')).toBeDefined();
     });
+
+    it('should handle null/undefined items in bookmarks array', () => {
+      const json = JSON.stringify({
+        version: '1.0',
+        bookmarks: [
+          { url: 'https://valid.com', title: 'Valid Bookmark' },
+          null,
+          undefined,
+          { url: 'https://another.com', title: 'Another Bookmark' },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      // Should filter out null/undefined and process valid bookmarks
+      expect(result.bookmarks).toHaveLength(2);
+      expect(result.bookmarks[0].title).toBe('Valid Bookmark');
+      expect(result.bookmarks[1].title).toBe('Another Bookmark');
+      expect(result.totalCount).toBe(2);
+    });
+
+    it('should handle null/undefined items in nested children', () => {
+      const json = JSON.stringify({
+        source: 'MarkSyncr',
+        bookmarks: [
+          {
+            title: 'Folder',
+            type: 'folder',
+            children: [
+              { url: 'https://valid.com', title: 'Valid' },
+              null,
+              { url: 'https://another.com', title: 'Another' },
+            ],
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks[0].children).toHaveLength(2);
+      expect(result.bookmarks[0].children[0].title).toBe('Valid');
+      expect(result.bookmarks[0].children[1].title).toBe('Another');
+    });
   });
 
   describe('parseCsv', () => {
