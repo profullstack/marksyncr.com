@@ -164,10 +164,11 @@ export async function POST(request) {
     }
 
     // Normalize bookmarks structure
+    // Preserve empty titles - don't replace with URL
     const normalizedBookmarks = bookmarks.map(bookmark => ({
       id: bookmark.id,
       url: bookmark.url,
-      title: bookmark.title || bookmark.url,
+      title: bookmark.title ?? '',
       folderPath: bookmark.folderPath || bookmark.folder_path || '',
       dateAdded: bookmark.dateAdded || Date.now(),
       source,

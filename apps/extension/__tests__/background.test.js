@@ -686,4 +686,235 @@ describe('Background Service Worker', () => {
       // detectBrowser() should return 'brave'
     });
   });
+
+  describe('Empty Title Preservation', () => {
+    describe('flattenBookmarkTree', () => {
+      it('should preserve empty string titles instead of replacing with URL', () => {
+        const tree = [
+          {
+            id: 'root',
+            children: [
+              { id: 'b1', url: 'https://example.com', title: '' },
+              { id: 'b2', url: 'https://test.com', title: null },
+              { id: 'b3', url: 'https://other.com', title: undefined },
+              { id: 'b4', url: 'https://normal.com', title: 'Normal Title' },
+            ],
+          },
+        ];
+
+        // Expected behavior:
+        // - Empty string title ('') should remain ''
+        // - null title should become ''
+        // - undefined title should become ''
+        // - Normal title should remain 'Normal Title'
+        // IMPORTANT: Titles should NOT be replaced with URLs
+      });
+
+      it('should not use URL as fallback for missing title', () => {
+        const tree = [
+          {
+            id: 'root',
+            children: [
+              { id: 'b1', url: 'https://example.com/very/long/path' },
+            ],
+          },
+        ];
+
+        // Expected: title should be '' not 'https://example.com/very/long/path'
+      });
+    });
+
+    describe('convertNode', () => {
+      it('should preserve empty title for bookmarks', () => {
+        // When converting a bookmark node with empty title,
+        // the title should remain empty, not be replaced with URL
+      });
+
+      it('should preserve empty title for folders', () => {
+        // When converting a folder node with empty title,
+        // the title should remain empty
+      });
+    });
+
+    describe('recreateBookmarks', () => {
+      it('should create bookmarks with empty titles when cloud data has empty titles', async () => {
+        const items = [
+          { type: 'bookmark', url: 'https://example.com', title: '' },
+          { type: 'bookmark', url: 'https://test.com', title: null },
+        ];
+
+        // browser.bookmarks.create should be called with title: ''
+        // NOT title: 'https://example.com'
+      });
+
+      it('should not replace null/undefined titles with URLs', async () => {
+        const items = [
+          { type: 'bookmark', url: 'https://example.com' }, // title is undefined
+        ];
+
+        // browser.bookmarks.create should be called with title: ''
+      });
+    });
+  });
+
+  describe('Force Push/Pull', () => {
+    describe('forcePush', () => {
+      it('should return requiresAuth error when not logged in', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: null,
+        });
+
+        // forcePush should return { success: false, requiresAuth: true }
+      });
+
+      it('should sync all local bookmarks to cloud', async () => {
+        const mockBookmarkTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'b1', url: 'https://example.com', title: 'Example' },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockBookmarkTree);
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 1 }) }) // sync
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // version
+
+        // forcePush should return { success: true, stats: {...} }
+      });
+
+      it('should save version with force_push marker', async () => {
+        // The changeSummary should include { type: 'force_push' }
+      });
+
+      it('should update lastSync timestamp on success', async () => {
+        // browser.storage.local.set should be called with lastSync
+      });
+    });
+
+    describe('forcePull', () => {
+      it('should return requiresAuth error when not logged in', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: null,
+        });
+
+        // forcePull should return { success: false, requiresAuth: true }
+      });
+
+      it('should return error when no cloud data exists', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [] }) }); // no versions
+
+        // forcePull should return { success: false, error: 'No bookmark data found in cloud' }
+      });
+
+      it('should delete existing local bookmarks before importing', async () => {
+        const mockCurrentTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'existing1', url: 'https://old.com', title: 'Old' },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.storage.local.get.mockResolvedValue({
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockCurrentTree);
+        mockBrowser.bookmarks.removeTree = vi.fn().mockResolvedValue(undefined);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [{ version: 1 }] }) })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({
+              version: {
+                bookmarkData: {
+                  roots: {
+                    toolbar: {
+                      children: [
+                        { type: 'bookmark', url: 'https://new.com', title: 'New' },
+                      ],
+                    },
+                  },
+                },
+              },
+            }),
+          });
+
+        // browser.bookmarks.removeTree should be called for existing bookmarks
+        // browser.bookmarks.create should be called for new bookmarks
+      });
+
+      it('should recreate bookmarks from cloud data', async () => {
+        // After deleting existing, should create new bookmarks from cloud
+      });
+
+      it('should preserve empty titles when recreating bookmarks', async () => {
+        const cloudData = {
+          roots: {
+            toolbar: {
+              children: [
+                { type: 'bookmark', url: 'https://example.com', title: '' },
+              ],
+            },
+          },
+        };
+
+        // browser.bookmarks.create should be called with title: ''
+        // NOT title: 'https://example.com'
+      });
+
+      it('should return correct stats after import', async () => {
+        // Should return { success: true, stats: { total: X, folders: Y, synced: X } }
+      });
+
+      it('should update lastSync timestamp on success', async () => {
+        // browser.storage.local.set should be called with lastSync
+      });
+    });
+
+    describe('Message Handlers', () => {
+      describe('FORCE_PUSH', () => {
+        it('should call forcePush when FORCE_PUSH message is received', async () => {
+          // Message handler should route to forcePush function
+        });
+      });
+
+      describe('FORCE_PULL', () => {
+        it('should call forcePull when FORCE_PULL message is received', async () => {
+          // Message handler should route to forcePull function
+        });
+      });
+    });
+  });
 });

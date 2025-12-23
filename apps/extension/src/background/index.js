@@ -390,7 +390,8 @@ function flattenBookmarkTree(tree) {
         bookmarks.push({
           id: node.id,
           url: node.url,
-          title: node.title || node.url,
+          // Preserve empty titles - don't replace with URL
+          title: node.title ?? '',
           folderPath: path,
           dateAdded: node.dateAdded,
         });
@@ -765,7 +766,8 @@ async function recreateBookmarks(parentId, items) {
       if (item.type === 'bookmark' && item.url) {
         await browser.bookmarks.create({
           parentId,
-          title: item.title || item.url,
+          // Preserve empty titles - don't replace with URL
+          title: item.title ?? '',
           url: item.url,
         });
         bookmarks++;

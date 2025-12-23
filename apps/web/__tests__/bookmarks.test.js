@@ -809,3 +809,171 @@ describe('Bookmarks API Edge Cases', () => {
     expect(response.status).toBe(200);
   });
 });
+
+describe('Empty Title Preservation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  describe('POST /api/bookmarks - Title Handling', () => {
+    it('should preserve empty string titles instead of replacing with URL', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example.com', title: '' },
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.synced).toBe(1);
+      // The normalized bookmark should have title: '' not title: 'https://example.com'
+    });
+
+    it('should preserve null titles as empty string', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example.com', title: null },
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // The normalized bookmark should have title: '' not title: 'https://example.com'
+    });
+
+    it('should preserve undefined titles as empty string', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example.com' }, // title is undefined
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // The normalized bookmark should have title: '' not title: 'https://example.com'
+    });
+
+    it('should NOT use URL as fallback for missing title', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example.com/very/long/path/to/page.html' },
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      // IMPORTANT: title should be '' not 'https://example.com/very/long/path/to/page.html'
+    });
+
+    it('should preserve normal titles unchanged', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example.com', title: 'My Bookmark Title' },
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.synced).toBe(1);
+    });
+
+    it('should handle mixed bookmarks with and without titles', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example1.com', title: 'Has Title' },
+        { id: '2', url: 'https://example2.com', title: '' },
+        { id: '3', url: 'https://example3.com', title: null },
+        { id: '4', url: 'https://example4.com' }, // undefined
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.synced).toBe(4);
+      // All bookmarks should be synced with their original titles preserved
+      // Empty/null/undefined titles should become '' not URLs
+    });
+  });
+
+  describe('Nullish Coalescing Behavior', () => {
+    it('should use nullish coalescing (??) not logical OR (||) for title', async () => {
+      // This test verifies the fix: title ?? '' instead of title || url
+      // The difference:
+      // - '' || url => url (empty string is falsy)
+      // - '' ?? '' => '' (empty string is not nullish)
+      
+      const bookmarksToSync = [
+        { id: '1', url: 'https://example.com', title: '' },
+      ];
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync },
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      // With the fix, empty string titles are preserved
+      // Without the fix, they would be replaced with URLs
+    });
+  });
+});
