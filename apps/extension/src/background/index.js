@@ -1297,37 +1297,48 @@ async function forcePull() {
  * Recreate bookmarks from cloud data
  * @param {string} parentId - Parent folder ID
  * @param {Array} items - Cloud bookmark items
+ * @param {number} startIndex - Starting index for bookmark positioning (default: 0)
  * @returns {Promise<{bookmarks: number, folders: number}>}
  */
-async function recreateBookmarks(parentId, items) {
+async function recreateBookmarks(parentId, items, startIndex = 0) {
   let bookmarks = 0;
   let folders = 0;
+  let currentIndex = startIndex;
   
   for (const item of items) {
     try {
       if (item.type === 'bookmark' && item.url) {
         await browser.bookmarks.create({
           parentId,
+          // Use index to preserve bookmark order
+          index: currentIndex,
           // Preserve empty titles - don't replace with URL
           title: item.title ?? '',
           url: item.url,
         });
         bookmarks++;
+        currentIndex++;
       } else if (item.type === 'folder' || item.children) {
         const newFolder = await browser.bookmarks.create({
           parentId,
+          // Use index to preserve folder order
+          index: currentIndex,
           title: item.title || 'Untitled Folder',
         });
         folders++;
+        currentIndex++;
         
         if (item.children && item.children.length > 0) {
-          const childResult = await recreateBookmarks(newFolder.id, item.children);
+          // Child items start at index 0 within the new folder
+          const childResult = await recreateBookmarks(newFolder.id, item.children, 0);
           bookmarks += childResult.bookmarks;
           folders += childResult.folders;
         }
       }
     } catch (err) {
       console.warn('[MarkSyncr] Failed to create bookmark:', item.title, err);
+      // Still increment index to maintain relative order of remaining items
+      currentIndex++;
     }
   }
   

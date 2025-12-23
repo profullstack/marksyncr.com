@@ -3,6 +3,82 @@ import { useStore } from '../store/index.js';
 import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
 import { LoginPanel } from './components/LoginPanel.jsx';
 
+// Confirmation Dialog Component using native <dialog> element
+function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onConfirm, onCancel, variant = 'warning' }) {
+  const variantStyles = {
+    warning: {
+      icon: 'text-orange-500',
+      confirmBtn: 'bg-orange-600 hover:bg-orange-700',
+      iconBg: 'bg-orange-100',
+    },
+    danger: {
+      icon: 'text-red-500',
+      confirmBtn: 'bg-red-600 hover:bg-red-700',
+      iconBg: 'bg-red-100',
+    },
+    info: {
+      icon: 'text-blue-500',
+      confirmBtn: 'bg-blue-600 hover:bg-blue-700',
+      iconBg: 'bg-blue-100',
+    },
+  };
+
+  const styles = variantStyles[variant] || variantStyles.warning;
+
+  const handleCancel = () => {
+    dialogRef.current?.close();
+    onCancel?.();
+  };
+
+  const handleConfirm = () => {
+    dialogRef.current?.close();
+    onConfirm?.();
+  };
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="w-full max-w-sm rounded-lg bg-white p-0 shadow-xl backdrop:bg-black/50"
+      onClose={onCancel}
+    >
+      <div className="p-4">
+        <div className="flex items-start space-x-3">
+          <div className={`flex-shrink-0 rounded-full p-2 ${styles.iconBg}`}>
+            <svg className={`h-5 w-5 ${styles.icon}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            <p className="mt-1 text-sm text-slate-600">{message}</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end space-x-2 border-t border-slate-200 bg-slate-50 px-4 py-3 rounded-b-lg">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          {cancelText || 'Cancel'}
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white ${styles.confirmBtn}`}
+        >
+          {confirmText || 'Confirm'}
+        </button>
+      </div>
+    </dialog>
+  );
+}
+
 // Icons
 const SyncIcon = ({ className = '', spinning = false }) => (
   <svg
@@ -400,6 +476,8 @@ export function Popup() {
   const [exportMessage, setExportMessage] = useState(null);
   const [forceActionMessage, setForceActionMessage] = useState(null);
   const fileInputRef = useRef(null);
+  const forcePushDialogRef = useRef(null);
+  const forcePullDialogRef = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -419,10 +497,13 @@ export function Popup() {
     }
   };
 
-  const handleForcePush = async () => {
-    if (!confirm('Force Push will overwrite ALL cloud bookmarks with your local bookmarks. This cannot be undone. Continue?')) {
-      return;
-    }
+  // Show force push confirmation dialog
+  const showForcePushDialog = () => {
+    forcePushDialogRef.current?.showModal();
+  };
+
+  // Execute force push after confirmation
+  const executeForcePush = async () => {
     try {
       setForceActionMessage({ type: 'info', text: 'Force pushing...' });
       await forcePush();
@@ -435,10 +516,13 @@ export function Popup() {
     }
   };
 
-  const handleForcePull = async () => {
-    if (!confirm('Force Pull will overwrite ALL local bookmarks with cloud bookmarks. This cannot be undone. Continue?')) {
-      return;
-    }
+  // Show force pull confirmation dialog
+  const showForcePullDialog = () => {
+    forcePullDialogRef.current?.showModal();
+  };
+
+  // Execute force pull after confirmation
+  const executeForcePull = async () => {
     try {
       setForceActionMessage({ type: 'info', text: 'Force pulling...' });
       await forcePull();
@@ -750,7 +834,7 @@ ${content}
             {/* Force Push/Pull buttons */}
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={handleForcePush}
+                onClick={showForcePushDialog}
                 disabled={status === 'syncing' || !isAuthenticated}
                 className="flex items-center justify-center space-x-1 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
                 title="Overwrite cloud with local bookmarks"
@@ -759,7 +843,7 @@ ${content}
                 <span>Force Push</span>
               </button>
               <button
-                onClick={handleForcePull}
+                onClick={showForcePullDialog}
                 disabled={status === 'syncing' || !isAuthenticated}
                 className="flex items-center justify-center space-x-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 title="Overwrite local with cloud bookmarks"
@@ -878,6 +962,28 @@ ${content}
           </a>
         </div>
       </footer>
+
+      {/* Force Push Confirmation Dialog */}
+      <ConfirmDialog
+        dialogRef={forcePushDialogRef}
+        title="Force Push Bookmarks"
+        message="This will overwrite ALL cloud bookmarks with your local bookmarks. This action cannot be undone."
+        confirmText="Force Push"
+        cancelText="Cancel"
+        onConfirm={executeForcePush}
+        variant="warning"
+      />
+
+      {/* Force Pull Confirmation Dialog */}
+      <ConfirmDialog
+        dialogRef={forcePullDialogRef}
+        title="Force Pull Bookmarks"
+        message="This will overwrite ALL local bookmarks with cloud bookmarks. This action cannot be undone."
+        confirmText="Force Pull"
+        cancelText="Cancel"
+        onConfirm={executeForcePull}
+        variant="info"
+      />
     </div>
   );
 }
