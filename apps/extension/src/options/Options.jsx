@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/index.js';
+import {
+  parseImportFile,
+  formatToNetscapeHtml,
+  formatToJson,
+  detectImportFormat,
+} from '@marksyncr/core';
 
 // Section component
 function Section({ title, description, children }) {
@@ -136,14 +142,22 @@ export function Options() {
   const {
     settings,
     sources,
+    bookmarks,
     updateSettings,
     connectSource,
     disconnectSource,
     initialize,
+    setBookmarks,
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
+  const [exportFormat, setExportFormat] = useState('json');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [importMessage, setImportMessage] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -165,6 +179,141 @@ export function Options() {
 
   const handleDisconnect = async (sourceId) => {
     await disconnectSource(sourceId);
+  };
+
+  // Export bookmarks
+  const handleExport = async (format) => {
+    try {
+      // Get bookmarks from browser
+      const browserBookmarks = await new Promise((resolve) => {
+        if (chrome?.bookmarks?.getTree) {
+          chrome.bookmarks.getTree((tree) => resolve(tree));
+        } else {
+          resolve(bookmarks || []);
+        }
+      });
+
+      let content;
+      let filename;
+      let mimeType;
+
+      if (format === 'json') {
+        content = formatToJson(browserBookmarks);
+        filename = `marksyncr-bookmarks-${new Date().toISOString().split('T')[0]}.json`;
+        mimeType = 'application/json';
+      } else {
+        content = formatToNetscapeHtml(browserBookmarks);
+        filename = `marksyncr-bookmarks-${new Date().toISOString().split('T')[0]}.html`;
+        mimeType = 'text/html';
+      }
+
+      // Create and download file
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setShowExportModal(false);
+      setSaveStatus('exported');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch (err) {
+      console.error('Export failed:', err);
+      setImportMessage({ type: 'error', text: `Export failed: ${err.message}` });
+    }
+  };
+
+  // Import bookmarks
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      const format = detectImportFormat(content);
+      
+      if (!format) {
+        throw new Error('Unable to detect file format. Please use HTML or JSON format.');
+      }
+
+      const parsed = parseImportFile(content, format);
+      
+      // Import to browser bookmarks
+      if (chrome?.bookmarks?.create) {
+        // Create an import folder
+        const importFolder = await new Promise((resolve) => {
+          chrome.bookmarks.create({
+            title: `Imported ${new Date().toLocaleDateString()}`,
+            parentId: '1', // Bookmarks bar
+          }, resolve);
+        });
+
+        // Recursively create bookmarks
+        const createBookmarks = async (items, parentId) => {
+          for (const item of items) {
+            if (item.type === 'folder' || item.children) {
+              const folder = await new Promise((resolve) => {
+                chrome.bookmarks.create({
+                  title: item.title,
+                  parentId,
+                }, resolve);
+              });
+              if (item.children) {
+                await createBookmarks(item.children, folder.id);
+              }
+            } else if (item.url) {
+              await new Promise((resolve) => {
+                chrome.bookmarks.create({
+                  title: item.title,
+                  url: item.url,
+                  parentId,
+                }, resolve);
+              });
+            }
+          }
+        };
+
+        await createBookmarks(parsed.bookmarks, importFolder.id);
+      }
+
+      setShowImportModal(false);
+      setImportMessage({ type: 'success', text: `Successfully imported ${parsed.totalCount} bookmarks` });
+      setTimeout(() => setImportMessage(null), 3000);
+    } catch (err) {
+      console.error('Import failed:', err);
+      setImportMessage({ type: 'error', text: `Import failed: ${err.message}` });
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Reset sync data
+  const handleReset = async () => {
+    try {
+      // Clear local storage
+      if (chrome?.storage?.local) {
+        await new Promise((resolve) => {
+          chrome.storage.local.clear(resolve);
+        });
+      }
+      
+      setShowResetModal(false);
+      setSaveStatus('reset');
+      setTimeout(() => {
+        setSaveStatus(null);
+        window.location.reload();
+      }, 1000);
+    } catch (err) {
+      console.error('Reset failed:', err);
+      setImportMessage({ type: 'error', text: `Reset failed: ${err.message}` });
+    }
   };
 
   if (!isInitialized) {
@@ -296,29 +445,167 @@ export function Options() {
           {/* Data Management */}
           <Section
             title="Data Management"
-            description="Export, import, or reset your bookmark data"
+            description="Export, import, or reset your bookmark data (HTML & JSON formats supported)"
           >
+            {/* Status Messages */}
+            {importMessage && (
+              <div className={`mb-4 p-3 rounded-lg ${
+                importMessage.type === 'error'
+                  ? 'bg-red-50 border border-red-200 text-red-700'
+                  : 'bg-green-50 border border-green-200 text-green-700'
+              }`}>
+                {importMessage.text}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => {/* TODO: Implement export */}}
+                onClick={() => setShowExportModal(true)}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Export Bookmarks
               </button>
               <button
-                onClick={() => {/* TODO: Implement import */}}
+                onClick={() => setShowImportModal(true)}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Import Bookmarks
               </button>
               <button
-                onClick={() => {/* TODO: Implement reset */}}
+                onClick={() => setShowResetModal(true)}
                 className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
               >
                 Reset Sync Data
               </button>
             </div>
+
+            {/* Hidden file input for import */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".html,.json"
+              onChange={handleImportFile}
+              className="hidden"
+            />
           </Section>
+
+          {/* Export Modal */}
+          {showExportModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Export Bookmarks</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  Choose a format to export your bookmarks:
+                </p>
+                <div className="space-y-2 mb-6">
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="json"
+                      checked={exportFormat === 'json'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                      className="h-4 w-4 text-primary-600"
+                    />
+                    <div>
+                      <div className="font-medium text-slate-900">JSON</div>
+                      <div className="text-xs text-slate-500">MarkSyncr format, includes all metadata</div>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="html"
+                      checked={exportFormat === 'html'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                      className="h-4 w-4 text-primary-600"
+                    />
+                    <div>
+                      <div className="font-medium text-slate-900">HTML</div>
+                      <div className="text-xs text-slate-500">Browser standard format, compatible with all browsers</div>
+                    </div>
+                  </label>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowExportModal(false)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleExport(exportFormat)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                  >
+                    Export
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Import Modal */}
+          {showImportModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Import Bookmarks</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  Select a bookmark file to import. Supported formats:
+                </p>
+                <ul className="text-sm text-slate-600 mb-4 list-disc list-inside">
+                  <li>HTML (Browser export format)</li>
+                  <li>JSON (MarkSyncr format)</li>
+                </ul>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setShowImportModal(false);
+                    }}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                  >
+                    Choose File
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reset Modal */}
+          {showResetModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-lg font-semibold text-red-600 mb-4">Reset Sync Data</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  This will clear all sync data and settings. Your browser bookmarks will not be affected.
+                </p>
+                <p className="text-sm text-red-600 font-medium mb-4">
+                  This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowResetModal(false)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                  >
+                    Reset Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* About */}
           <Section title="About">
