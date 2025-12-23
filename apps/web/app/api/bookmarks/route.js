@@ -113,11 +113,12 @@ export async function GET(request) {
       );
     }
 
-    // Extract bookmarks array from JSONB
-    const bookmarks = cloudBookmarks?.bookmark_data || [];
-    const bookmarksArray = Array.isArray(bookmarks) ? bookmarks : [];
+    // Extract bookmarks array from JSONB (handle both flat array and nested format)
+    const rawBookmarks = cloudBookmarks?.bookmark_data;
+    const bookmarksArray = extractBookmarksFromNested(rawBookmarks);
     
     console.log(`[Bookmarks API GET] User: ${user.id}`);
+    console.log(`[Bookmarks API GET] Raw data type: ${Array.isArray(rawBookmarks) ? 'array' : typeof rawBookmarks}`);
     console.log(`[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks`);
     console.log(`[Bookmarks API GET] Version: ${cloudBookmarks?.version || 0}`);
 
@@ -138,6 +139,60 @@ export async function GET(request) {
 }
 
 /**
+ * Extract flat array of bookmarks from nested format
+ * The database might have bookmarks in nested format: { roots: { toolbar: { children: [...] } } }
+ * This function extracts all bookmarks into a flat array
+ */
+function extractBookmarksFromNested(data) {
+  if (!data) return [];
+  
+  // If it's already an array, return it
+  if (Array.isArray(data)) return data;
+  
+  // If it has a 'roots' property, extract from nested format
+  if (data.roots) {
+    const bookmarks = [];
+    
+    function extractFromNode(node, path = '') {
+      if (!node) return;
+      
+      // If it's a bookmark (has url)
+      if (node.url) {
+        bookmarks.push({
+          url: node.url,
+          title: node.title ?? '',
+          folderPath: path,
+          dateAdded: node.dateAdded ? new Date(node.dateAdded).getTime() : Date.now(),
+        });
+        return;
+      }
+      
+      // If it has children, recurse
+      if (node.children && Array.isArray(node.children)) {
+        const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
+        for (const child of node.children) {
+          extractFromNode(child, newPath);
+        }
+      }
+    }
+    
+    // Extract from each root
+    for (const [rootKey, rootNode] of Object.entries(data.roots)) {
+      if (rootNode && rootNode.children) {
+        const rootPath = rootNode.title || rootKey;
+        for (const child of rootNode.children) {
+          extractFromNode(child, rootPath);
+        }
+      }
+    }
+    
+    return bookmarks;
+  }
+  
+  return [];
+}
+
+/**
  * Merge incoming bookmarks with existing cloud bookmarks
  * Uses URL as unique identifier
  * Newer bookmarks (by dateAdded) win conflicts
@@ -146,11 +201,13 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
   // Create a map of existing bookmarks by URL
   const bookmarkMap = new Map();
   
-  // Ensure existingBookmarks is an array
-  const existingArray = Array.isArray(existingBookmarks) ? existingBookmarks : [];
+  // Extract bookmarks from nested format if needed
+  const existingArray = extractBookmarksFromNested(existingBookmarks);
   
   // Ensure incomingBookmarks is an array
   const incomingArray = Array.isArray(incomingBookmarks) ? incomingBookmarks : [];
+  
+  console.log(`[Bookmarks API] Extracted ${existingArray.length} bookmarks from existing data`);
   
   // Add existing bookmarks to map
   for (const bookmark of existingArray) {
