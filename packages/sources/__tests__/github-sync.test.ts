@@ -327,6 +327,198 @@ describe('GitHub Sync', () => {
 
       expect(content.metadata.checksum).toBe('abc123');
     });
+
+    it('should skip update when checksum matches existing file', async () => {
+      const existingContent = {
+        version: '1.0',
+        metadata: {
+          createdAt: '2025-01-01T00:00:00.000Z',
+          lastModified: '2025-01-01T00:00:00.000Z',
+          source: 'marksyncr',
+          checksum: 'abc123', // Same checksum as incoming
+        },
+        bookmarks: [
+          { url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks Bar' },
+          { url: 'https://test.com', title: 'Test', folderPath: 'Other' },
+        ],
+      };
+
+      // First call: get existing file with matching checksum
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: Buffer.from(JSON.stringify(existingContent)).toString('base64'),
+          sha: 'existingsha123',
+        }),
+      });
+
+      // No second call should be made since checksums match
+
+      const result = await updateBookmarkFile(
+        mockAccessToken,
+        mockRepository,
+        mockBranch,
+        mockFilePath,
+        mockBookmarks // Has checksum 'abc123'
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.sha).toBe('existingsha123');
+      expect(result.bookmarkCount).toBe(2);
+      // Only one fetch call (to get existing file), no PUT call
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should update when checksum differs from existing file', async () => {
+      const existingContent = {
+        version: '1.0',
+        metadata: {
+          createdAt: '2025-01-01T00:00:00.000Z',
+          lastModified: '2025-01-01T00:00:00.000Z',
+          source: 'marksyncr',
+          checksum: 'different_checksum', // Different checksum
+        },
+        bookmarks: [
+          { url: 'https://old.com', title: 'Old' },
+        ],
+      };
+
+      // First call: get existing file with different checksum
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: Buffer.from(JSON.stringify(existingContent)).toString('base64'),
+          sha: 'existingsha123',
+        }),
+      });
+
+      // Second call: update file
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: { sha: 'updatedsha123' },
+          commit: { sha: 'commitsha456' },
+        }),
+      });
+
+      const result = await updateBookmarkFile(
+        mockAccessToken,
+        mockRepository,
+        mockBranch,
+        mockFilePath,
+        mockBookmarks // Has checksum 'abc123'
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(false);
+      expect(result.created).toBe(false);
+      expect(result.sha).toBe('updatedsha123');
+      // Two fetch calls: get existing + PUT update
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should update when existing file has no checksum', async () => {
+      const existingContent = {
+        version: '1.0',
+        metadata: {
+          createdAt: '2025-01-01T00:00:00.000Z',
+          lastModified: '2025-01-01T00:00:00.000Z',
+          source: 'marksyncr',
+          // No checksum field
+        },
+        bookmarks: [
+          { url: 'https://old.com', title: 'Old' },
+        ],
+      };
+
+      // First call: get existing file without checksum
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: Buffer.from(JSON.stringify(existingContent)).toString('base64'),
+          sha: 'existingsha123',
+        }),
+      });
+
+      // Second call: update file
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: { sha: 'updatedsha123' },
+          commit: { sha: 'commitsha456' },
+        }),
+      });
+
+      const result = await updateBookmarkFile(
+        mockAccessToken,
+        mockRepository,
+        mockBranch,
+        mockFilePath,
+        mockBookmarks
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(false);
+      expect(result.created).toBe(false);
+      expect(result.sha).toBe('updatedsha123');
+      // Two fetch calls: get existing + PUT update
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should update when incoming data has no checksum', async () => {
+      const existingContent = {
+        version: '1.0',
+        metadata: {
+          createdAt: '2025-01-01T00:00:00.000Z',
+          lastModified: '2025-01-01T00:00:00.000Z',
+          source: 'marksyncr',
+          checksum: 'existing_checksum',
+        },
+        bookmarks: [
+          { url: 'https://old.com', title: 'Old' },
+        ],
+      };
+
+      // First call: get existing file
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: Buffer.from(JSON.stringify(existingContent)).toString('base64'),
+          sha: 'existingsha123',
+        }),
+      });
+
+      // Second call: update file
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          content: { sha: 'updatedsha123' },
+          commit: { sha: 'commitsha456' },
+        }),
+      });
+
+      const bookmarksWithoutChecksum: BookmarkSyncData = {
+        bookmarks: [
+          { url: 'https://example.com', title: 'Example' },
+        ],
+        tombstones: [],
+        // No checksum
+      };
+
+      const result = await updateBookmarkFile(
+        mockAccessToken,
+        mockRepository,
+        mockBranch,
+        mockFilePath,
+        bookmarksWithoutChecksum
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(false);
+      // Two fetch calls: get existing + PUT update
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('GitHubSyncResult', () => {

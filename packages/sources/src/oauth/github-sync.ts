@@ -64,6 +64,7 @@ export interface GitHubSyncResult {
   success: boolean;
   sha: string;
   created: boolean;
+  skipped: boolean;
   bookmarkCount: number;
   error?: string;
 }
@@ -139,8 +140,21 @@ export async function updateBookmarkFile(
   // Try to get existing file to get SHA and preserve metadata
   const existing = await getBookmarkFile(accessToken, repository, branch, filePath);
   
-  const now = new Date().toISOString();
   const bookmarkCount = data.bookmarks.length;
+
+  // Check if checksum matches - skip update if data hasn't changed
+  // Only skip if both checksums exist and match
+  if (existing && data.checksum && existing.content.metadata.checksum === data.checksum) {
+    return {
+      success: true,
+      sha: existing.sha,
+      created: false,
+      skipped: true,
+      bookmarkCount,
+    };
+  }
+
+  const now = new Date().toISOString();
 
   // Build the file content
   const fileContent: BookmarkFile = {
@@ -199,6 +213,7 @@ export async function updateBookmarkFile(
     success: true,
     sha: result.content.sha,
     created: !existing,
+    skipped: false,
     bookmarkCount,
   };
 }
