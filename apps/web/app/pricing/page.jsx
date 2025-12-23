@@ -39,7 +39,6 @@ const plans = [
     yearlyPrice: 15,
     features: [
       'Everything in Free',
-      'MarkSyncr Cloud storage',
       'Safari support',
       'Bookmark tags & notes',
       'Smart search with filters',

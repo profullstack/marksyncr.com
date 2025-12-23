@@ -468,9 +468,10 @@ export default function HomePage() {
             <PricingCard
               name="Free"
               price="Free"
-              description="Perfect for personal use with your own storage"
+              description="Perfect for personal use"
               features={[
                 'Unlimited bookmarks',
+                'MarkSyncr Cloud storage',
                 'GitHub, Dropbox, Google Drive sync',
                 'Import/Export bookmarks',
                 'Chrome & Firefox support',
@@ -484,10 +485,9 @@ export default function HomePage() {
               name="Pro"
               price="$5"
               yearlyPrice="$15"
-              description="Managed cloud storage with premium features"
+              description="Premium features for power users"
               features={[
                 'Everything in Free',
-                'MarkSyncr Cloud storage',
                 'Priority sync (faster)',
                 'Safari support',
                 'Version history (30 days)',
