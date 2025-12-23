@@ -43,7 +43,7 @@ describe('PLAN_FEATURES', () => {
     it('should have correct name and pricing', () => {
       expect(PLAN_FEATURES.pro.name).toBe('Pro');
       expect(PLAN_FEATURES.pro.monthlyPrice).toBe(5);
-      expect(PLAN_FEATURES.pro.yearlyPrice).toBe(48);
+      expect(PLAN_FEATURES.pro.yearlyPrice).toBe(15);
     });
 
     it('should have features array', () => {
@@ -63,7 +63,7 @@ describe('PLAN_FEATURES', () => {
     it('should have correct name and pricing', () => {
       expect(PLAN_FEATURES.team.name).toBe('Team');
       expect(PLAN_FEATURES.team.monthlyPrice).toBe(12);
-      expect(PLAN_FEATURES.team.yearlyPrice).toBe(120);
+      expect(PLAN_FEATURES.team.yearlyPrice).toBe(36);
     });
 
     it('should have features array', () => {

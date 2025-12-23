@@ -38,7 +38,7 @@ export const PLAN_FEATURES = {
   pro: {
     name: 'Pro',
     monthlyPrice: 5,
-    yearlyPrice: 48, // $4/month billed yearly
+    yearlyPrice: 15, // $1.25/month billed yearly
     features: [
       'Everything in Free',
       'MarkSyncr Cloud storage',
@@ -51,7 +51,7 @@ export const PLAN_FEATURES = {
   team: {
     name: 'Team',
     monthlyPrice: 12,
-    yearlyPrice: 120, // $10/month billed yearly
+    yearlyPrice: 36, // $3/month billed yearly
     features: [
       'Everything in Pro',
       'Shared bookmark folders',

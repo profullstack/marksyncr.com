@@ -35,7 +35,7 @@ const plans = [
     name: 'Pro',
     description: 'For power users who want the simplest experience',
     monthlyPrice: 5,
-    yearlyPrice: 48,
+    yearlyPrice: 15,
     features: [
       'Everything in Free',
       'MarkSyncr Cloud storage',
@@ -59,7 +59,7 @@ const plans = [
     name: 'Team',
     description: 'For teams who need to share bookmarks',
     monthlyPrice: 12,
-    yearlyPrice: 120,
+    yearlyPrice: 36,
     features: [
       'Everything in Pro',
       'Shared bookmark folders',
