@@ -431,18 +431,43 @@ async function getLatestVersionFromCloud() {
 }
 
 /**
- * Initialize the background service worker
+ * Initialize the background script
+ * Note: Firefox MV3 uses persistent background scripts, not service workers
+ * Chrome MV3 uses service workers
  */
 async function initialize() {
   const browserInfo = detectBrowser();
-  console.log(`[MarkSyncr] Background service worker initialized (${browserInfo})`);
+  const isFirefox = browserInfo === 'firefox';
+  
+  console.log(`[MarkSyncr] Background script initialized (${browserInfo})`);
   console.log(`[MarkSyncr] User agent: ${navigator.userAgent}`);
+  console.log(`[MarkSyncr] Script type: ${isFirefox ? 'persistent background script' : 'service worker'}`);
 
   // Set up alarm for automatic sync
   await setupAutoSync();
 
   // Listen for bookmark changes
   setupBookmarkListeners();
+  
+  // For Firefox, set up a periodic check to ensure alarm is still active
+  // Firefox background scripts are persistent, so we can use setInterval
+  if (isFirefox) {
+    console.log('[MarkSyncr] Firefox detected - setting up alarm health check');
+    
+    // Check alarm health every 2 minutes
+    setInterval(async () => {
+      const alarm = await browser.alarms.get(SYNC_ALARM_NAME);
+      if (!alarm) {
+        console.warn('[MarkSyncr] Firefox: Alarm not found, recreating...');
+        await setupAutoSync();
+      } else {
+        const nextFire = new Date(alarm.scheduledTime);
+        const now = new Date();
+        const minutesUntilFire = Math.round((nextFire - now) / 60000);
+        console.log(`[MarkSyncr] Firefox: Alarm health check OK - next fire in ${minutesUntilFire} minutes`);
+      }
+    }, 2 * 60 * 1000); // Every 2 minutes
+  }
   
   // Log that initialization is complete
   console.log('[MarkSyncr] Initialization complete');
