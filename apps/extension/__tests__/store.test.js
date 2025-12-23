@@ -442,7 +442,7 @@ describe('Extension Store', () => {
       it('should set error when no source is selected', async () => {
         await useStore.getState().triggerSync();
 
-        expect(useStore.getState().error).toBe('No sync source selected');
+        expect(useStore.getState().error).toBe('No sync source selected. Please select a source from the dropdown.');
       });
 
       it('should set syncing status during sync', async () => {
