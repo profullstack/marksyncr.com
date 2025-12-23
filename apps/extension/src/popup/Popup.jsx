@@ -143,6 +143,12 @@ const CloudIcon = ({ className = '' }) => (
   </svg>
 );
 
+const MarkSyncrIcon = ({ className = '' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+  </svg>
+);
+
 const ExternalLinkIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -150,7 +156,7 @@ const ExternalLinkIcon = ({ className = '' }) => (
 );
 
 // Connected services display component
-function ConnectedServices({ sources }) {
+function ConnectedServices({ sources, isAuthenticated }) {
   const getServiceIcon = (sourceType) => {
     switch (sourceType) {
       case 'github':
@@ -160,6 +166,8 @@ function ConnectedServices({ sources }) {
       case 'google_drive':
       case 'google-drive':
         return GoogleDriveIcon;
+      case 'marksyncr-cloud':
+        return MarkSyncrIcon;
       default:
         return CloudIcon;
     }
@@ -175,15 +183,17 @@ function ConnectedServices({ sources }) {
     if (sourceType === 'github' && source.repository) {
       return `GitHub: ${source.repository}`;
     }
+    if (sourceType === 'marksyncr-cloud') {
+      return 'MarkSyncr Cloud';
+    }
     return source.name || sourceType;
   };
 
-  // Filter to only external services (not browser-bookmarks or supabase-cloud)
+  // Filter to only external services (not browser-bookmarks)
   const externalServices = ['github', 'dropbox', 'google-drive', 'google_drive'];
   const connectedSources = sources.filter(s =>
     s.connected && externalServices.includes(getSourceType(s))
   );
-  const hasConnectedSources = connectedSources.length > 0;
 
   const openDashboard = () => {
     window.open('https://marksyncr.com/dashboard', '_blank');
@@ -192,7 +202,7 @@ function ConnectedServices({ sources }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-slate-700">Connected Services</label>
+        <label className="text-sm font-medium text-slate-700">Sync Destinations</label>
         <button
           onClick={openDashboard}
           className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
@@ -202,44 +212,66 @@ function ConnectedServices({ sources }) {
         </button>
       </div>
 
-      {hasConnectedSources ? (
-        <div className="space-y-2">
-          {connectedSources.map((source) => {
-            const sourceType = getSourceType(source);
-            const Icon = getServiceIcon(sourceType);
-            return (
-              <div
-                key={source.id}
-                className="flex items-center justify-between rounded-lg bg-slate-50 p-3"
-              >
-                <div className="flex items-center space-x-2">
-                  <Icon className="h-4 w-4 text-slate-600" />
-                  <span className="text-sm text-slate-700">{getServiceName(source)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-xs text-green-600">Connected</span>
-                </div>
-              </div>
-            );
-          })}
+      <div className="space-y-2">
+        {/* MarkSyncr Cloud - Always shown when authenticated */}
+        <div className="flex items-center justify-between rounded-lg bg-primary-50 p-3 border border-primary-200">
+          <div className="flex items-center space-x-2">
+            <MarkSyncrIcon className="h-4 w-4 text-primary-600" />
+            <span className="text-sm font-medium text-primary-700">MarkSyncr Cloud</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {isAuthenticated ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-xs text-green-600">Active</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <span className="text-xs text-slate-500">Sign in required</span>
+              </>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
-          <CloudIcon className="mx-auto h-8 w-8 text-slate-400" />
-          <p className="mt-2 text-sm text-slate-500">No services connected</p>
+
+        {/* External services */}
+        {connectedSources.map((source) => {
+          const sourceType = getSourceType(source);
+          const Icon = getServiceIcon(sourceType);
+          return (
+            <div
+              key={source.id}
+              className="flex items-center justify-between rounded-lg bg-slate-50 p-3"
+            >
+              <div className="flex items-center space-x-2">
+                <Icon className="h-4 w-4 text-slate-600" />
+                <span className="text-sm text-slate-700">{getServiceName(source)}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-xs text-green-600">Connected</span>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Add more services button */}
+        {connectedSources.length === 0 && (
           <button
             onClick={openDashboard}
-            className="mt-2 rounded-lg bg-primary-600 px-3 py-1.5 text-sm text-white hover:bg-primary-700"
+            className="flex w-full items-center justify-center space-x-2 rounded-lg border border-dashed border-slate-300 p-3 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-600"
           >
-            Connect Services
+            <CloudIcon className="h-4 w-4" />
+            <span>Connect GitHub, Dropbox, or Google Drive</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Info text */}
       <p className="text-xs text-slate-500">
-        Bookmarks sync automatically to all connected services.
+        {isAuthenticated
+          ? 'Bookmarks sync automatically to MarkSyncr Cloud and all connected services.'
+          : 'Sign in to enable cloud sync.'}
       </p>
     </div>
   );
@@ -703,7 +735,7 @@ ${content}
             <SyncStats stats={stats} />
 
             {/* Connected services display */}
-            <ConnectedServices sources={sources} />
+            <ConnectedServices sources={sources} isAuthenticated={isAuthenticated} />
 
             {/* Sync button */}
             <button
