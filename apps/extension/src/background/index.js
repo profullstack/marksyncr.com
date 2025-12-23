@@ -309,6 +309,71 @@ async function saveVersionToCloud(bookmarkData, sourceType, deviceName, changeSu
 }
 
 /**
+ * Generate a unique device ID for this browser instance
+ * @returns {Promise<string>}
+ */
+async function getDeviceId() {
+  const { deviceId } = await browser.storage.local.get('deviceId');
+  if (deviceId) {
+    return deviceId;
+  }
+  
+  // Generate a new device ID
+  const newDeviceId = `${detectBrowser()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  await browser.storage.local.set({ deviceId: newDeviceId });
+  return newDeviceId;
+}
+
+/**
+ * Get OS information
+ * @returns {string}
+ */
+function detectOS() {
+  const ua = navigator.userAgent;
+  if (ua.includes('Windows')) return 'Windows';
+  if (ua.includes('Mac OS')) return 'macOS';
+  if (ua.includes('Linux')) return 'Linux';
+  if (ua.includes('Android')) return 'Android';
+  if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
+  return 'Unknown';
+}
+
+/**
+ * Register this device with the server
+ * @returns {Promise<{success: boolean, device?: object, error?: string}>}
+ */
+async function registerDevice() {
+  try {
+    const deviceId = await getDeviceId();
+    const browserName = detectBrowser();
+    const os = detectOS();
+    
+    const response = await apiRequest('/api/devices', {
+      method: 'POST',
+      body: JSON.stringify({
+        deviceId,
+        name: `${browserName.charAt(0).toUpperCase() + browserName.slice(1)} on ${os}`,
+        browser: browserName,
+        os,
+      }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      console.warn('[MarkSyncr] Failed to register device:', data.error);
+      return { success: false, error: data.error };
+    }
+    
+    const data = await response.json();
+    console.log('[MarkSyncr] Device registered:', data.device);
+    return { success: true, device: data.device };
+  } catch (err) {
+    console.warn('[MarkSyncr] Device registration error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Get bookmarks from cloud
  */
 async function getBookmarksFromCloud() {
@@ -574,6 +639,10 @@ async function performSync(sourceId) {
         requiresAuth: true,
       };
     }
+    
+    // Register this device with the server (updates last_seen_at if already registered)
+    console.log('[MarkSyncr] Registering device...');
+    await registerDevice();
     
     // Two-way sync with tombstone support
     try {

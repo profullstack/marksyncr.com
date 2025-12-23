@@ -326,28 +326,16 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            {/* Chrome Logo */}
-            <svg
-              className="h-6 w-6"
-              viewBox="0 0 48 48"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <circle cx="24" cy="24" r="20" fill="#4285F4" />
-              <path
-                d="M24 14C29.523 14 34 18.477 34 24H24V14Z"
-                fill="#EA4335"
-              />
-              <path
-                d="M24 14C18.477 14 14 18.477 14 24C14 26.387 14.784 28.588 16.1 30.35L24 24V14Z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M16.1 30.35C18.1 33.1 21.3 35 24 35C29.523 35 34 30.523 34 24H24L16.1 30.35Z"
-                fill="#34A853"
-              />
-              <circle cx="24" cy="24" r="8" fill="white" />
-              <circle cx="24" cy="24" r="4" fill="#4285F4" />
+            {/* Chrome Logo - Multi-colored */}
+            <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+              {/* Outer ring segments */}
+              <path fill="#EA4335" d="M24 4C14.06 4 5.7 10.42 3.34 19.27L13.85 24.5C15.28 20.7 19.3 18 24 18c2.76 0 5.26 1 7.2 2.64L40.36 11.5C36.34 6.86 30.52 4 24 4z"/>
+              <path fill="#FBBC05" d="M3.34 19.27C2.48 22.06 2 25 2 28c0 7.18 3.02 13.64 7.86 18.2L18.5 33.5l-4.65-9C12.7 26.3 12 25.2 12 24c0-.34.02-.68.06-1L3.34 19.27z"/>
+              <path fill="#34A853" d="M24 44c6.52 0 12.34-2.86 16.36-7.5l-9.16-9.14C29.26 29 26.76 30 24 30c-4.7 0-8.72-2.7-10.15-6.5l-3.99 6.7L9.86 46.2C13.64 48.98 18.52 44 24 44z"/>
+              {/* Center circle */}
+              <circle cx="24" cy="24" r="10" fill="#4285F4"/>
+              <circle cx="24" cy="24" r="6" fill="white"/>
+              <circle cx="24" cy="24" r="4" fill="#4285F4"/>
             </svg>
           </div>
           <div>
@@ -362,43 +350,27 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            {/* Firefox Logo */}
-            <svg
-              className="h-6 w-6"
-              viewBox="0 0 48 48"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <defs>
-                <linearGradient id="firefox-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#FF9500" />
-                  <stop offset="100%" stopColor="#FF0039" />
-                </linearGradient>
-                <linearGradient id="firefox-gradient-2" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#FF0039" />
-                  <stop offset="100%" stopColor="#FF9500" />
-                </linearGradient>
-              </defs>
-              <circle cx="24" cy="24" r="20" fill="url(#firefox-gradient-1)" />
-              <path
-                d="M24 8C15.163 8 8 15.163 8 24C8 32.837 15.163 40 24 40C32.837 40 40 32.837 40 24C40 15.163 32.837 8 24 8ZM24 36C17.373 36 12 30.627 12 24C12 17.373 17.373 12 24 12C30.627 12 36 17.373 36 24C36 30.627 30.627 36 24 36Z"
-                fill="url(#firefox-gradient-2)"
-                opacity="0.3"
-              />
-              <path
-                d="M32 16C30 14 27 13 24 13C18.477 13 14 17.477 14 23C14 28.523 18.477 33 24 33C29.523 33 34 28.523 34 23C34 20 33 18 32 16Z"
-                fill="#FF6611"
-              />
-              <path
-                d="M24 15C20 15 17 18 17 22C17 26 20 29 24 29C28 29 31 26 31 22C31 18 28 15 24 15Z"
-                fill="#FFBD4F"
-              />
-              <ellipse cx="21" cy="20" rx="2" ry="3" fill="white" opacity="0.6" />
-            </svg>
+            {/* Firefox - Fox emoji */}
+            <span className="text-2xl">🦊</span>
           </div>
           <div>
             <p className="font-medium text-slate-900">Firefox Add-on</p>
             <p className="text-xs text-slate-500">Install for Firefox</p>
+          </div>
+        </a>
+        <a
+          href="https://apps.apple.com/app/safari"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
+        >
+          <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+            {/* Safari - Compass emoji */}
+            <span className="text-2xl">🧭</span>
+          </div>
+          <div>
+            <p className="font-medium text-slate-900">Safari Extension</p>
+            <p className="text-xs text-slate-500">Install for Safari</p>
           </div>
         </a>
         <Link
