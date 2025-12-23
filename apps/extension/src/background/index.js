@@ -907,19 +907,33 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
   // Get current browser bookmarks to find root folders
   const currentTree = await browser.bookmarks.getTree();
   const rootFolders = {};
+  const browserType = detectBrowser();
+  
+  console.log(`[MarkSyncr] addCloudBookmarksToLocal: browser=${browserType}, bookmarks to add=${cloudBookmarks.length}`);
   
   if (currentTree[0]?.children) {
+    console.log('[MarkSyncr] Root folder children:', currentTree[0].children.map(c => ({ id: c.id, title: c.title })));
+    
     for (const root of currentTree[0].children) {
       const title = root.title?.toLowerCase() || '';
-      if (title.includes('toolbar') || title.includes('bar')) {
+      const id = root.id;
+      
+      // Chrome/Opera/Edge/Brave use numeric IDs: '1' for bookmarks bar, '2' for other bookmarks
+      // Firefox uses string IDs: 'toolbar_____', 'menu________', 'unfiled_____'
+      if (title.includes('toolbar') || title.includes('bar') || id === '1') {
         rootFolders.toolbar = root;
-      } else if (title.includes('menu')) {
+        console.log(`[MarkSyncr] Found toolbar folder: id=${id}, title="${root.title}"`);
+      } else if (title.includes('menu') || id === 'menu________') {
         rootFolders.menu = root;
-      } else if (title.includes('other') || title.includes('unsorted')) {
+        console.log(`[MarkSyncr] Found menu folder: id=${id}, title="${root.title}"`);
+      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
         rootFolders.other = root;
+        console.log(`[MarkSyncr] Found other folder: id=${id}, title="${root.title}"`);
       }
     }
   }
+  
+  console.log('[MarkSyncr] Detected root folders:', Object.keys(rootFolders));
   
   // Create a folder cache for quick lookup
   const folderCache = new Map();
@@ -969,6 +983,9 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
   }
   
   // Add each bookmark
+  let addedCount = 0;
+  let skippedCount = 0;
+  
   for (const bookmark of cloudBookmarks) {
     try {
       // Determine which root folder to use based on folderPath
@@ -976,20 +993,29 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
       let folderPath = bookmark.folderPath || '';
       
       // Check if folderPath starts with a known root
+      // Handle various browser naming conventions:
+      // - Chrome: "Bookmarks Bar", "Other Bookmarks"
+      // - Firefox: "Bookmarks Toolbar", "Bookmarks Menu", "Other Bookmarks"
+      // - Opera: "Bookmarks bar", "Other bookmarks", "Speed Dial" (Opera-specific)
       const lowerPath = folderPath.toLowerCase();
-      if (lowerPath.startsWith('bookmarks bar') || lowerPath.startsWith('bookmarks toolbar')) {
+      
+      if (lowerPath.startsWith('bookmarks bar') ||
+          lowerPath.startsWith('bookmarks toolbar') ||
+          lowerPath.startsWith('speed dial')) {
         rootFolder = rootFolders.toolbar || rootFolders.other;
         folderPath = folderPath.split('/').slice(1).join('/');
       } else if (lowerPath.startsWith('bookmarks menu')) {
         rootFolder = rootFolders.menu || rootFolders.other;
         folderPath = folderPath.split('/').slice(1).join('/');
-      } else if (lowerPath.startsWith('other bookmarks')) {
+      } else if (lowerPath.startsWith('other bookmarks') ||
+                 lowerPath.startsWith('unsorted bookmarks')) {
         rootFolder = rootFolders.other || rootFolders.toolbar;
         folderPath = folderPath.split('/').slice(1).join('/');
       }
       
       if (!rootFolder) {
-        console.warn('[MarkSyncr] No root folder found, skipping bookmark:', bookmark.url);
+        console.warn(`[MarkSyncr] No root folder found for bookmark: ${bookmark.url}, folderPath: ${bookmark.folderPath}`);
+        skippedCount++;
         continue;
       }
       
@@ -1002,10 +1028,14 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
         title: bookmark.title ?? '',
         url: bookmark.url,
       });
+      addedCount++;
     } catch (err) {
       console.warn('[MarkSyncr] Failed to add bookmark from cloud:', bookmark.url, err);
+      skippedCount++;
     }
   }
+  
+  console.log(`[MarkSyncr] addCloudBookmarksToLocal complete: added=${addedCount}, skipped=${skippedCount}, total=${cloudBookmarks.length}`);
 }
 
 /**
