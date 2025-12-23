@@ -156,18 +156,18 @@ export default function DocsPage() {
 
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <h3 className="mb-2 text-lg font-medium text-slate-900">MarkSyncr Cloud</h3>
-              <span className="mb-2 inline-block rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
-                Pro Plan
+              <span className="mb-2 inline-block rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                Free
               </span>
               <p className="mb-4 text-slate-600">
-                Our managed cloud storage with premium features. The easiest option with 
-                the best performance.
+                Our managed cloud storage. The easiest option with no setup required -
+                just sign in and start syncing.
               </p>
               <ul className="list-disc pl-6 text-sm text-slate-600">
-                <li>Fastest sync speeds</li>
-                <li>30-day version history</li>
+                <li>Fast sync speeds</li>
+                <li>5-day version history (30 days on Pro)</li>
                 <li>Cross-device sync state</li>
-                <li>Priority support</li>
+                <li>No configuration needed</li>
               </ul>
             </div>
           </div>
@@ -195,8 +195,9 @@ export default function DocsPage() {
             <div>
               <h3 className="mb-2 text-lg font-medium text-slate-900">Version History</h3>
               <p className="text-slate-600">
-                Pro users get access to version history, allowing you to restore your bookmarks 
-                to any previous state within the last 30 days.
+                All users get access to version history, allowing you to restore your bookmarks
+                to any previous state. Free users get 5 days of history, Pro users get 30 days,
+                and Team users get 1 year.
               </p>
             </div>
 

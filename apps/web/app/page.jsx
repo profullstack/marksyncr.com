@@ -467,10 +467,11 @@ export default function HomePage() {
                 'Unlimited bookmarks',
                 'MarkSyncr Cloud storage',
                 'GitHub, Dropbox, Google Drive sync',
-                'Import/Export bookmarks',
+                'HTML & JSON import/export',
                 'Chrome & Firefox support',
                 'Two-way sync',
                 'Conflict resolution',
+                'Version history (5 days)',
               ]}
               cta="Get Started"
               isYearly={isYearly}
