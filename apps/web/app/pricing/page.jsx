@@ -185,15 +185,14 @@ export default function PricingPage() {
       <header className="bg-white shadow-sm">
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between items-center">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center">
               <Image
                 src="/logo.svg"
                 alt="MarkSyncr"
-                width={32}
+                width={140}
                 height={32}
-                className="h-8 w-8"
+                className="h-8 w-auto"
               />
-              <span className="text-xl font-bold text-gray-900">MarkSyncr</span>
             </Link>
             <div className="flex items-center space-x-4">
               <Link href="/login" className="text-gray-600 hover:text-gray-900">
@@ -461,15 +460,14 @@ export default function PricingPage() {
       <footer className="bg-gray-900 text-gray-400 py-12 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center">
               <Image
                 src="/logo.svg"
                 alt="MarkSyncr"
-                width={32}
-                height={32}
-                className="h-8 w-8"
+                width={120}
+                height={28}
+                className="h-7 w-auto"
               />
-              <span className="text-xl font-bold text-white">MarkSyncr</span>
             </Link>
             <div className="mt-4 md:mt-0 flex space-x-6">
               <Link href="/privacy" className="hover:text-white transition">

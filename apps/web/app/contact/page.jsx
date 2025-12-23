@@ -62,15 +62,14 @@ export default function ContactPage() {
       {/* Navigation */}
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center">
             <Image
               src="/logo.svg"
               alt="MarkSyncr"
-              width={32}
+              width={140}
               height={32}
-              className="h-8 w-8"
+              className="h-8 w-auto"
             />
-            <span className="text-xl font-bold text-slate-900">MarkSyncr</span>
           </Link>
           <div className="flex items-center space-x-4">
             <Link

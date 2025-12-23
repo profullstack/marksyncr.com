@@ -98,15 +98,14 @@ export default function HomePage() {
       {/* Navigation */}
       <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center">
             <Image
               src="/logo.svg"
               alt="MarkSyncr"
-              width={32}
+              width={140}
               height={32}
-              className="h-8 w-8"
+              className="h-8 w-auto"
             />
-            <span className="text-xl font-bold text-slate-900">MarkSyncr</span>
           </Link>
           <div className="hidden items-center space-x-8 md:flex">
             <Link
@@ -537,15 +536,14 @@ export default function HomePage() {
       <footer className="border-t border-slate-200 bg-white py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between md:flex-row">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center">
               <Image
                 src="/logo.svg"
                 alt="MarkSyncr"
-                width={24}
-                height={24}
-                className="h-6 w-6"
+                width={120}
+                height={28}
+                className="h-7 w-auto"
               />
-              <span className="font-semibold text-slate-900">MarkSyncr</span>
             </Link>
             <div className="mt-4 flex space-x-6 md:mt-0">
               <Link
