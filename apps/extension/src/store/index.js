@@ -446,6 +446,96 @@ export const useStore = create(
       },
 
       /**
+       * Force Push - Overwrite cloud data with local bookmarks
+       */
+      forcePush: async () => {
+        set({ status: 'syncing', error: null });
+
+        try {
+          const browserAPI = getBrowserAPI();
+          console.log('[MarkSyncr Store] Force Push: Sending FORCE_PUSH message...');
+          
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'FORCE_PUSH',
+          });
+
+          console.log('[MarkSyncr Store] Force Push result:', result);
+
+          if (result?.success) {
+            const lastSync = new Date().toISOString();
+            set({
+              status: 'synced',
+              lastSync,
+              stats: result.stats || get().stats,
+            });
+
+            await browserAPI.storage.local.set({ lastSync });
+            return { success: true, message: result.message };
+          } else {
+            throw new Error(result?.error || 'Force push failed');
+          }
+        } catch (err) {
+          console.error('[MarkSyncr Store] Force Push failed:', err);
+          set({
+            status: 'error',
+            error: err.message || 'Force push failed',
+          });
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
+       * Force Pull - Overwrite local bookmarks with cloud data
+       */
+      forcePull: async () => {
+        set({ status: 'syncing', error: null });
+
+        try {
+          const browserAPI = getBrowserAPI();
+          console.log('[MarkSyncr Store] Force Pull: Sending FORCE_PULL message...');
+          
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'FORCE_PULL',
+          });
+
+          console.log('[MarkSyncr Store] Force Pull result:', result);
+
+          if (result?.success) {
+            const lastSync = new Date().toISOString();
+            
+            // Refresh bookmark stats after pull
+            try {
+              const tree = await browserAPI.bookmarks.getTree();
+              const stats = countBookmarks(tree);
+              set({
+                status: 'synced',
+                lastSync,
+                stats,
+              });
+            } catch {
+              set({
+                status: 'synced',
+                lastSync,
+                stats: result.stats || get().stats,
+              });
+            }
+
+            await browserAPI.storage.local.set({ lastSync });
+            return { success: true, message: result.message };
+          } else {
+            throw new Error(result?.error || 'Force pull failed');
+          }
+        } catch (err) {
+          console.error('[MarkSyncr Store] Force Pull failed:', err);
+          set({
+            status: 'error',
+            error: err.message || 'Force pull failed',
+          });
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
        * Connect to a source (OAuth flow)
        */
       connectSource: async (sourceId) => {

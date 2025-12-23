@@ -232,6 +232,30 @@ const UserIcon = ({ className = '' }) => (
   </svg>
 );
 
+// Upload icon for Force Push
+const UploadIcon = ({ className = '' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+    />
+  </svg>
+);
+
+// Download icon for Force Pull
+const DownloadIcon = ({ className = '' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+    />
+  </svg>
+);
+
 // Main Popup component
 export function Popup() {
   const {
@@ -243,6 +267,8 @@ export function Popup() {
     error,
     setSelectedSource,
     triggerSync,
+    forcePush,
+    forcePull,
     initialize,
     connectSource,
     disconnectSource,
@@ -271,6 +297,7 @@ export function Popup() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'pro' | 'account'
   const [exportMessage, setExportMessage] = useState(null);
+  const [forceActionMessage, setForceActionMessage] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -288,6 +315,38 @@ export function Popup() {
       await triggerSync();
     } catch (err) {
       console.error('Sync failed:', err);
+    }
+  };
+
+  const handleForcePush = async () => {
+    if (!confirm('Force Push will overwrite ALL cloud bookmarks with your local bookmarks. This cannot be undone. Continue?')) {
+      return;
+    }
+    try {
+      setForceActionMessage({ type: 'info', text: 'Force pushing...' });
+      await forcePush();
+      setForceActionMessage({ type: 'success', text: 'Force push completed! Cloud bookmarks replaced with local.' });
+      setTimeout(() => setForceActionMessage(null), 5000);
+    } catch (err) {
+      console.error('Force push failed:', err);
+      setForceActionMessage({ type: 'error', text: `Force push failed: ${err.message}` });
+      setTimeout(() => setForceActionMessage(null), 5000);
+    }
+  };
+
+  const handleForcePull = async () => {
+    if (!confirm('Force Pull will overwrite ALL local bookmarks with cloud bookmarks. This cannot be undone. Continue?')) {
+      return;
+    }
+    try {
+      setForceActionMessage({ type: 'info', text: 'Force pulling...' });
+      await forcePull();
+      setForceActionMessage({ type: 'success', text: 'Force pull completed! Local bookmarks replaced with cloud.' });
+      setTimeout(() => setForceActionMessage(null), 5000);
+    } catch (err) {
+      console.error('Force pull failed:', err);
+      setForceActionMessage({ type: 'error', text: `Force pull failed: ${err.message}` });
+      setTimeout(() => setForceActionMessage(null), 5000);
     }
   };
 
@@ -592,6 +651,41 @@ ${content}
               <SyncIcon className="h-5 w-5" spinning={status === 'syncing'} />
               <span>{status === 'syncing' ? 'Syncing...' : 'Sync Now'}</span>
             </button>
+
+            {/* Force Push/Pull buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleForcePush}
+                disabled={status === 'syncing' || !selectedSource}
+                className="flex items-center justify-center space-x-1 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Overwrite cloud with local bookmarks"
+              >
+                <UploadIcon className="h-4 w-4" />
+                <span>Force Push</span>
+              </button>
+              <button
+                onClick={handleForcePull}
+                disabled={status === 'syncing' || !selectedSource}
+                className="flex items-center justify-center space-x-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Overwrite local with cloud bookmarks"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                <span>Force Pull</span>
+              </button>
+            </div>
+
+            {/* Force action message */}
+            {forceActionMessage && (
+              <div className={`rounded-lg p-3 text-sm ${
+                forceActionMessage.type === 'success'
+                  ? 'bg-green-50 text-green-700'
+                  : forceActionMessage.type === 'error'
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-blue-50 text-blue-700'
+              }`}>
+                {forceActionMessage.text}
+              </div>
+            )}
 
             {/* Export/Import message */}
             {exportMessage && (

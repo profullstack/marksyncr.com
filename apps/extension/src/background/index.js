@@ -12,7 +12,7 @@ import browser from 'webextension-polyfill';
 
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
-const DEFAULT_SYNC_INTERVAL = 15; // minutes
+const DEFAULT_SYNC_INTERVAL = 5; // minutes - sync every 5 minutes by default
 
 /**
  * Get API base URL - uses VITE_APP_URL from build config or falls back to production URL
@@ -210,7 +210,7 @@ async function syncBookmarksToCloud(bookmarks, source = 'browser') {
 /**
  * Save bookmark version to cloud
  */
-async function saveVersionToCloud(bookmarkData, sourceType, deviceName) {
+async function saveVersionToCloud(bookmarkData, sourceType, deviceName, changeSummary = {}) {
   try {
     const response = await apiRequest('/api/versions', {
       method: 'POST',
@@ -218,6 +218,7 @@ async function saveVersionToCloud(bookmarkData, sourceType, deviceName) {
         bookmarkData,
         sourceType,
         deviceName,
+        changeSummary,
       }),
     });
     
@@ -229,6 +230,63 @@ async function saveVersionToCloud(bookmarkData, sourceType, deviceName) {
     return await response.json();
   } catch (err) {
     console.error('[MarkSyncr] Failed to save version to cloud:', err);
+    throw err;
+  }
+}
+
+/**
+ * Get bookmarks from cloud
+ */
+async function getBookmarksFromCloud() {
+  try {
+    const response = await apiRequest('/api/bookmarks', {
+      method: 'GET',
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to get bookmarks from cloud');
+    }
+    
+    return await response.json();
+  } catch (err) {
+    console.error('[MarkSyncr] Failed to get bookmarks from cloud:', err);
+    throw err;
+  }
+}
+
+/**
+ * Get latest version data from cloud
+ */
+async function getLatestVersionFromCloud() {
+  try {
+    const response = await apiRequest('/api/versions?limit=1', {
+      method: 'GET',
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to get latest version');
+    }
+    
+    const data = await response.json();
+    if (!data.versions || data.versions.length === 0) {
+      return null;
+    }
+    
+    // Get full version data
+    const versionResponse = await apiRequest(`/api/versions/${data.versions[0].version}`, {
+      method: 'GET',
+    });
+    
+    if (!versionResponse.ok) {
+      const errorData = await versionResponse.json();
+      throw new Error(errorData.error || 'Failed to get version data');
+    }
+    
+    return await versionResponse.json();
+  } catch (err) {
+    console.error('[MarkSyncr] Failed to get latest version from cloud:', err);
     throw err;
   }
 }
@@ -551,6 +609,188 @@ function countBookmarks(tree) {
 }
 
 /**
+ * Force Push - Overwrite cloud data with local bookmarks
+ * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
+ */
+async function forcePush() {
+  try {
+    console.log('[MarkSyncr] Force Push: Overwriting cloud data with local bookmarks');
+    
+    // Ensure we have a valid token
+    const hasValidToken = await ensureValidToken();
+    if (!hasValidToken) {
+      return {
+        success: false,
+        error: 'Please log in to force push bookmarks',
+        requiresAuth: true,
+      };
+    }
+    
+    // Get current bookmarks from browser
+    const bookmarkTree = await browser.bookmarks.getTree();
+    const bookmarkData = convertBrowserBookmarks(bookmarkTree);
+    const stats = countBookmarks(bookmarkTree);
+    const flatBookmarks = flattenBookmarkTree(bookmarkTree);
+    
+    // Force push to cloud (overwrite)
+    console.log(`[MarkSyncr] Force pushing ${flatBookmarks.length} bookmarks to cloud...`);
+    const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
+    console.log('[MarkSyncr] Force push sync result:', syncResult);
+    
+    // Save version with force push marker
+    const versionResult = await saveVersionToCloud(
+      bookmarkData,
+      detectBrowser(),
+      `${detectBrowser()}-extension`,
+      { type: 'force_push', description: 'Force pushed from browser' }
+    );
+    console.log('[MarkSyncr] Force push version saved:', versionResult);
+    
+    // Update last sync time
+    await browser.storage.local.set({
+      lastSync: new Date().toISOString(),
+    });
+    
+    return { success: true, stats, message: 'Successfully force pushed bookmarks to cloud' };
+  } catch (err) {
+    console.error('[MarkSyncr] Force push failed:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Force Pull - Overwrite local bookmarks with cloud data
+ * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
+ */
+async function forcePull() {
+  try {
+    console.log('[MarkSyncr] Force Pull: Overwriting local bookmarks with cloud data');
+    
+    // Ensure we have a valid token
+    const hasValidToken = await ensureValidToken();
+    if (!hasValidToken) {
+      return {
+        success: false,
+        error: 'Please log in to force pull bookmarks',
+        requiresAuth: true,
+      };
+    }
+    
+    // Get latest version from cloud
+    const versionData = await getLatestVersionFromCloud();
+    if (!versionData || !versionData.version?.bookmarkData) {
+      return {
+        success: false,
+        error: 'No bookmark data found in cloud. Please sync first.',
+      };
+    }
+    
+    const cloudBookmarks = versionData.version.bookmarkData;
+    console.log('[MarkSyncr] Retrieved cloud bookmarks:', cloudBookmarks);
+    
+    // Get current browser bookmarks to find root folders
+    const currentTree = await browser.bookmarks.getTree();
+    const rootFolders = {};
+    
+    if (currentTree[0]?.children) {
+      for (const root of currentTree[0].children) {
+        const title = root.title?.toLowerCase() || '';
+        if (title.includes('toolbar') || title.includes('bar')) {
+          rootFolders.toolbar = root;
+        } else if (title.includes('menu')) {
+          rootFolders.menu = root;
+        } else if (title.includes('other') || title.includes('unsorted')) {
+          rootFolders.other = root;
+        }
+      }
+    }
+    
+    // Clear existing bookmarks in each root folder and recreate from cloud
+    let importedCount = 0;
+    let foldersCreated = 0;
+    
+    for (const [rootKey, rootFolder] of Object.entries(rootFolders)) {
+      if (!rootFolder) continue;
+      
+      const cloudRoot = cloudBookmarks.roots?.[rootKey];
+      if (!cloudRoot?.children) continue;
+      
+      // Remove existing children
+      if (rootFolder.children) {
+        for (const child of rootFolder.children) {
+          try {
+            await browser.bookmarks.removeTree(child.id);
+          } catch (err) {
+            console.warn('[MarkSyncr] Failed to remove bookmark:', child.id, err);
+          }
+        }
+      }
+      
+      // Recreate from cloud data
+      const result = await recreateBookmarks(rootFolder.id, cloudRoot.children);
+      importedCount += result.bookmarks;
+      foldersCreated += result.folders;
+    }
+    
+    // Update last sync time
+    await browser.storage.local.set({
+      lastSync: new Date().toISOString(),
+    });
+    
+    const stats = { total: importedCount, folders: foldersCreated, synced: importedCount };
+    
+    return {
+      success: true,
+      stats,
+      message: `Successfully imported ${importedCount} bookmarks and ${foldersCreated} folders from cloud`,
+    };
+  } catch (err) {
+    console.error('[MarkSyncr] Force pull failed:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Recreate bookmarks from cloud data
+ * @param {string} parentId - Parent folder ID
+ * @param {Array} items - Cloud bookmark items
+ * @returns {Promise<{bookmarks: number, folders: number}>}
+ */
+async function recreateBookmarks(parentId, items) {
+  let bookmarks = 0;
+  let folders = 0;
+  
+  for (const item of items) {
+    try {
+      if (item.type === 'bookmark' && item.url) {
+        await browser.bookmarks.create({
+          parentId,
+          title: item.title || item.url,
+          url: item.url,
+        });
+        bookmarks++;
+      } else if (item.type === 'folder' || item.children) {
+        const newFolder = await browser.bookmarks.create({
+          parentId,
+          title: item.title || 'Untitled Folder',
+        });
+        folders++;
+        
+        if (item.children && item.children.length > 0) {
+          const childResult = await recreateBookmarks(newFolder.id, item.children);
+          bookmarks += childResult.bookmarks;
+          folders += childResult.folders;
+        }
+      }
+    } catch (err) {
+      console.warn('[MarkSyncr] Failed to create bookmark:', item.title, err);
+    }
+  }
+  
+  return { bookmarks, folders };
+}
+
+/**
  * Handle OAuth connection for a source
  * @param {string} sourceId
  * @returns {Promise<{success: boolean, error?: string}>}
@@ -619,6 +859,12 @@ browser.runtime.onMessage.addListener((message, sender) => {
   switch (message.type) {
     case 'SYNC_BOOKMARKS':
       return performSync(message.payload?.sourceId);
+
+    case 'FORCE_PUSH':
+      return forcePush();
+
+    case 'FORCE_PULL':
+      return forcePull();
 
     case 'CONNECT_SOURCE':
       return connectSource(message.payload?.sourceId);
