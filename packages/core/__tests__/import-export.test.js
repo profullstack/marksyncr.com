@@ -431,6 +431,170 @@ describe('Import/Export Module', () => {
       expect(result.bookmarks[0].dateModified).toBe(1609545600000);
       expect(result.bookmarks[0].favicon).toBe('https://example.com/favicon.ico');
     });
+
+    it('should parse GitHub repo format with folderPath', () => {
+      // GitHub repo sync format uses flat bookmarks with folderPath
+      const json = JSON.stringify({
+        version: '1.0',
+        metadata: {
+          createdAt: '2024-01-01T00:00:00Z',
+          lastModified: '2024-01-02T00:00:00Z',
+          source: 'MarkSyncr',
+        },
+        bookmarks: [
+          {
+            url: 'https://example1.com',
+            title: 'Root Bookmark',
+            dateAdded: 1609459200000,
+          },
+          {
+            url: 'https://example2.com',
+            title: 'Work Bookmark',
+            folderPath: 'Work',
+            dateAdded: 1609545600000,
+          },
+          {
+            url: 'https://example3.com',
+            title: 'Nested Bookmark',
+            folderPath: 'Work/Projects',
+            dateAdded: 1609632000000,
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      // Should convert to nested structure
+      expect(result.format).toBe(IMPORT_FORMATS.JSON);
+      expect(result.totalCount).toBe(3);
+      
+      // Root bookmark should be at top level
+      const rootBookmark = result.bookmarks.find(b => b.title === 'Root Bookmark');
+      expect(rootBookmark).toBeDefined();
+      expect(rootBookmark.url).toBe('https://example1.com');
+      expect(rootBookmark.id).toBeDefined(); // Should have generated ID
+      
+      // Work folder should exist
+      const workFolder = result.bookmarks.find(b => b.title === 'Work' && b.type === 'folder');
+      expect(workFolder).toBeDefined();
+      expect(workFolder.id).toBeDefined();
+      expect(workFolder.children).toBeDefined();
+      
+      // Work bookmark should be inside Work folder
+      const workBookmark = workFolder.children.find(b => b.title === 'Work Bookmark');
+      expect(workBookmark).toBeDefined();
+      expect(workBookmark.url).toBe('https://example2.com');
+      expect(workBookmark.id).toBeDefined();
+      
+      // Projects folder should be inside Work folder
+      const projectsFolder = workFolder.children.find(b => b.title === 'Projects' && b.type === 'folder');
+      expect(projectsFolder).toBeDefined();
+      
+      // Nested bookmark should be inside Projects folder
+      const nestedBookmark = projectsFolder.children.find(b => b.title === 'Nested Bookmark');
+      expect(nestedBookmark).toBeDefined();
+      expect(nestedBookmark.url).toBe('https://example3.com');
+      expect(nestedBookmark.id).toBeDefined();
+    });
+
+    it('should generate IDs for bookmarks without IDs', () => {
+      const json = JSON.stringify({
+        version: '1.0',
+        bookmarks: [
+          {
+            title: 'No ID Bookmark',
+            url: 'https://example.com',
+            type: 'bookmark',
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks[0].id).toBeDefined();
+      expect(result.bookmarks[0].id).toMatch(/^import-/);
+    });
+
+    it('should generate IDs for nested bookmarks without IDs', () => {
+      const json = JSON.stringify({
+        source: 'MarkSyncr',
+        bookmarks: [
+          {
+            title: 'Folder',
+            type: 'folder',
+            children: [
+              {
+                title: 'Child Bookmark',
+                url: 'https://example.com',
+                type: 'bookmark',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks[0].id).toBeDefined();
+      expect(result.bookmarks[0].children[0].id).toBeDefined();
+    });
+
+    it('should handle GitHub repo format with empty folderPath', () => {
+      const json = JSON.stringify({
+        version: '1.0',
+        bookmarks: [
+          {
+            url: 'https://example.com',
+            title: 'Bookmark',
+            folderPath: '',
+          },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      expect(result.bookmarks).toHaveLength(1);
+      expect(result.bookmarks[0].title).toBe('Bookmark');
+      expect(result.bookmarks[0].id).toBeDefined();
+    });
+
+    it('should handle mixed folderPath depths', () => {
+      const json = JSON.stringify({
+        version: '1.0',
+        bookmarks: [
+          { url: 'https://a.com', title: 'A', folderPath: 'Folder1' },
+          { url: 'https://b.com', title: 'B', folderPath: 'Folder1/Sub1' },
+          { url: 'https://c.com', title: 'C', folderPath: 'Folder1/Sub1/Deep' },
+          { url: 'https://d.com', title: 'D', folderPath: 'Folder2' },
+        ],
+      });
+
+      const result = parseMarkSyncrJson(json);
+
+      // Should have 2 top-level folders
+      const folders = result.bookmarks.filter(b => b.type === 'folder');
+      expect(folders).toHaveLength(2);
+      
+      const folder1 = folders.find(f => f.title === 'Folder1');
+      expect(folder1).toBeDefined();
+      
+      // Folder1 should have bookmark A and subfolder Sub1
+      expect(folder1.children.find(c => c.title === 'A')).toBeDefined();
+      const sub1 = folder1.children.find(c => c.title === 'Sub1');
+      expect(sub1).toBeDefined();
+      
+      // Sub1 should have bookmark B and subfolder Deep
+      expect(sub1.children.find(c => c.title === 'B')).toBeDefined();
+      const deep = sub1.children.find(c => c.title === 'Deep');
+      expect(deep).toBeDefined();
+      
+      // Deep should have bookmark C
+      expect(deep.children.find(c => c.title === 'C')).toBeDefined();
+      
+      // Folder2 should have bookmark D
+      const folder2 = folders.find(f => f.title === 'Folder2');
+      expect(folder2.children.find(c => c.title === 'D')).toBeDefined();
+    });
   });
 
   describe('parseCsv', () => {
