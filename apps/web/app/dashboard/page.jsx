@@ -273,14 +273,15 @@ function getBrowserIcon(browser) {
   const browserLower = browser?.toLowerCase() || '';
   
   if (browserLower === 'chrome') {
+    // Chrome logo - matches version history page
     return (
       <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-        <path fill="#EA4335" d="M24 4C14.06 4 5.7 10.42 3.34 19.27L13.85 24.5C15.28 20.7 19.3 18 24 18c2.76 0 5.26 1 7.2 2.64L40.36 11.5C36.34 6.86 30.52 4 24 4z"/>
-        <path fill="#FBBC05" d="M3.34 19.27C2.48 22.06 2 25 2 28c0 7.18 3.02 13.64 7.86 18.2L18.5 33.5l-4.65-9C12.7 26.3 12 25.2 12 24c0-.34.02-.68.06-1L3.34 19.27z"/>
-        <path fill="#34A853" d="M24 44c6.52 0 12.34-2.86 16.36-7.5l-9.16-9.14C29.26 29 26.76 30 24 30c-4.7 0-8.72-2.7-10.15-6.5l-3.99 6.7L9.86 46.2C13.64 48.98 18.52 44 24 44z"/>
-        <circle cx="24" cy="24" r="10" fill="#4285F4"/>
-        <circle cx="24" cy="24" r="6" fill="white"/>
-        <circle cx="24" cy="24" r="4" fill="#4285F4"/>
+        <circle cx="24" cy="24" r="20" fill="#4CAF50"/>
+        <path fill="#F44336" d="M24,4C12.95,4,4,12.95,4,24c0,3.31,0.81,6.43,2.23,9.18L24,24V4z"/>
+        <path fill="#FFEB3B" d="M24,4v20l17.77,9.18C43.19,30.43,44,27.31,44,24C44,12.95,35.05,4,24,4z"/>
+        <path fill="#4CAF50" d="M6.23,33.18C9.38,39.49,16.18,44,24,44c7.82,0,14.62-4.51,17.77-10.82L24,24L6.23,33.18z"/>
+        <circle cx="24" cy="24" r="8" fill="#fff"/>
+        <circle cx="24" cy="24" r="6" fill="#2196F3"/>
       </svg>
     );
   }
@@ -294,7 +295,24 @@ function getBrowserIcon(browser) {
   }
   
   if (browserLower === 'edge') {
-    return <span className="text-2xl">🌐</span>;
+    // Microsoft Edge logo - blue wave design
+    return (
+      <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="edge-gradient-1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#0078D4"/>
+            <stop offset="100%" stopColor="#1DB954"/>
+          </linearGradient>
+          <linearGradient id="edge-gradient-2" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#1DB954"/>
+            <stop offset="100%" stopColor="#0078D4"/>
+          </linearGradient>
+        </defs>
+        <path fill="url(#edge-gradient-1)" d="M24 4C12.95 4 4 12.95 4 24c0 6.08 2.72 11.52 7 15.2V24c0-7.18 5.82-13 13-13s13 5.82 13 13c0 3.31-1.24 6.33-3.28 8.63C38.28 29.52 44 27.31 44 24c0-11.05-8.95-20-20-20z"/>
+        <path fill="url(#edge-gradient-2)" d="M24 11c-7.18 0-13 5.82-13 13v15.2c3.48 2.68 7.82 4.28 12.5 4.28 8.56 0 15.72-5.72 18-13.48-2.95 3.3-7.22 5.38-12 5.38-8.84 0-16-7.16-16-16 0-4.42 1.79-8.42 4.68-11.32C20.18 8.06 22.08 8 24 8c-0.01 0 0 3 0 3z"/>
+        <circle cx="30" cy="24" r="6" fill="#fff"/>
+      </svg>
+    );
   }
   
   if (browserLower === 'opera') {
@@ -390,16 +408,14 @@ function QuickActionsCard() {
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
         >
           <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-            {/* Chrome Logo - Multi-colored */}
+            {/* Chrome Logo - matches version history page */}
             <svg className="h-6 w-6" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              {/* Outer ring segments */}
-              <path fill="#EA4335" d="M24 4C14.06 4 5.7 10.42 3.34 19.27L13.85 24.5C15.28 20.7 19.3 18 24 18c2.76 0 5.26 1 7.2 2.64L40.36 11.5C36.34 6.86 30.52 4 24 4z"/>
-              <path fill="#FBBC05" d="M3.34 19.27C2.48 22.06 2 25 2 28c0 7.18 3.02 13.64 7.86 18.2L18.5 33.5l-4.65-9C12.7 26.3 12 25.2 12 24c0-.34.02-.68.06-1L3.34 19.27z"/>
-              <path fill="#34A853" d="M24 44c6.52 0 12.34-2.86 16.36-7.5l-9.16-9.14C29.26 29 26.76 30 24 30c-4.7 0-8.72-2.7-10.15-6.5l-3.99 6.7L9.86 46.2C13.64 48.98 18.52 44 24 44z"/>
-              {/* Center circle */}
-              <circle cx="24" cy="24" r="10" fill="#4285F4"/>
-              <circle cx="24" cy="24" r="6" fill="white"/>
-              <circle cx="24" cy="24" r="4" fill="#4285F4"/>
+              <circle cx="24" cy="24" r="20" fill="#4CAF50"/>
+              <path fill="#F44336" d="M24,4C12.95,4,4,12.95,4,24c0,3.31,0.81,6.43,2.23,9.18L24,24V4z"/>
+              <path fill="#FFEB3B" d="M24,4v20l17.77,9.18C43.19,30.43,44,27.31,44,24C44,12.95,35.05,4,24,4z"/>
+              <path fill="#4CAF50" d="M6.23,33.18C9.38,39.49,16.18,44,24,44c7.82,0,14.62-4.51,17.77-10.82L24,24L6.23,33.18z"/>
+              <circle cx="24" cy="24" r="8" fill="#fff"/>
+              <circle cx="24" cy="24" r="6" fill="#2196F3"/>
             </svg>
           </div>
           <div>

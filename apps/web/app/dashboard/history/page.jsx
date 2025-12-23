@@ -136,7 +136,24 @@ export default function HistoryPage() {
           </svg>
         );
       case 'edge':
-        return <span className="text-3xl">🔷</span>;
+        // Microsoft Edge logo - blue wave design
+        return (
+          <svg className="w-8 h-8" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="edge-gradient-hist-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#0078D4"/>
+                <stop offset="100%" stopColor="#1DB954"/>
+              </linearGradient>
+              <linearGradient id="edge-gradient-hist-2" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#1DB954"/>
+                <stop offset="100%" stopColor="#0078D4"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#edge-gradient-hist-1)" d="M24 4C12.95 4 4 12.95 4 24c0 6.08 2.72 11.52 7 15.2V24c0-7.18 5.82-13 13-13s13 5.82 13 13c0 3.31-1.24 6.33-3.28 8.63C38.28 29.52 44 27.31 44 24c0-11.05-8.95-20-20-20z"/>
+            <path fill="url(#edge-gradient-hist-2)" d="M24 11c-7.18 0-13 5.82-13 13v15.2c3.48 2.68 7.82 4.28 12.5 4.28 8.56 0 15.72-5.72 18-13.48-2.95 3.3-7.22 5.38-12 5.38-8.84 0-16-7.16-16-16 0-4.42 1.79-8.42 4.68-11.32C20.18 8.06 22.08 8 24 8c-0.01 0 0 3 0 3z"/>
+            <circle cx="30" cy="24" r="6" fill="#fff"/>
+          </svg>
+        );
       case 'safari':
         return <span className="text-3xl">🧭</span>;
       case 'brave':
