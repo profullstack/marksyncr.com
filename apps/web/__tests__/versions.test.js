@@ -27,7 +27,7 @@ vi.mock('@/lib/auth-helper', () => ({
 
 // Mock @marksyncr/core
 vi.mock('@marksyncr/core', () => ({
-  computeChecksum: vi.fn(() => 'mock-checksum-abc123'),
+  generateChecksum: vi.fn(() => Promise.resolve('mock-checksum-abc123')),
 }));
 
 // Import after mocks

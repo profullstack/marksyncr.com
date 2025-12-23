@@ -101,8 +101,8 @@ export async function POST(request) {
     }
 
     // Compute checksum
-    const { computeChecksum } = await import('@marksyncr/core');
-    const checksum = computeChecksum(bookmarkData);
+    const { generateChecksum } = await import('@marksyncr/core');
+    const checksum = await generateChecksum(bookmarkData);
 
     const { data, error } = await supabase.rpc('save_bookmark_version', {
       p_user_id: user.id,
