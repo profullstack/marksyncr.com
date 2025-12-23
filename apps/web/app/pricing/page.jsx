@@ -237,7 +237,7 @@ export default function PricingPage() {
               className={`text-sm ${billingInterval === 'yearly' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}
             >
               Yearly
-              <span className="ml-1 text-green-600 font-medium">(Save 20%)</span>
+              <span className="ml-1 text-green-600 font-medium">(Save 75%)</span>
             </span>
           </div>
         </div>
