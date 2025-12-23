@@ -94,10 +94,23 @@ export const trackEvent = async (eventName, properties = {}) => {
  */
 const getBrowserName = () => {
   const userAgent = navigator.userAgent;
+  
+  // Check Firefox first
   if (userAgent.includes('Firefox')) return 'firefox';
+  
+  // Check Brave - Brave exposes navigator.brave for detection
+  // Note: Brave doesn't include "Brave" in user agent for privacy reasons
+  if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
+    return 'brave';
+  }
+  
+  // Check other browsers
   if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) return 'safari';
-  if (userAgent.includes('Edge')) return 'edge';
+  if (userAgent.includes('Edg/')) return 'edge';
+  if (userAgent.includes('OPR/') || userAgent.includes('Opera/')) return 'opera';
+  if (userAgent.includes('Vivaldi/')) return 'vivaldi';
   if (userAgent.includes('Chrome')) return 'chrome';
+  
   return 'unknown';
 };
 

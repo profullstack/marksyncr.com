@@ -1165,10 +1165,15 @@ function detectBrowser() {
   // Check Firefox first - Firefox has "Firefox/" in user agent
   if (ua.includes('Firefox/')) return 'firefox';
   
-  // Check other Chromium-based browsers
+  // Check Brave - Brave exposes navigator.brave for detection
+  // Note: Brave doesn't include "Brave" in user agent for privacy reasons
+  if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
+    return 'brave';
+  }
+  
+  // Check other Chromium-based browsers by user agent
   if (ua.includes('Edg/')) return 'edge';
   if (ua.includes('OPR/') || ua.includes('Opera/')) return 'opera';
-  if (ua.includes('Brave')) return 'brave';
   if (ua.includes('Vivaldi/')) return 'vivaldi';
   
   // Default to Chrome for other Chromium browsers
