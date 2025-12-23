@@ -386,16 +386,32 @@ async function setupAutoSync() {
     const { settings } = await browser.storage.local.get('settings');
     const interval = settings?.syncInterval || DEFAULT_SYNC_INTERVAL;
 
-    if (settings?.autoSync !== false) {
-      // Clear existing alarm
+    // Auto-sync is enabled by default (when settings.autoSync is undefined or true)
+    const autoSyncEnabled = settings?.autoSync !== false;
+    
+    console.log(`[MarkSyncr] Auto-sync setup: enabled=${autoSyncEnabled}, interval=${interval} minutes`);
+
+    if (autoSyncEnabled) {
+      // Clear existing alarm first
       await browser.alarms.clear(SYNC_ALARM_NAME);
 
-      // Create new alarm
+      // Create new alarm with both delayInMinutes and periodInMinutes
+      // delayInMinutes: fire first alarm after 'interval' minutes
+      // periodInMinutes: then repeat every 'interval' minutes
       await browser.alarms.create(SYNC_ALARM_NAME, {
+        delayInMinutes: interval,
         periodInMinutes: interval,
       });
 
-      console.log(`[MarkSyncr] Auto-sync alarm set for every ${interval} minutes`);
+      console.log(`[MarkSyncr] Auto-sync alarm created: first fire in ${interval} minutes, then every ${interval} minutes`);
+      
+      // Log all current alarms for debugging
+      const alarms = await browser.alarms.getAll();
+      console.log('[MarkSyncr] Current alarms:', alarms);
+    } else {
+      // Auto-sync disabled, clear any existing alarm
+      await browser.alarms.clear(SYNC_ALARM_NAME);
+      console.log('[MarkSyncr] Auto-sync disabled, alarm cleared');
     }
   } catch (err) {
     console.error('[MarkSyncr] Failed to set up auto-sync:', err);
@@ -1225,10 +1241,25 @@ browser.runtime.onMessage.addListener((message, sender) => {
 });
 
 // Alarm handler
-browser.alarms.onAlarm.addListener((alarm) => {
+browser.alarms.onAlarm.addListener(async (alarm) => {
+  console.log('[MarkSyncr] Alarm fired:', alarm.name, 'at', new Date().toISOString());
+  
   if (alarm.name === SYNC_ALARM_NAME) {
-    console.log('[MarkSyncr] Auto-sync alarm triggered');
-    performSync();
+    console.log('[MarkSyncr] Auto-sync alarm triggered, starting sync...');
+    
+    // Check if user is logged in before syncing
+    const loggedIn = await isLoggedIn();
+    if (!loggedIn) {
+      console.log('[MarkSyncr] Auto-sync skipped: user not logged in');
+      return;
+    }
+    
+    try {
+      const result = await performSync();
+      console.log('[MarkSyncr] Auto-sync completed:', result);
+    } catch (err) {
+      console.error('[MarkSyncr] Auto-sync failed:', err);
+    }
   }
 });
 
