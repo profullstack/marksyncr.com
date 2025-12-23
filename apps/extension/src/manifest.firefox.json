@@ -58,5 +58,17 @@
       "id": "marksyncr@marksyncr.com",
       "strict_min_version": "109.0"
     }
+  },
+  "data_collection_permissions": {
+    "bookmarks": {
+      "collected": true,
+      "shared": false,
+      "purpose": "Sync bookmarks across browsers and devices"
+    },
+    "analytics": {
+      "collected": true,
+      "shared": false,
+      "purpose": "Improve extension functionality and user experience"
+    }
   }
 }
