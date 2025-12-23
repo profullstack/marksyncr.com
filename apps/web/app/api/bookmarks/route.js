@@ -256,13 +256,16 @@ export async function POST(request) {
       );
     }
 
+    // Debug: log the raw existingData to see what's in the database
+    console.log(`[Bookmarks API] Raw existingData:`, JSON.stringify(existingData, null, 2)?.substring(0, 500));
+    
     const existingBookmarks = existingData?.bookmark_data || [];
     const existingVersion = existingData?.version || 0;
 
     // Debug logging
     console.log(`[Bookmarks API] Source: ${source}`);
     console.log(`[Bookmarks API] Incoming bookmarks: ${normalizedBookmarks.length}`);
-    console.log(`[Bookmarks API] Existing cloud bookmarks: ${existingBookmarks.length}`);
+    console.log(`[Bookmarks API] Existing cloud bookmarks: ${Array.isArray(existingBookmarks) ? existingBookmarks.length : 'NOT AN ARRAY: ' + typeof existingBookmarks}`);
     console.log(`[Bookmarks API] Existing version: ${existingVersion}`);
 
     // Merge incoming bookmarks with existing
