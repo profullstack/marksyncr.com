@@ -585,6 +585,14 @@ export default function HomePage() {
               >
                 GitHub
               </a>
+              <a
+                href="https://discord.gg/U7dEXfBA3s"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-slate-600 hover:text-slate-900"
+              >
+                Discord
+              </a>
             </div>
             <p className="mt-4 text-sm text-slate-500 md:mt-0">
               © {new Date().getFullYear()} MarkSyncr. All rights reserved.
