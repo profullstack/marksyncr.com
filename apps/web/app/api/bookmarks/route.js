@@ -132,6 +132,56 @@ export async function GET(request) {
   }
 }
 
+/**
+ * Merge incoming bookmarks with existing cloud bookmarks
+ * Uses URL as unique identifier
+ * Newer bookmarks (by dateAdded) win conflicts
+ */
+function mergeBookmarks(existingBookmarks, incomingBookmarks) {
+  // Create a map of existing bookmarks by URL
+  const bookmarkMap = new Map();
+  
+  // Add existing bookmarks to map
+  for (const bookmark of existingBookmarks) {
+    bookmarkMap.set(bookmark.url, bookmark);
+  }
+  
+  let added = 0;
+  let updated = 0;
+  
+  // Merge incoming bookmarks
+  for (const incoming of incomingBookmarks) {
+    const existing = bookmarkMap.get(incoming.url);
+    
+    if (!existing) {
+      // New bookmark - add it
+      bookmarkMap.set(incoming.url, incoming);
+      added++;
+    } else {
+      // Existing bookmark - check if incoming is newer
+      const existingDate = existing.dateAdded || 0;
+      const incomingDate = incoming.dateAdded || 0;
+      
+      if (incomingDate > existingDate) {
+        // Incoming is newer - update
+        bookmarkMap.set(incoming.url, {
+          ...incoming,
+          // Preserve the original id if it exists
+          id: existing.id || incoming.id,
+        });
+        updated++;
+      }
+      // If existing is newer or same, keep existing (do nothing)
+    }
+  }
+  
+  return {
+    merged: Array.from(bookmarkMap.values()),
+    added,
+    updated,
+  };
+}
+
 export async function POST(request) {
   const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
   
@@ -174,24 +224,39 @@ export async function POST(request) {
       source,
     }));
 
-    // Generate checksum for the bookmark data
-    const checksum = generateChecksum(normalizedBookmarks);
-
-    // Get current version
-    const { data: existing } = await supabase
+    // Get existing bookmarks from cloud
+    const { data: existingData, error: fetchError } = await supabase
       .from('cloud_bookmarks')
-      .select('version')
+      .select('*')
       .eq('user_id', user.id)
       .single();
 
-    const newVersion = (existing?.version || 0) + 1;
+    // PGRST116 = no rows found, which is fine for new users
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Bookmarks fetch error:', fetchError);
+      return NextResponse.json(
+        { error: 'Failed to fetch existing bookmarks' },
+        { status: 500, headers }
+      );
+    }
 
-    // Upsert bookmarks (single row per user with JSONB data)
+    const existingBookmarks = existingData?.bookmark_data || [];
+    const existingVersion = existingData?.version || 0;
+
+    // Merge incoming bookmarks with existing
+    const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
+
+    // Generate checksum for the merged bookmark data
+    const checksum = generateChecksum(merged);
+
+    const newVersion = existingVersion + 1;
+
+    // Upsert merged bookmarks (single row per user with JSONB data)
     const { data, error: upsertError } = await supabase
       .from('cloud_bookmarks')
       .upsert({
         user_id: user.id,
-        bookmark_data: normalizedBookmarks,
+        bookmark_data: merged,
         checksum,
         version: newVersion,
         last_modified: new Date().toISOString(),
@@ -211,7 +276,10 @@ export async function POST(request) {
 
     return NextResponse.json({
       synced: normalizedBookmarks.length,
-      total: normalizedBookmarks.length,
+      merged: merged.length,
+      added,
+      updated,
+      total: merged.length,
       version: data.version,
       checksum: data.checksum,
       message: 'Bookmarks synced successfully',

@@ -977,3 +977,374 @@ describe('Empty Title Preservation', () => {
     });
   });
 });
+
+describe('Server-Side Bookmark Merging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  /**
+   * Helper to create a mock that handles server-side merging
+   * This mock simulates the full flow: fetch existing, merge, upsert
+   */
+  function createMergeMockSupabase(options = {}) {
+    const {
+      userExists = true,
+      existingBookmarks = [],
+      existingVersion = 0,
+      upsertSuccess = true,
+    } = options;
+
+    // Track what was upserted for assertions
+    let upsertedData = null;
+
+    // Mock for ensureUserExists - user check
+    const usersSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: userExists ? { id: 'user-123' } : null,
+          error: userExists ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for user insert (when user doesn't exist)
+    const usersInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for subscriptions insert
+    const subscriptionsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for getting existing bookmarks from cloud_bookmarks
+    const bookmarksSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: existingBookmarks.length > 0 ? {
+            bookmark_data: existingBookmarks,
+            version: existingVersion,
+            checksum: 'existing-checksum',
+          } : null,
+          error: existingBookmarks.length > 0 ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for upsert - capture what was upserted
+    const upsertMock = vi.fn().mockImplementation((data) => {
+      upsertedData = data;
+      return {
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: upsertSuccess ? {
+              version: existingVersion + 1,
+              checksum: 'new-checksum',
+              bookmark_data: data.bookmark_data,
+            } : null,
+            error: upsertSuccess ? null : { message: 'Upsert failed' },
+          }),
+        }),
+      };
+    });
+
+    const mock = {
+      from: vi.fn().mockImplementation((table) => {
+        if (table === 'users') {
+          return { select: usersSelectMock, insert: usersInsertMock };
+        }
+        if (table === 'subscriptions') {
+          return { insert: subscriptionsInsertMock };
+        }
+        return {
+          select: bookmarksSelectMock,
+          upsert: upsertMock,
+        };
+      }),
+      getUpsertedData: () => upsertedData,
+    };
+
+    return mock;
+  }
+
+  describe('POST /api/bookmarks - Merging Behavior', () => {
+    it('should merge incoming bookmarks with existing cloud bookmarks', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://existing.com', title: 'Existing', folderPath: '/Bookmarks', source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://new.com', title: 'New', folderPath: '/Bookmarks' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should report merged count (existing + new)
+      expect(data.merged).toBe(2);
+      expect(data.added).toBe(1);
+    });
+
+    it('should not duplicate bookmarks with same URL', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Old Title', folderPath: '/Bookmarks', source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://example.com', title: 'New Title', folderPath: '/Bookmarks' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should have 1 bookmark (merged), not 2 (duplicated)
+      expect(data.merged).toBe(1);
+      expect(data.added).toBe(0);
+    });
+
+    it('should update existing bookmark when URL matches but data differs', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Old Title', folderPath: '/Old', source: 'firefox', dateAdded: 1000 },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://example.com', title: 'New Title', folderPath: '/New', dateAdded: 2000 },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.merged).toBe(1);
+      expect(data.updated).toBe(1);
+    });
+
+    it('should preserve bookmarks from other browsers when syncing', async () => {
+      // Firefox has bookmarks A and B
+      const existingBookmarks = [
+        { id: '1', url: 'https://firefox-only.com', title: 'Firefox Only', source: 'firefox' },
+        { id: '2', url: 'https://shared.com', title: 'Shared', source: 'firefox' },
+      ];
+      // Chrome syncs with bookmark B and C
+      const incomingBookmarks = [
+        { id: '3', url: 'https://shared.com', title: 'Shared', source: 'chrome' },
+        { id: '4', url: 'https://chrome-only.com', title: 'Chrome Only', source: 'chrome' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should have 3 unique bookmarks: firefox-only, shared, chrome-only
+      expect(data.merged).toBe(3);
+    });
+
+    it('should handle first sync when no existing bookmarks', async () => {
+      const incomingBookmarks = [
+        { id: '1', url: 'https://new.com', title: 'New' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks: [], existingVersion: 0 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.merged).toBe(1);
+      expect(data.added).toBe(1);
+    });
+
+    it('should merge bookmarks from multiple browsers correctly', async () => {
+      // Simulate: Firefox synced first, then Chrome syncs
+      const existingBookmarks = [
+        { id: 'ff-1', url: 'https://a.com', title: 'A', source: 'firefox' },
+        { id: 'ff-2', url: 'https://b.com', title: 'B', source: 'firefox' },
+      ];
+      const chromeBookmarks = [
+        { id: 'ch-1', url: 'https://b.com', title: 'B', source: 'chrome' }, // Same as Firefox
+        { id: 'ch-2', url: 'https://c.com', title: 'C', source: 'chrome' }, // Chrome only
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: chromeBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should have 3 unique URLs: a.com, b.com, c.com
+      expect(data.merged).toBe(3);
+    });
+
+    it('should use URL as the unique identifier for merging', async () => {
+      const existingBookmarks = [
+        { id: 'old-id', url: 'https://example.com/page', title: 'Old', source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: 'new-id', url: 'https://example.com/page', title: 'New', source: 'chrome' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Same URL = same bookmark, should not duplicate
+      expect(data.merged).toBe(1);
+    });
+
+    it('should treat different URLs as different bookmarks', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://example.com/page1', title: 'Page 1', source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://example.com/page2', title: 'Page 2', source: 'chrome' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Different URLs = different bookmarks
+      expect(data.merged).toBe(2);
+    });
+
+    it('should preserve empty titles during merge', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://example.com', title: '', source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://new.com', title: '', source: 'chrome' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.merged).toBe(2);
+    });
+  });
+
+  describe('Merge Conflict Resolution', () => {
+    it('should prefer newer bookmark when same URL has different data', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Old', dateAdded: 1000, source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://example.com', title: 'New', dateAdded: 2000, source: 'chrome' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // The newer bookmark (dateAdded: 2000) should win
+      expect(data.merged).toBe(1);
+    });
+
+    it('should keep existing bookmark if incoming is older', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Newer', dateAdded: 2000, source: 'firefox' },
+      ];
+      const incomingBookmarks = [
+        { id: '2', url: 'https://example.com', title: 'Older', dateAdded: 1000, source: 'chrome' },
+      ];
+
+      mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.merged).toBe(1);
+    });
+  });
+});
