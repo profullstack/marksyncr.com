@@ -628,6 +628,66 @@ export const useStore = create(
         }
       },
 
+      /**
+       * Refresh connected sources from the server
+       * Call this after connecting sources via the web dashboard
+       */
+      refreshSources: async () => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          console.log('[MarkSyncr Store] Refreshing sources from server...');
+          
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'REFRESH_SOURCES',
+          });
+
+          if (result?.success && result.sources) {
+            set({ sources: result.sources });
+            console.log('[MarkSyncr Store] Sources refreshed:', result.sources);
+            return { success: true, sources: result.sources };
+          } else {
+            console.warn('[MarkSyncr Store] Failed to refresh sources:', result?.error);
+            return { success: false, error: result?.error || 'Failed to refresh sources' };
+          }
+        } catch (err) {
+          console.error('[MarkSyncr Store] Failed to refresh sources:', err);
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
+       * Open the web dashboard to connect a source
+       */
+      openDashboardToConnect: async (sourceId) => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'CONNECT_SOURCE',
+            payload: { sourceId },
+          });
+
+          if (result?.redirectUrl) {
+            // Dashboard was opened in a new tab
+            return {
+              success: true,
+              message: result.message || 'Please connect the source from the dashboard, then refresh sources.',
+            };
+          }
+
+          if (result?.success) {
+            get().updateSourceConnection(sourceId, true);
+            return { success: true };
+          }
+
+          return { success: false, error: result?.error || 'Failed to connect source' };
+        } catch (err) {
+          console.error('[MarkSyncr Store] Failed to open dashboard:', err);
+          return { success: false, error: err.message };
+        }
+      },
+
       // ==========================================
       // Pro Features Actions
       // ==========================================

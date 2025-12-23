@@ -2,12 +2,14 @@
  * GitHub OAuth Callback Route
  *
  * Handles the OAuth callback from GitHub and stores the connection.
+ * Auto-creates a bookmark repository for the user.
  */
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getUser, createClient } from '../../../../../lib/supabase/server';
 import { exchangeCodeForToken, validateToken } from '@marksyncr/sources/oauth/github-oauth';
+import { getOrCreateRepository } from '@marksyncr/sources/oauth/github-repo';
 
 export async function GET(request) {
   try {
@@ -67,7 +69,19 @@ export async function GET(request) {
       );
     }
 
-    // Store connection in database
+    // Auto-create or get existing bookmark repository
+    let repoConfig;
+    try {
+      repoConfig = await getOrCreateRepository(tokenData.access_token);
+      console.log('GitHub repository setup:', repoConfig);
+    } catch (repoError) {
+      console.error('Failed to setup GitHub repository:', repoError);
+      return NextResponse.redirect(
+        new URL('/dashboard?error=repo_setup_failed', process.env.NEXT_PUBLIC_APP_URL)
+      );
+    }
+
+    // Store connection in database with repository configuration
     const supabase = await createClient();
 
     const { error: dbError } = await supabase.from('sync_sources').upsert(
@@ -79,6 +93,13 @@ export async function GET(request) {
         access_token: tokenData.access_token,
         token_type: tokenData.token_type,
         scope: tokenData.scope,
+        repository: repoConfig.repository,
+        branch: repoConfig.branch,
+        file_path: repoConfig.filePath,
+        config: {
+          repoCreated: repoConfig.created,
+          setupAt: new Date().toISOString(),
+        },
         connected_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },

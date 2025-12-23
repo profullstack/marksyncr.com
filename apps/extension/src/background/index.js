@@ -1289,36 +1289,113 @@ async function recreateBookmarks(parentId, items) {
 
 /**
  * Handle OAuth connection for a source
+ * For 3rd party services, directs users to the web app dashboard
  * @param {string} sourceId
- * @returns {Promise<{success: boolean, error?: string}>}
+ * @returns {Promise<{success: boolean, error?: string, redirectUrl?: string}>}
  */
 async function connectSource(sourceId) {
   try {
     console.log(`[MarkSyncr] Connecting to source: ${sourceId}`);
 
-    // TODO: Implement OAuth flows for each source type
-    // For now, just mark as connected
-    const { sources = [] } = await browser.storage.local.get('sources');
+    // 3rd party OAuth sources must be connected via the web app dashboard
+    const oauthSources = ['github', 'dropbox', 'google-drive'];
+    
+    if (oauthSources.includes(sourceId)) {
+      // Direct user to web app dashboard to connect
+      const baseUrl = getApiBaseUrl();
+      const dashboardUrl = `${baseUrl}/dashboard`;
+      
+      console.log(`[MarkSyncr] Redirecting to dashboard for ${sourceId} connection`);
+      
+      // Open the dashboard in a new tab
+      await browser.tabs.create({ url: dashboardUrl });
+      
+      return {
+        success: true,
+        redirectUrl: dashboardUrl,
+        message: `Please connect ${sourceId} from the MarkSyncr dashboard. After connecting, click "Refresh Sources" in the extension.`,
+      };
+    }
 
+    // For non-OAuth sources (like browser-bookmarks), just mark as connected
+    const { sources = [] } = await browser.storage.local.get('sources');
     const updatedSources = sources.map((s) =>
       s.id === sourceId ? { ...s, connected: true } : s
     );
-
-    // If source doesn't exist, add it
-    if (!sources.find((s) => s.id === sourceId)) {
-      updatedSources.push({
-        id: sourceId,
-        name: sourceId,
-        type: sourceId,
-        connected: true,
-      });
-    }
-
     await browser.storage.local.set({ sources: updatedSources });
-
     return { success: true };
   } catch (err) {
     console.error(`[MarkSyncr] Failed to connect source ${sourceId}:`, err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetch connected sources from the server and update local state
+ * @returns {Promise<{success: boolean, sources?: Array, error?: string}>}
+ */
+async function refreshConnectedSources() {
+  try {
+    console.log('[MarkSyncr] Refreshing connected sources from server...');
+    
+    const baseUrl = getApiBaseUrl();
+    const token = await getAccessToken();
+    
+    if (!token) {
+      console.log('[MarkSyncr] No access token, cannot fetch sources');
+      return { success: false, error: 'Not authenticated' };
+    }
+    
+    const response = await fetch(`${baseUrl}/api/sources`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      console.error('[MarkSyncr] Failed to fetch sources:', response.status);
+      return { success: false, error: 'Failed to fetch sources' };
+    }
+    
+    const data = await response.json();
+    const serverSources = data.sources || [];
+    
+    console.log('[MarkSyncr] Server sources:', serverSources);
+    
+    // Get current local sources
+    const { sources: localSources = [] } = await browser.storage.local.get('sources');
+    
+    // Merge server sources with local sources
+    // Server sources take precedence for connection status
+    const updatedSources = localSources.map((localSource) => {
+      const serverSource = serverSources.find(s => s.id === localSource.id);
+      if (serverSource) {
+        return {
+          ...localSource,
+          connected: true,
+          providerUsername: serverSource.providerUsername,
+          repository: serverSource.repository,
+          branch: serverSource.branch,
+          filePath: serverSource.filePath,
+          connectedAt: serverSource.connectedAt,
+        };
+      }
+      // Keep local source but mark as disconnected if not on server
+      // (except for browser-bookmarks which is always local)
+      if (localSource.id === 'browser-bookmarks') {
+        return localSource;
+      }
+      return { ...localSource, connected: false };
+    });
+    
+    await browser.storage.local.set({ sources: updatedSources });
+    
+    console.log('[MarkSyncr] Updated local sources:', updatedSources);
+    
+    return { success: true, sources: updatedSources };
+  } catch (err) {
+    console.error('[MarkSyncr] Failed to refresh sources:', err);
     return { success: false, error: err.message };
   }
 }
@@ -1368,6 +1445,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
     case 'DISCONNECT_SOURCE':
       return disconnectSource(message.payload?.sourceId);
+
+    case 'REFRESH_SOURCES':
+      return refreshConnectedSources();
 
     case 'GET_BOOKMARKS':
       return browser.bookmarks.getTree().then((tree) => ({

@@ -385,6 +385,45 @@ export async function fetchVersionHistory(limit = 20, offset = 0) {
 }
 
 /**
+ * Fetch connected sync sources from the server
+ */
+export async function fetchSyncSources() {
+  try {
+    const response = await apiRequest('/api/sources');
+    
+    if (!response.ok) {
+      return [];
+    }
+    
+    const data = await response.json();
+    return data.sources || [];
+  } catch (err) {
+    console.error('Failed to fetch sync sources:', err);
+    return [];
+  }
+}
+
+/**
+ * Get the OAuth connect URL for a provider
+ * @param {string} provider - Provider name (github, dropbox, google-drive)
+ * @returns {string} OAuth URL to open in a new tab
+ */
+export function getOAuthConnectUrl(provider) {
+  const providerMap = {
+    'github': '/api/connect/github',
+    'dropbox': '/api/connect/dropbox',
+    'google-drive': '/api/connect/google',
+  };
+  
+  const endpoint = providerMap[provider];
+  if (!endpoint) {
+    throw new Error(`Unknown provider: ${provider}`);
+  }
+  
+  return `${APP_URL}${endpoint}`;
+}
+
+/**
  * Fetch tags
  */
 export async function fetchTags() {
@@ -520,6 +559,8 @@ export default {
   saveCloudSettings,
   saveBookmarkVersion,
   fetchVersionHistory,
+  fetchSyncSources,
+  getOAuthConnectUrl,
   fetchTags,
   fetchBookmarks,
   syncBookmarks,

@@ -14,6 +14,7 @@
     "./supabase": "./src/supabase-cloud.js",
     "./oauth": "./src/oauth/index.js",
     "./oauth/github-oauth": "./src/oauth/github-oauth.js",
+    "./oauth/github-repo": "./src/oauth/github-repo.ts",
     "./oauth/dropbox-oauth": "./src/oauth/dropbox-oauth.js",
     "./oauth/google-oauth": "./src/oauth/google-oauth.js"
   },
@@ -25,10 +26,11 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@marksyncr/types": "workspace:*",
-    "@marksyncr/core": "workspace:*"
+    "@marksyncr/core": "workspace:*",
+    "@marksyncr/types": "workspace:*"
   },
   "devDependencies": {
+    "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   }
 }
