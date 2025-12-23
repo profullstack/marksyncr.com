@@ -407,7 +407,7 @@ function flattenBookmarkTree(tree) {
 }
 
 /**
- * Perform bookmark sync
+ * Perform bookmark sync (two-way: pull from cloud, merge, push back)
  * @param {string} [sourceId] - Optional specific source to sync with
  * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
  */
@@ -424,12 +424,7 @@ async function performSync(sourceId) {
       return { success: false, error: 'No sync source configured' };
     }
 
-    console.log(`[MarkSyncr] Starting sync with source: ${targetSourceId}`);
-
-    // Get current bookmarks from browser
-    const bookmarkTree = await browser.bookmarks.getTree();
-    const bookmarkData = convertBrowserBookmarks(bookmarkTree);
-    const stats = countBookmarks(bookmarkTree);
+    console.log(`[MarkSyncr] Starting two-way sync with source: ${targetSourceId}`);
 
     // Get source configuration
     const source = sources?.find((s) => s.id === targetSourceId);
@@ -454,45 +449,185 @@ async function performSync(sourceId) {
         success: false,
         error: 'Please log in to sync bookmarks to the cloud',
         requiresAuth: true,
-        stats
       };
     }
     
-    // Sync to cloud
+    // Two-way sync
     try {
-      // Flatten bookmarks for API
-      const flatBookmarks = flattenBookmarkTree(bookmarkTree);
+      // Step 1: Get current local bookmarks
+      const bookmarkTree = await browser.bookmarks.getTree();
+      const localFlat = flattenBookmarkTree(bookmarkTree);
+      console.log(`[MarkSyncr] Local bookmarks: ${localFlat.length}`);
       
-      // Sync bookmarks to cloud
-      console.log(`[MarkSyncr] Syncing ${flatBookmarks.length} bookmarks to cloud...`);
-      const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
+      // Step 2: Get bookmarks from cloud
+      console.log('[MarkSyncr] Fetching cloud bookmarks...');
+      const cloudData = await getBookmarksFromCloud();
+      const cloudBookmarks = cloudData.bookmarks || [];
+      console.log(`[MarkSyncr] Cloud bookmarks: ${cloudBookmarks.length}`);
+      
+      // Step 3: Merge - find bookmarks in cloud that are not in local
+      const localUrls = new Set(localFlat.map(b => b.url));
+      const newFromCloud = cloudBookmarks.filter(cb => !localUrls.has(cb.url));
+      console.log(`[MarkSyncr] New bookmarks from cloud: ${newFromCloud.length}`);
+      
+      // Step 4: Add new cloud bookmarks to local browser
+      if (newFromCloud.length > 0) {
+        await addCloudBookmarksToLocal(newFromCloud);
+        console.log(`[MarkSyncr] Added ${newFromCloud.length} bookmarks from cloud to local`);
+      }
+      
+      // Step 5: Get updated local bookmarks after merge
+      const updatedTree = await browser.bookmarks.getTree();
+      const mergedFlat = flattenBookmarkTree(updatedTree);
+      const mergedData = convertBrowserBookmarks(updatedTree);
+      const stats = countBookmarks(updatedTree);
+      
+      // Step 6: Push merged bookmarks back to cloud
+      console.log(`[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks to cloud...`);
+      const syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser());
       console.log('[MarkSyncr] Cloud sync result:', syncResult);
 
-      // Save version history
+      // Step 7: Save version history
       console.log('[MarkSyncr] Saving version history...');
       const versionResult = await saveVersionToCloud(
-        bookmarkData,
+        mergedData,
         detectBrowser(),
-        `${detectBrowser()}-extension`
+        `${detectBrowser()}-extension`,
+        {
+          type: 'two_way_sync',
+          addedFromCloud: newFromCloud.length,
+        }
       );
       console.log('[MarkSyncr] Version saved:', versionResult);
+      
+      console.log('[MarkSyncr] Two-way sync completed:', stats);
+
+      // Update last sync time
+      await browser.storage.local.set({
+        lastSync: new Date().toISOString(),
+      });
+
+      return {
+        success: true,
+        stats,
+        addedFromCloud: newFromCloud.length,
+      };
     } catch (cloudErr) {
       console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
-      // Return error so user knows cloud sync failed
       return { success: false, error: `Cloud sync failed: ${cloudErr.message}` };
     }
-
-    console.log('[MarkSyncr] Sync completed:', stats);
-
-    // Update last sync time
-    await browser.storage.local.set({
-      lastSync: new Date().toISOString(),
-    });
-
-    return { success: true, stats };
   } catch (err) {
     console.error('[MarkSyncr] Sync failed:', err);
     return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Add bookmarks from cloud to local browser
+ * @param {Array} cloudBookmarks - Bookmarks from cloud to add locally
+ */
+async function addCloudBookmarksToLocal(cloudBookmarks) {
+  // Get current browser bookmarks to find root folders
+  const currentTree = await browser.bookmarks.getTree();
+  const rootFolders = {};
+  
+  if (currentTree[0]?.children) {
+    for (const root of currentTree[0].children) {
+      const title = root.title?.toLowerCase() || '';
+      if (title.includes('toolbar') || title.includes('bar')) {
+        rootFolders.toolbar = root;
+      } else if (title.includes('menu')) {
+        rootFolders.menu = root;
+      } else if (title.includes('other') || title.includes('unsorted')) {
+        rootFolders.other = root;
+      }
+    }
+  }
+  
+  // Create a folder cache for quick lookup
+  const folderCache = new Map();
+  
+  // Helper to get or create folder by path
+  async function getOrCreateFolder(folderPath, parentId) {
+    if (!folderPath) return parentId;
+    
+    const cacheKey = `${parentId}:${folderPath}`;
+    if (folderCache.has(cacheKey)) {
+      return folderCache.get(cacheKey);
+    }
+    
+    const parts = folderPath.split('/').filter(p => p);
+    let currentParentId = parentId;
+    let currentPath = '';
+    
+    for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const pathCacheKey = `${parentId}:${currentPath}`;
+      
+      if (folderCache.has(pathCacheKey)) {
+        currentParentId = folderCache.get(pathCacheKey);
+        continue;
+      }
+      
+      // Search for existing folder
+      const children = await browser.bookmarks.getChildren(currentParentId);
+      const existingFolder = children.find(c => !c.url && c.title === part);
+      
+      if (existingFolder) {
+        currentParentId = existingFolder.id;
+      } else {
+        // Create new folder
+        const newFolder = await browser.bookmarks.create({
+          parentId: currentParentId,
+          title: part,
+        });
+        currentParentId = newFolder.id;
+      }
+      
+      folderCache.set(pathCacheKey, currentParentId);
+    }
+    
+    folderCache.set(cacheKey, currentParentId);
+    return currentParentId;
+  }
+  
+  // Add each bookmark
+  for (const bookmark of cloudBookmarks) {
+    try {
+      // Determine which root folder to use based on folderPath
+      let rootFolder = rootFolders.other || rootFolders.toolbar;
+      let folderPath = bookmark.folderPath || '';
+      
+      // Check if folderPath starts with a known root
+      const lowerPath = folderPath.toLowerCase();
+      if (lowerPath.startsWith('bookmarks bar') || lowerPath.startsWith('bookmarks toolbar')) {
+        rootFolder = rootFolders.toolbar || rootFolders.other;
+        folderPath = folderPath.split('/').slice(1).join('/');
+      } else if (lowerPath.startsWith('bookmarks menu')) {
+        rootFolder = rootFolders.menu || rootFolders.other;
+        folderPath = folderPath.split('/').slice(1).join('/');
+      } else if (lowerPath.startsWith('other bookmarks')) {
+        rootFolder = rootFolders.other || rootFolders.toolbar;
+        folderPath = folderPath.split('/').slice(1).join('/');
+      }
+      
+      if (!rootFolder) {
+        console.warn('[MarkSyncr] No root folder found, skipping bookmark:', bookmark.url);
+        continue;
+      }
+      
+      // Get or create the target folder
+      const targetFolderId = await getOrCreateFolder(folderPath, rootFolder.id);
+      
+      // Create the bookmark
+      await browser.bookmarks.create({
+        parentId: targetFolderId,
+        title: bookmark.title ?? '',
+        url: bookmark.url,
+      });
+    } catch (err) {
+      console.warn('[MarkSyncr] Failed to add bookmark from cloud:', bookmark.url, err);
+    }
   }
 }
 

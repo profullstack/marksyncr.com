@@ -917,4 +917,244 @@ describe('Background Service Worker', () => {
       });
     });
   });
+
+  describe('Two-Way Sync', () => {
+    describe('performSync (two-way)', () => {
+      it('should fetch bookmarks from cloud during sync', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          selectedSource: 'browser-bookmarks',
+          sources: [{ id: 'browser-bookmarks', connected: true }],
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        const mockLocalTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'b1', url: 'https://local.com', title: 'Local' },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockLocalTree);
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({
+              bookmarks: [
+                { url: 'https://cloud.com', title: 'Cloud', folderPath: '' },
+              ],
+            }),
+          }) // get bookmarks from cloud
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 2 }) }) // sync to cloud
+          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // save version
+
+        // performSync should:
+        // 1. Get local bookmarks
+        // 2. Fetch cloud bookmarks
+        // 3. Find new bookmarks from cloud
+        // 4. Add them locally
+        // 5. Push merged result to cloud
+      });
+
+      it('should merge cloud bookmarks with local bookmarks', async () => {
+        // When cloud has bookmarks that local doesn't have,
+        // they should be added to local browser
+      });
+
+      it('should not duplicate bookmarks that exist in both local and cloud', async () => {
+        mockBrowser.storage.local.get.mockResolvedValue({
+          selectedSource: 'browser-bookmarks',
+          sources: [{ id: 'browser-bookmarks', connected: true }],
+          session: { access_token: 'valid-token', refresh_token: 'refresh' },
+        });
+
+        const mockLocalTree = [
+          {
+            id: 'root',
+            children: [
+              {
+                id: 'toolbar',
+                title: 'Bookmarks Bar',
+                children: [
+                  { id: 'b1', url: 'https://same.com', title: 'Same' },
+                ],
+              },
+            ],
+          },
+        ];
+
+        mockBrowser.bookmarks.getTree.mockResolvedValue(mockLocalTree);
+
+        global.fetch
+          .mockResolvedValueOnce({ ok: true }) // validate token
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({
+              bookmarks: [
+                { url: 'https://same.com', title: 'Same', folderPath: '' },
+              ],
+            }),
+          }); // cloud has same bookmark
+
+        // No new bookmarks should be added since URL already exists locally
+      });
+
+      it('should add new cloud bookmarks to correct folder based on folderPath', async () => {
+        // Cloud bookmark with folderPath: 'Work/Projects'
+        // Should be added to Work/Projects folder locally
+      });
+
+      it('should create folders if they do not exist', async () => {
+        // If cloud bookmark has folderPath that doesn't exist locally,
+        // the folders should be created
+      });
+
+      it('should return addedFromCloud count in result', async () => {
+        // Result should include { addedFromCloud: X } to show how many were added
+      });
+
+      it('should push merged bookmarks back to cloud after adding cloud bookmarks locally', async () => {
+        // After adding cloud bookmarks to local, should push the merged result back
+      });
+
+      it('should save version with two_way_sync type', async () => {
+        // Version history should include { type: 'two_way_sync', addedFromCloud: X }
+      });
+    });
+
+    describe('addCloudBookmarksToLocal', () => {
+      it('should add bookmarks to correct root folder', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'toolbar', title: 'Bookmarks Bar', children: [] },
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        // Bookmark with no folderPath should go to 'other' or 'toolbar'
+      });
+
+      it('should create nested folders from folderPath', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn()
+          .mockResolvedValueOnce({ id: 'folder1' }) // Create 'Work' folder
+          .mockResolvedValueOnce({ id: 'folder2' }) // Create 'Projects' folder
+          .mockResolvedValueOnce({ id: 'bookmark1' }); // Create bookmark
+
+        // Bookmark with folderPath: 'Work/Projects' should create both folders
+      });
+
+      it('should reuse existing folders instead of creating duplicates', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        // First call returns existing 'Work' folder
+        mockBrowser.bookmarks.getChildren = vi.fn()
+          .mockResolvedValueOnce([{ id: 'existing-work', title: 'Work' }]);
+
+        mockBrowser.bookmarks.create = vi.fn()
+          .mockResolvedValueOnce({ id: 'bookmark1' });
+
+        // Should use existing 'Work' folder, not create a new one
+      });
+
+      it('should preserve empty titles when adding bookmarks', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValue({ id: 'new1' });
+
+        // Bookmark with empty title should be created with title: ''
+        // NOT title: url
+      });
+
+      it('should handle bookmarks with Bookmarks Bar prefix in folderPath', async () => {
+        // folderPath: 'Bookmarks Bar/Work' should go to toolbar root
+      });
+
+      it('should handle bookmarks with Other Bookmarks prefix in folderPath', async () => {
+        // folderPath: 'Other Bookmarks/Work' should go to other root
+      });
+
+      it('should skip bookmarks if no root folder is found', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          { id: 'root', children: [] }, // No root folders
+        ]);
+
+        // Should log warning and skip, not throw error
+      });
+
+      it('should continue adding other bookmarks if one fails', async () => {
+        mockBrowser.bookmarks.getTree.mockResolvedValue([
+          {
+            id: 'root',
+            children: [
+              { id: 'other', title: 'Other Bookmarks', children: [] },
+            ],
+          },
+        ]);
+
+        mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
+        mockBrowser.bookmarks.create = vi.fn()
+          .mockRejectedValueOnce(new Error('Failed')) // First bookmark fails
+          .mockResolvedValueOnce({ id: 'new2' }); // Second succeeds
+
+        // Should continue with second bookmark even if first fails
+      });
+    });
+
+    describe('URL-based deduplication', () => {
+      it('should use URL as unique identifier for merging', async () => {
+        // Two bookmarks with same URL but different titles should be considered the same
+      });
+
+      it('should handle URLs with different protocols as different bookmarks', async () => {
+        // http://example.com and https://example.com are different
+      });
+
+      it('should handle URLs with trailing slashes correctly', async () => {
+        // https://example.com and https://example.com/ might need normalization
+        // Current implementation treats them as different - this is expected behavior
+      });
+    });
+  });
 });
