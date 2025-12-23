@@ -53,6 +53,26 @@ export function createAdminClient() {
 }
 
 /**
+ * Create a stateless Supabase client for API routes
+ * This client does NOT use cookies and does NOT persist sessions
+ * Use this for API routes called by the extension or other clients
+ * that manage their own session tokens
+ * @returns {import('@supabase/supabase-js').SupabaseClient}
+ */
+export function createStatelessClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+/**
  * Get the current authenticated user from server-side
  * @returns {Promise<import('@supabase/supabase-js').User | null>}
  */

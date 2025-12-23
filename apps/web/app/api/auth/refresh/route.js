@@ -1,10 +1,13 @@
 /**
  * POST /api/auth/refresh
  * Refresh the access token using a refresh token
+ *
+ * Uses a stateless Supabase client to avoid cookie-based session management.
+ * This allows multiple devices/browsers to maintain independent sessions.
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createStatelessClient } from '@/lib/supabase/server';
 
 /**
  * Handle CORS preflight requests
@@ -31,7 +34,9 @@ export async function POST(request) {
       );
     }
 
-    const supabase = await createClient();
+    // Use stateless client to avoid cookie-based session management
+    // This allows multiple devices to have independent sessions
+    const supabase = createStatelessClient();
 
     const { data, error } = await supabase.auth.refreshSession({
       refresh_token,

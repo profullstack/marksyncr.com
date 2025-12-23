@@ -1,6 +1,6 @@
 /**
  * @fileoverview Tests for auth API routes
- * Tests POST /api/auth/login, /api/auth/signup, /api/auth/logout, 
+ * Tests POST /api/auth/login, /api/auth/signup, /api/auth/logout,
  * GET /api/auth/session, POST /api/auth/refresh endpoints
  * Uses Vitest with mocked Supabase client
  */
@@ -16,6 +16,7 @@ const mockRefreshSession = vi.fn();
 
 // Mock @/lib/supabase/server
 vi.mock('@/lib/supabase/server', () => ({
+  // Cookie-based client (for web app)
   createClient: vi.fn(() =>
     Promise.resolve({
       auth: {
@@ -27,6 +28,16 @@ vi.mock('@/lib/supabase/server', () => ({
       },
     })
   ),
+  // Stateless client (for extension API calls)
+  createStatelessClient: vi.fn(() => ({
+    auth: {
+      signInWithPassword: mockSignInWithPassword,
+      signUp: mockSignUp,
+      signOut: mockSignOut,
+      getUser: mockGetUser,
+      refreshSession: mockRefreshSession,
+    },
+  })),
 }));
 
 // Import after mocks

@@ -1,10 +1,12 @@
 /**
  * POST /api/auth/signup
  * Sign up with email and password
+ *
+ * Uses a stateless Supabase client to avoid cookie-based session management.
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createStatelessClient } from '@/lib/supabase/server';
 
 /**
  * Handle CORS preflight requests
@@ -38,7 +40,8 @@ export async function POST(request) {
       );
     }
 
-    const supabase = await createClient();
+    // Use stateless client to avoid cookie-based session management
+    const supabase = createStatelessClient();
 
     const { data, error } = await supabase.auth.signUp({
       email,
