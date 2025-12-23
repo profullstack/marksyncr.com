@@ -395,16 +395,18 @@ export const useStore = create(
       triggerSync: async () => {
         const { selectedSource, sources } = get();
 
-        console.log('[MarkSyncr Store] triggerSync called, selectedSource:', selectedSource);
+        console.log('[MarkSyncr Store] triggerSync called');
+        console.log('[MarkSyncr Store] selectedSource:', selectedSource);
+        console.log('[MarkSyncr Store] sources:', sources?.map(s => ({ id: s.id, connected: s.connected })));
 
         if (!selectedSource) {
-          set({ error: 'No sync source selected' });
+          set({ error: 'No sync source selected. Please select a source from the dropdown.', status: 'error' });
           return;
         }
 
         const source = sources.find((s) => s.id === selectedSource);
         if (!source) {
-          set({ error: 'Invalid sync source' });
+          set({ error: 'Invalid sync source. Please select a valid source.', status: 'error' });
           return;
         }
 
@@ -412,16 +414,33 @@ export const useStore = create(
 
         try {
           const browserAPI = getBrowserAPI();
-          console.log('[MarkSyncr Store] Browser API available:', !!browserAPI.runtime?.sendMessage);
+          const hasRuntimeAPI = !!browserAPI.runtime?.sendMessage;
+          console.log('[MarkSyncr Store] Browser API available:', hasRuntimeAPI);
+
+          if (!hasRuntimeAPI) {
+            throw new Error('Browser extension API not available. Please reload the extension.');
+          }
 
           // Send message to background script to perform sync
-          console.log('[MarkSyncr Store] Sending SYNC_BOOKMARKS message...');
+          console.log('[MarkSyncr Store] Sending SYNC_BOOKMARKS message to background script...');
           const result = await browserAPI.runtime.sendMessage({
             type: 'SYNC_BOOKMARKS',
             payload: { sourceId: selectedSource },
           });
 
-          console.log('[MarkSyncr Store] Sync result:', result);
+          console.log('[MarkSyncr Store] Sync result from background:', result);
+
+          if (!result) {
+            throw new Error('No response from background script. The extension may need to be reloaded.');
+          }
+
+          if (result.requiresAuth) {
+            set({
+              status: 'error',
+              error: 'Please log in to sync bookmarks. Go to the Account tab to sign in.',
+            });
+            return;
+          }
 
           if (result?.success) {
             const lastSync = new Date().toISOString();
@@ -433,8 +452,15 @@ export const useStore = create(
 
             // Persist last sync time
             await browserAPI.storage.local.set({ lastSync });
+            
+            // Show success message with details
+            const addedFromCloud = result.addedFromCloud || 0;
+            const deletedLocally = result.deletedLocally || 0;
+            if (addedFromCloud > 0 || deletedLocally > 0) {
+              console.log(`[MarkSyncr Store] Sync complete: ${addedFromCloud} added from cloud, ${deletedLocally} deleted locally`);
+            }
           } else {
-            throw new Error(result?.error || 'Sync failed - no result from background');
+            throw new Error(result?.error || 'Sync failed - unknown error from background script');
           }
         } catch (err) {
           console.error('[MarkSyncr Store] Sync failed:', err);

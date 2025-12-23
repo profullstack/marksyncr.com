@@ -600,29 +600,42 @@ function flattenBookmarkTree(tree) {
  * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
  */
 async function performSync(sourceId) {
+  console.log('[MarkSyncr] performSync called with sourceId:', sourceId);
+  
   try {
-    const { selectedSource, sources } = await browser.storage.local.get([
+    const storageData = await browser.storage.local.get([
       'selectedSource',
       'sources',
+      'session',
     ]);
+    
+    const { selectedSource, sources, session } = storageData;
+    
+    console.log('[MarkSyncr] Storage data:');
+    console.log('  - selectedSource:', selectedSource);
+    console.log('  - sources count:', sources?.length || 0);
+    console.log('  - has session:', !!session);
+    console.log('  - has access_token:', !!session?.access_token);
 
     const targetSourceId = sourceId || selectedSource;
 
     if (!targetSourceId) {
-      return { success: false, error: 'No sync source configured' };
+      console.log('[MarkSyncr] No sync source configured');
+      return { success: false, error: 'No sync source configured. Please select a source in the extension popup.' };
     }
 
     console.log(`[MarkSyncr] Starting two-way sync with source: ${targetSourceId}`);
 
     // Get source configuration
     const source = sources?.find((s) => s.id === targetSourceId);
+    console.log('[MarkSyncr] Source config:', source);
     
     // Browser bookmarks source is always available
     const isBrowserSource = targetSourceId === 'browser-bookmarks';
     
     if (!isBrowserSource && !source?.connected) {
       console.log('[MarkSyncr] Source not connected:', targetSourceId, source);
-      return { success: false, error: 'Source not connected' };
+      return { success: false, error: `Source "${targetSourceId}" is not connected. Please connect it first.` };
     }
 
     // Ensure we have a valid token (will attempt refresh if expired)
@@ -635,7 +648,7 @@ async function performSync(sourceId) {
       console.log('[MarkSyncr] No valid token, cannot sync to cloud');
       return {
         success: false,
-        error: 'Please log in to sync bookmarks to the cloud',
+        error: 'Please log in to sync bookmarks to the cloud. Go to the Account tab in the extension popup.',
         requiresAuth: true,
       };
     }
