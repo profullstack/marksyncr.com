@@ -320,16 +320,20 @@ export function Options() {
             if (!item) continue;
             
             if (item.type === 'folder' || item.children) {
+              // Use nullish coalescing to preserve empty strings
+              // Folders need a visible name, so use 'Untitled Folder' only if null/undefined
               const folder = await createBookmark({
-                title: item.title || 'Untitled Folder',
+                title: item.title ?? 'Untitled Folder',
                 parentId,
               });
               if (folder && folder.id && item.children) {
                 await createBookmarks(item.children, folder.id);
               }
             } else if (item.url) {
+              // Use nullish coalescing to preserve empty strings
+              // Empty titles will display as the URL in the browser
               await createBookmark({
-                title: item.title || 'Untitled',
+                title: item.title ?? '',
                 url: item.url,
                 parentId,
               });

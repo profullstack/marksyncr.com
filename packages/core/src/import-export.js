@@ -380,9 +380,10 @@ const convertFolderPathToNested = (flatBookmarks) => {
     const pathParts = folderPath ? folderPath.split('/').filter(Boolean) : [];
     
     // Create bookmark entry (without folderPath, as it's now represented by structure)
+    // Use nullish coalescing to preserve empty strings
     const bookmarkEntry = {
       id: bookmark.id || generateId(),
-      title: bookmark.title || 'Untitled',
+      title: bookmark.title ?? '',
       url: bookmark.url,
       type: 'bookmark',
       dateAdded: bookmark.dateAdded || Date.now(),
@@ -465,7 +466,7 @@ export function parseMarkSyncrJson(jsonString) {
     } else {
       bookmarks = validData.map(item => ({
         id: item.id || generateId(),
-        title: item.title || 'Untitled',
+        title: item.title ?? '',  // Use nullish coalescing to preserve empty strings
         url: item.url || item.href || item.link,
         type: item.type || 'bookmark',
         tags: item.tags || [],
