@@ -115,10 +115,15 @@ export async function GET(request) {
 
     // Extract bookmarks array from JSONB
     const bookmarks = cloudBookmarks?.bookmark_data || [];
+    const bookmarksArray = Array.isArray(bookmarks) ? bookmarks : [];
+    
+    console.log(`[Bookmarks API GET] User: ${user.id}`);
+    console.log(`[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks`);
+    console.log(`[Bookmarks API GET] Version: ${cloudBookmarks?.version || 0}`);
 
     return NextResponse.json({
-      bookmarks: Array.isArray(bookmarks) ? bookmarks : [],
-      count: Array.isArray(bookmarks) ? bookmarks.length : 0,
+      bookmarks: bookmarksArray,
+      count: bookmarksArray.length,
       version: cloudBookmarks?.version || 0,
       checksum: cloudBookmarks?.checksum || null,
       lastModified: cloudBookmarks?.last_modified || null,
@@ -254,8 +259,16 @@ export async function POST(request) {
     const existingBookmarks = existingData?.bookmark_data || [];
     const existingVersion = existingData?.version || 0;
 
+    // Debug logging
+    console.log(`[Bookmarks API] Source: ${source}`);
+    console.log(`[Bookmarks API] Incoming bookmarks: ${normalizedBookmarks.length}`);
+    console.log(`[Bookmarks API] Existing cloud bookmarks: ${existingBookmarks.length}`);
+    console.log(`[Bookmarks API] Existing version: ${existingVersion}`);
+
     // Merge incoming bookmarks with existing
     const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
+    
+    console.log(`[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`);
 
     // Generate checksum for the merged bookmark data
     const checksum = generateChecksum(merged);
