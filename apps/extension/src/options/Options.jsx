@@ -243,14 +243,73 @@ export function Options() {
       const parsed = parseImportFile(content, format);
       
       // Import to browser bookmarks
-      if (chrome?.bookmarks?.create) {
+      // Detect if we're in Firefox (uses browser.bookmarks with Promises) or Chrome (uses chrome.bookmarks with callbacks)
+      const isFirefox = typeof browser !== 'undefined' && browser.bookmarks && typeof browser.bookmarks.create === 'function';
+      const bookmarksApi = isFirefox ? browser.bookmarks : chrome?.bookmarks;
+      
+      if (bookmarksApi?.create) {
+        // Helper function to create a bookmark that works in both Chrome and Firefox
+        const createBookmark = async (options) => {
+          if (isFirefox) {
+            // Firefox uses Promises and different property names
+            try {
+              return await browser.bookmarks.create(options);
+            } catch (err) {
+              console.warn('Firefox bookmark creation failed:', err.message);
+              return null;
+            }
+          } else {
+            // Chrome uses callbacks
+            return new Promise((resolve) => {
+              chrome.bookmarks.create(options, (result) => {
+                if (chrome.runtime.lastError) {
+                  console.warn('Chrome bookmark creation failed:', chrome.runtime.lastError.message);
+                  resolve(null);
+                } else {
+                  resolve(result);
+                }
+              });
+            });
+          }
+        };
+
+        // Get the bookmarks bar folder ID
+        // Chrome uses '1' for bookmarks bar, Firefox uses 'toolbar_____'
+        const getBookmarksBarId = async () => {
+          if (isFirefox) {
+            // Firefox: Get the toolbar folder
+            try {
+              const tree = await browser.bookmarks.getTree();
+              // Find the toolbar folder (usually the second child of root)
+              const root = tree[0];
+              if (root && root.children) {
+                const toolbar = root.children.find(c => c.id === 'toolbar_____' || c.title === 'Bookmarks Toolbar');
+                if (toolbar) return toolbar.id;
+                // Fallback to menu folder
+                const menu = root.children.find(c => c.id === 'menu________' || c.title === 'Bookmarks Menu');
+                if (menu) return menu.id;
+              }
+              return 'unfiled_____'; // Fallback to Other Bookmarks
+            } catch (err) {
+              console.warn('Failed to get Firefox bookmarks bar:', err);
+              return 'unfiled_____';
+            }
+          } else {
+            return '1'; // Chrome bookmarks bar
+          }
+        };
+
+        const parentFolderId = await getBookmarksBarId();
+        
         // Create an import folder
-        const importFolder = await new Promise((resolve) => {
-          chrome.bookmarks.create({
-            title: `Imported ${new Date().toLocaleDateString()}`,
-            parentId: '1', // Bookmarks bar
-          }, resolve);
+        const importFolder = await createBookmark({
+          title: `Imported ${new Date().toLocaleDateString()}`,
+          parentId: parentFolderId,
         });
+
+        if (!importFolder || !importFolder.id) {
+          throw new Error('Failed to create import folder');
+        }
 
         // Recursively create bookmarks
         const createBookmarks = async (items, parentId) => {
@@ -261,22 +320,18 @@ export function Options() {
             if (!item) continue;
             
             if (item.type === 'folder' || item.children) {
-              const folder = await new Promise((resolve) => {
-                chrome.bookmarks.create({
-                  title: item.title || 'Untitled Folder',
-                  parentId,
-                }, resolve);
+              const folder = await createBookmark({
+                title: item.title || 'Untitled Folder',
+                parentId,
               });
-              if (folder && item.children) {
+              if (folder && folder.id && item.children) {
                 await createBookmarks(item.children, folder.id);
               }
             } else if (item.url) {
-              await new Promise((resolve) => {
-                chrome.bookmarks.create({
-                  title: item.title || 'Untitled',
-                  url: item.url,
-                  parentId,
-                }, resolve);
+              await createBookmark({
+                title: item.title || 'Untitled',
+                url: item.url,
+                parentId,
               });
             }
           }
