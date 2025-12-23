@@ -76,17 +76,15 @@ describe('Bookmarks API External Sync', () => {
       });
       
       // Create a more sophisticated mock
-      let callCount = 0;
       mockSupabase.from.mockImplementation((table) => {
         if (table === 'sync_sources') {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [{
                     id: 'source-1',
-                    source_type: 'github',
-                    connected: true,
+                    provider: 'github',
                     access_token: 'ghp_test_token',
                     repository: 'testuser/marksyncr-bookmarks',
                     branch: 'main',
@@ -155,7 +153,7 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [],
                   error: null,
                 }),
@@ -202,11 +200,10 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [{
                     id: 'source-1',
-                    source_type: 'github',
-                    connected: true,
+                    provider: 'github',
                     access_token: 'ghp_test_token',
                     repository: 'testuser/marksyncr-bookmarks',
                     branch: 'main',
@@ -253,21 +250,15 @@ describe('Bookmarks API External Sync', () => {
         });
 
       // Mock sync_sources query - GitHub connected but no token
+      // Note: With the new query using .not('access_token', 'is', null),
+      // sources without tokens won't be returned, so we return empty array
       mockSupabase.from.mockImplementation((table) => {
         if (table === 'sync_sources') {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    source_type: 'github',
-                    connected: true,
-                    access_token: null, // No token
-                    repository: 'testuser/marksyncr-bookmarks',
-                    branch: 'main',
-                    file_path: 'bookmarks.json',
-                  }],
+                not: () => Promise.resolve({
+                  data: [], // No sources returned because token is null
                   error: null,
                 }),
               }),
@@ -313,11 +304,10 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [{
                     id: 'source-1',
-                    source_type: 'github',
-                    connected: true,
+                    provider: 'github',
                     access_token: 'ghp_test_token',
                     repository: null, // No repository
                     branch: 'main',
@@ -368,12 +358,11 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [
                     {
                       id: 'source-1',
-                      source_type: 'github',
-                      connected: true,
+                      provider: 'github',
                       access_token: 'ghp_test_token',
                       repository: 'testuser/marksyncr-bookmarks',
                       branch: 'main',
@@ -381,14 +370,12 @@ describe('Bookmarks API External Sync', () => {
                     },
                     {
                       id: 'source-2',
-                      source_type: 'dropbox',
-                      connected: true,
+                      provider: 'dropbox',
                       access_token: 'dropbox_token',
                     },
                     {
                       id: 'source-3',
-                      source_type: 'google_drive',
-                      connected: true,
+                      provider: 'google-drive',
                       access_token: 'google_token',
                     },
                   ],
@@ -444,12 +431,11 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [
                     {
                       id: 'source-1',
-                      source_type: 'github',
-                      connected: true,
+                      provider: 'github',
                       access_token: 'ghp_test_token_1',
                       repository: 'testuser/repo1',
                       branch: 'main',
@@ -457,8 +443,7 @@ describe('Bookmarks API External Sync', () => {
                     },
                     {
                       id: 'source-2',
-                      source_type: 'github',
-                      connected: true,
+                      provider: 'github',
                       access_token: 'ghp_test_token_2',
                       repository: 'testuser/repo2',
                       branch: 'main',
@@ -520,7 +505,7 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: null,
                   error: { message: 'Database connection failed' },
                 }),
@@ -568,11 +553,10 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [{
                     id: 'source-1',
-                    source_type: 'github',
-                    connected: true,
+                    provider: 'github',
                     access_token: 'ghp_test_token',
                     repository: 'testuser/marksyncr-bookmarks',
                     branch: null, // Not specified
@@ -641,11 +625,10 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => Promise.resolve({
+                not: () => Promise.resolve({
                   data: [{
                     id: 'source-1',
-                    source_type: 'github',
-                    connected: true,
+                    provider: 'github',
                     access_token: 'ghp_test_token',
                     repository: 'testuser/marksyncr-bookmarks',
                     branch: 'main',

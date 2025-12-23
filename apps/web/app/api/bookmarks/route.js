@@ -347,11 +347,12 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
 async function syncToExternalSources(supabase, userId, bookmarks, tombstones, checksum) {
   try {
     // Get all connected sync sources for this user
+    // A source is considered connected if it has an access_token and connected_at timestamp
     const { data: sources, error: sourcesError } = await supabase
       .from('sync_sources')
       .select('*')
       .eq('user_id', userId)
-      .eq('connected', true);
+      .not('access_token', 'is', null);
 
     if (sourcesError) {
       console.error('[External Sync] Failed to fetch sync sources:', sourcesError);
@@ -368,17 +369,18 @@ async function syncToExternalSources(supabase, userId, bookmarks, tombstones, ch
     // Sync to each connected source
     for (const source of sources) {
       try {
-        if (source.source_type === 'github') {
+        // Use 'provider' column (not 'source_type')
+        if (source.provider === 'github') {
           await syncToGitHub(source, bookmarks, tombstones, checksum);
-        } else if (source.source_type === 'dropbox') {
+        } else if (source.provider === 'dropbox') {
           // TODO: Implement Dropbox sync
           console.log('[External Sync] Dropbox sync not yet implemented');
-        } else if (source.source_type === 'google_drive') {
+        } else if (source.provider === 'google-drive') {
           // TODO: Implement Google Drive sync
           console.log('[External Sync] Google Drive sync not yet implemented');
         }
       } catch (sourceError) {
-        console.error(`[External Sync] Failed to sync to ${source.source_type}:`, sourceError);
+        console.error(`[External Sync] Failed to sync to ${source.provider}:`, sourceError);
         // Continue with other sources even if one fails
       }
     }
