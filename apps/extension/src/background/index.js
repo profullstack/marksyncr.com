@@ -758,12 +758,29 @@ async function performSync(sourceId) {
       const updatedLocalFlat = flattenBookmarkTree(updatedTree);
       
       // Step 6: Find bookmarks in cloud that are not in local (and not tombstoned)
+      // Important: Only filter out bookmarks where the tombstone is NEWER than the bookmark
+      // This allows re-added bookmarks (from other browsers) to sync correctly
       const localUrls = new Set(updatedLocalFlat.map(b => b.url));
-      const tombstonedUrls = new Set(mergedTombstones.map(t => t.url));
-      const newFromCloud = cloudBookmarks.filter(cb =>
-        !localUrls.has(cb.url) && !tombstonedUrls.has(cb.url)
-      );
-      console.log(`[MarkSyncr] New bookmarks from cloud (not tombstoned): ${newFromCloud.length}`);
+      const newFromCloud = cloudBookmarks.filter(cb => {
+        // Skip if bookmark already exists locally
+        if (localUrls.has(cb.url)) {
+          return false;
+        }
+        
+        // Check if there's a tombstone for this URL
+        const tombstone = mergedTombstones.find(t => t.url === cb.url);
+        if (!tombstone) {
+          return true; // No tombstone, add the bookmark
+        }
+        
+        // Compare dates: add bookmark only if it's newer than the tombstone
+        // This handles the case where Browser A adds a bookmark after Browser B deleted it
+        const bookmarkDate = cb.dateAdded || 0;
+        const tombstoneDate = tombstone.deletedAt || 0;
+        
+        return bookmarkDate > tombstoneDate;
+      });
+      console.log(`[MarkSyncr] New bookmarks from cloud (after tombstone date check): ${newFromCloud.length}`);
       
       // Step 7: Add new cloud bookmarks to local browser
       if (newFromCloud.length > 0) {
