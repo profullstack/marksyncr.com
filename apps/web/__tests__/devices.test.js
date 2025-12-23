@@ -6,14 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock Supabase methods
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockOrder = vi.fn();
-const mockUpsert = vi.fn();
-const mockDelete = vi.fn();
-const mockSingle = vi.fn();
-
 // Create chainable mock
 const createChainableMock = () => {
   const chain = {
@@ -28,6 +20,12 @@ const createChainableMock = () => {
 };
 
 let mockChain = createChainableMock();
+
+// Helper to create auth result with supabase client
+const createAuthResult = (userId) => ({
+  user: { id: userId },
+  supabase: { from: vi.fn(() => mockChain) }
+});
 
 // Mock @/lib/supabase/server
 vi.mock('@/lib/supabase/server', () => ({
@@ -86,7 +84,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return empty array when user has no devices', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       mockChain.order.mockReturnValue(Promise.resolve({
         data: [],
@@ -102,7 +100,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return list of devices for authenticated user', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       const mockDevices = [
         {
@@ -141,7 +139,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return 500 when database error occurs', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       mockChain.order.mockReturnValue(Promise.resolve({
         data: null,
@@ -173,7 +171,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return 400 when deviceId is missing', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
 
       const request = createMockRequest({
         method: 'POST',
@@ -187,7 +185,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should register a new device successfully', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       const mockDevice = {
         id: 'device-1',
@@ -217,7 +215,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should update existing device on upsert', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       const mockDevice = {
         id: 'device-1',
@@ -246,7 +244,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should use default name when name is not provided', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       const mockDevice = {
         id: 'device-1',
@@ -275,7 +273,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should use Unknown for missing browser and os', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       const mockDevice = {
         id: 'device-1',
@@ -303,7 +301,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return 500 when database error occurs', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       mockChain.single.mockReturnValue(Promise.resolve({
         data: null,
@@ -338,7 +336,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return 400 when deviceId is missing', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
 
       const request = createMockRequest({
         method: 'DELETE',
@@ -352,7 +350,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should delete device successfully', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       // Mock the delete chain with double eq() call
       const secondEq = vi.fn().mockReturnValue(Promise.resolve({ error: null }));
@@ -371,7 +369,7 @@ describe('Devices API Routes', () => {
     });
 
     it('should return 500 when database error occurs', async () => {
-      mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+      mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
       
       // Mock the delete chain with error
       const secondEq = vi.fn().mockReturnValue(Promise.resolve({ error: { message: 'Delete failed' } }));
@@ -398,7 +396,7 @@ describe('Devices API Edge Cases', () => {
   });
 
   it('should handle empty deviceId string', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
 
     const request = createMockRequest({
       method: 'POST',
@@ -412,7 +410,7 @@ describe('Devices API Edge Cases', () => {
   });
 
   it('should handle special characters in device name', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
     
     const mockDevice = {
       id: 'device-1',
@@ -439,7 +437,7 @@ describe('Devices API Edge Cases', () => {
   });
 
   it('should handle very long device names', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
     
     const longName = 'A'.repeat(500);
     const mockDevice = {
@@ -467,7 +465,7 @@ describe('Devices API Edge Cases', () => {
   });
 
   it('should handle unicode characters in device info', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
     
     const mockDevice = {
       id: 'device-1',
@@ -496,7 +494,7 @@ describe('Devices API Edge Cases', () => {
   });
 
   it('should handle multiple devices for same user', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
     
     const mockDevices = [
       { id: 'device-1', device_id: 'chrome-1', name: 'Chrome 1', browser: 'chrome', os: 'Windows' },
@@ -526,7 +524,7 @@ describe('Devices API Security', () => {
   });
 
   it('should not expose internal error details', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
     
     mockChain.order.mockRejectedValue(new Error('Internal database connection string exposed'));
 
@@ -541,7 +539,7 @@ describe('Devices API Security', () => {
   });
 
   it('should handle null body gracefully in POST', async () => {
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
 
     const request = {
       method: 'POST',
@@ -558,7 +556,7 @@ describe('Devices API Security', () => {
 
   it('should only return devices for authenticated user', async () => {
     // First user
-    mockGetAuthenticatedUser.mockResolvedValue({ id: 'user-123' });
+    mockGetAuthenticatedUser.mockResolvedValue(createAuthResult('user-123'));
     
     const user1Devices = [
       { id: 'device-1', user_id: 'user-123', device_id: 'chrome-1', name: 'User 1 Chrome' },

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '../../../lib/supabase/server';
 import { getAuthenticatedUser } from '../../../lib/auth-helper';
 
 /**
@@ -7,12 +6,12 @@ import { getAuthenticatedUser } from '../../../lib/auth-helper';
  */
 export async function GET(request) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
+    const authResult = await getAuthenticatedUser(request);
+    if (!authResult || !authResult.user || !authResult.supabase) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { user, supabase } = authResult;
 
-    const supabase = await createClient();
     const { data: devices, error } = await supabase
       .from('devices')
       .select('*')
@@ -36,10 +35,11 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
+    const authResult = await getAuthenticatedUser(request);
+    if (!authResult || !authResult.user || !authResult.supabase) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { user, supabase } = authResult;
 
     const body = await request.json();
     const { deviceId, name, browser, os } = body;
@@ -47,8 +47,6 @@ export async function POST(request) {
     if (!deviceId) {
       return NextResponse.json({ error: 'deviceId is required' }, { status: 400 });
     }
-
-    const supabase = await createClient();
 
     // Upsert device (insert or update if exists)
     const { data: device, error } = await supabase
@@ -86,10 +84,11 @@ export async function POST(request) {
  */
 export async function DELETE(request) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
+    const authResult = await getAuthenticatedUser(request);
+    if (!authResult || !authResult.user || !authResult.supabase) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const { user, supabase } = authResult;
 
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('deviceId');
@@ -98,7 +97,6 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'deviceId is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
     const { error } = await supabase
       .from('devices')
       .delete()
