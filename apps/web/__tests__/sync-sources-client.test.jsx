@@ -204,9 +204,8 @@ describe('SyncSourcesClient', () => {
         },
         {
           provider: 'dropbox',
-          repository: '/Apps/MarkSyncr',
-          branch: null,
-          file_path: 'bookmarks.json',
+          file_path: '/Apps/MarkSyncr/bookmarks.json',
+          provider_username: 'test@example.com',
         },
       ];
 
@@ -218,9 +217,109 @@ describe('SyncSourcesClient', () => {
 
       // GitHub repo should be displayed
       expect(screen.getByText('user/marksyncr-bookmarks')).toBeInTheDocument();
+    });
+  });
 
-      // Dropbox path should be displayed
-      expect(screen.getByText('/Apps/MarkSyncr')).toBeInTheDocument();
+  describe('Dropbox Details Display', () => {
+    it('should display file path for connected Dropbox', () => {
+      const connectedSources = [
+        {
+          provider: 'dropbox',
+          file_path: '/Apps/MarkSyncr/bookmarks.json',
+          provider_username: 'test@example.com',
+        },
+      ];
+
+      render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
+
+      expect(screen.getByText('/Apps/MarkSyncr/bookmarks.json')).toBeInTheDocument();
+    });
+
+    it('should display default file path when not provided', () => {
+      const connectedSources = [
+        {
+          provider: 'dropbox',
+          provider_username: 'test@example.com',
+        },
+      ];
+
+      render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
+
+      // Should show default path
+      expect(screen.getByText('/Apps/MarkSyncr/bookmarks.json')).toBeInTheDocument();
+    });
+
+    it('should display user email for connected Dropbox', () => {
+      const connectedSources = [
+        {
+          provider: 'dropbox',
+          file_path: '/Apps/MarkSyncr/bookmarks.json',
+          provider_username: 'user@dropbox.com',
+        },
+      ];
+
+      render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
+
+      expect(screen.getByText('user@dropbox.com')).toBeInTheDocument();
+    });
+
+    it('should display View in Dropbox link for Dropbox sources', () => {
+      const connectedSources = [
+        {
+          provider: 'dropbox',
+          file_path: '/Apps/MarkSyncr/bookmarks.json',
+          provider_username: 'test@example.com',
+        },
+      ];
+
+      render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
+
+      const link = screen.getByText('View in Dropbox');
+      expect(link).toBeInTheDocument();
+      expect(link.closest('a')).toHaveAttribute(
+        'href',
+        'https://www.dropbox.com/home/Apps/MarkSyncr'
+      );
+    });
+
+    it('should not display Dropbox details when not connected', () => {
+      render(<SyncSourcesClient subscription={null} connectedSources={[]} />);
+
+      expect(screen.queryByText('View in Dropbox')).not.toBeInTheDocument();
+    });
+
+    it('should not display GitHub link for Dropbox sources', () => {
+      const connectedSources = [
+        {
+          provider: 'dropbox',
+          file_path: '/Apps/MarkSyncr/bookmarks.json',
+        },
+      ];
+
+      render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
+
+      expect(screen.queryByText('View on GitHub')).not.toBeInTheDocument();
+    });
+
+    it('should display both GitHub and Dropbox links when both connected', () => {
+      const connectedSources = [
+        {
+          provider: 'github',
+          repository: 'user/marksyncr-bookmarks',
+          branch: 'main',
+          file_path: 'bookmarks.json',
+        },
+        {
+          provider: 'dropbox',
+          file_path: '/Apps/MarkSyncr/bookmarks.json',
+          provider_username: 'test@example.com',
+        },
+      ];
+
+      render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
+
+      expect(screen.getByText('View on GitHub')).toBeInTheDocument();
+      expect(screen.getByText('View in Dropbox')).toBeInTheDocument();
     });
   });
 

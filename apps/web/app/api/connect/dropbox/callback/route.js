@@ -67,8 +67,11 @@ export async function GET(request) {
       );
     }
 
-    // Store connection in database
+    // Store connection in database with file path configuration
     const supabase = await createClient();
+    
+    // Default Dropbox file path for bookmarks
+    const filePath = '/Apps/MarkSyncr/bookmarks.json';
 
     const { error: dbError } = await supabase.from('sync_sources').upsert(
       {
@@ -82,6 +85,10 @@ export async function GET(request) {
         expires_at: tokenData.expires_in
           ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
           : null,
+        file_path: filePath,
+        config: {
+          setupAt: new Date().toISOString(),
+        },
         connected_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
