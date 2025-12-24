@@ -73,7 +73,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       const result = await getBookmarkFile(mockAccessToken, mockPath);
@@ -85,6 +86,7 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
+        text: async () => JSON.stringify({ error_summary: 'Internal Server Error' }),
         json: async () => ({ error_summary: 'Internal Server Error' }),
       });
 
@@ -140,7 +142,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       // Second call: upload file
@@ -219,12 +222,14 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
+        text: async () => JSON.stringify({ error_summary: 'path/conflict/file' }),
         json: async () => ({ error_summary: 'path/conflict/file' }),
       });
 
@@ -278,7 +283,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       mockFetch.mockResolvedValueOnce({
@@ -485,7 +491,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       mockFetch.mockResolvedValueOnce({
@@ -517,7 +524,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       mockFetch.mockResolvedValueOnce({
@@ -541,7 +549,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        json: async () => ({ error_summary: 'path/not_found/.' }),
+        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
       mockFetch.mockResolvedValueOnce({

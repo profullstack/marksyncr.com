@@ -99,12 +99,32 @@ export async function getBookmarkFile(
   });
 
   if (!response.ok) {
+    // Try to get error details from response
+    const errorText = await response.text().catch(() => '');
+    let errorSummary = `HTTP ${response.status}`;
+    
+    try {
+      const errorJson = JSON.parse(errorText) as { error_summary?: string; error?: { '.tag'?: string } };
+      if (errorJson.error_summary) {
+        errorSummary = errorJson.error_summary;
+      }
+      // Check for path/not_found error (file doesn't exist)
+      if (errorJson.error?.['.tag'] === 'path' || errorSummary.includes('path/not_found')) {
+        return null;
+      }
+    } catch {
+      // Not JSON, use text if available
+      if (errorText) {
+        errorSummary = errorText.substring(0, 200);
+      }
+    }
+    
+    // 409 Conflict often means path not found
     if (response.status === 409) {
-      // Path not found - file doesn't exist
       return null;
     }
-    const error = await response.json().catch(() => ({ error_summary: 'Unknown error' })) as { error_summary: string };
-    throw new Error(`Failed to get bookmark file: ${error.error_summary}`);
+    
+    throw new Error(`Failed to get bookmark file: ${errorSummary}`);
   }
 
   // Get metadata from response header
