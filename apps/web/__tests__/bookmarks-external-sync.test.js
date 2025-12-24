@@ -720,9 +720,10 @@ describe('Bookmarks API External Sync', () => {
 
       syncBookmarksToDropbox.mockResolvedValue({
         success: true,
-        updated: true,
+        rev: 'rev123',
+        created: false,
+        skipped: false,
         bookmarkCount: 1,
-        checksum: 'abc123',
       });
 
       const request = new Request('http://localhost/api/bookmarks', {
@@ -906,9 +907,10 @@ describe('Bookmarks API External Sync', () => {
 
       syncBookmarksToDropbox.mockResolvedValue({
         success: true,
-        updated: true,
+        rev: 'rev123',
+        created: false,
+        skipped: false,
         bookmarkCount: 1,
-        checksum: 'abc123',
       });
 
       const request = new Request('http://localhost/api/bookmarks', {
@@ -966,9 +968,10 @@ describe('Bookmarks API External Sync', () => {
 
       syncBookmarksToDropbox.mockResolvedValue({
         success: true,
-        updated: true,
+        rev: 'rev123',
+        created: false,
+        skipped: false,
         bookmarkCount: 1,
-        checksum: 'abc123',
       });
 
       const request = new Request('http://localhost/api/bookmarks', {

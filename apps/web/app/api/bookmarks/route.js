@@ -461,7 +461,8 @@ async function syncToDropbox(source, bookmarks, tombstones, checksum) {
     );
 
     console.log(`[Dropbox Sync] Successfully synced to ${dropboxPath}:`, {
-      updated: result.updated,
+      created: result.created,
+      skipped: result.skipped,
       bookmarkCount: result.bookmarkCount,
       rev: result.rev,
     });
