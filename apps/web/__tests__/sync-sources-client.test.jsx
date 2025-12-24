@@ -36,8 +36,20 @@ describe('SyncSourcesClient', () => {
       render(<SyncSourcesClient subscription={null} connectedSources={[]} />);
 
       const connectButtons = screen.getAllByText('Connect');
-      // GitHub, Dropbox, Google Drive should have Connect buttons
-      expect(connectButtons.length).toBeGreaterThanOrEqual(3);
+      // GitHub, Dropbox, Google Drive should have Connect buttons (not MarkSyncr Cloud - it's always connected)
+      expect(connectButtons.length).toBe(3);
+    });
+
+    it('should show MarkSyncr Cloud as always connected with Default label', () => {
+      render(<SyncSourcesClient subscription={null} connectedSources={[]} />);
+
+      // MarkSyncr Cloud should show as connected
+      expect(screen.getByText('MarkSyncr Cloud')).toBeInTheDocument();
+      expect(screen.getByText('Default')).toBeInTheDocument();
+      
+      // Should show Connected status for MarkSyncr Cloud
+      const connectedLabels = screen.getAllByText('Connected');
+      expect(connectedLabels.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should show Connected status for connected sources', () => {
@@ -47,7 +59,9 @@ describe('SyncSourcesClient', () => {
 
       render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
 
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      // GitHub + MarkSyncr Cloud (always connected) = 2 Connected labels
+      const connectedLabels = screen.getAllByText('Connected');
+      expect(connectedLabels.length).toBe(2);
     });
 
     it('should show Disconnect button for connected sources', () => {
@@ -160,12 +174,25 @@ describe('SyncSourcesClient', () => {
       expect(screen.queryByText('Upgrade')).not.toBeInTheDocument();
     });
 
-    it('should allow connection for free users', () => {
+    it('should always show as connected (default sync)', () => {
       render(<SyncSourcesClient subscription={{ plan: 'free' }} connectedSources={[]} />);
 
-      // All 4 sources should have Connect buttons (GitHub, Dropbox, Google Drive, MarkSyncr Cloud)
+      // Only 3 sources should have Connect buttons (GitHub, Dropbox, Google Drive)
+      // MarkSyncr Cloud is always connected and shows "Default" instead
       const connectButtons = screen.getAllByText('Connect');
-      expect(connectButtons.length).toBe(4);
+      expect(connectButtons.length).toBe(3);
+      
+      // MarkSyncr Cloud should show "Default" label
+      expect(screen.getByText('Default')).toBeInTheDocument();
+    });
+
+    it('should not show disconnect button for MarkSyncr Cloud', () => {
+      render(<SyncSourcesClient subscription={{ plan: 'free' }} connectedSources={[]} />);
+
+      // MarkSyncr Cloud should not have a disconnect button
+      // It's always connected as the default sync
+      const disconnectButtons = screen.queryAllByText('Disconnect');
+      expect(disconnectButtons.length).toBe(0);
     });
 
     it('should allow connection for Pro users', () => {
@@ -211,9 +238,9 @@ describe('SyncSourcesClient', () => {
 
       render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
 
-      // Both should show Connected
+      // GitHub + Dropbox + MarkSyncr Cloud (always connected) = 3 Connected labels
       const connectedLabels = screen.getAllByText('Connected');
-      expect(connectedLabels.length).toBe(2);
+      expect(connectedLabels.length).toBe(3);
 
       // GitHub repo should be displayed
       expect(screen.getByText('user/marksyncr-bookmarks')).toBeInTheDocument();

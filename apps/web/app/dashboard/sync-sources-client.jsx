@@ -42,11 +42,16 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
       available: true,
       requiresPro: false,
       isInternal: true,
+      alwaysConnected: true, // Default sync, always enabled for all users
     },
   ];
 
-  const isConnected = (sourceId) => {
-    return connectedSources.some((s) => s.provider === sourceId);
+  const isConnected = (source) => {
+    // MarkSyncr Cloud is always connected for all users
+    if (source.alwaysConnected) {
+      return true;
+    }
+    return connectedSources.some((s) => s.provider === source.id);
   };
 
   const getSourceDetails = (sourceId) => {
@@ -123,7 +128,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {sources.map((source) => {
-          const connected = isConnected(source.id);
+          const connected = isConnected(source);
           const sourceDetails = getSourceDetails(source.id);
           const isLoading = connectingSource === source.id && isPending;
 
@@ -169,7 +174,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                     )}
                   </div>
                 </div>
-                {source.available && (
+                {source.available && !source.alwaysConnected && (
                   <div>
                     {connected ? (
                       <button
@@ -189,6 +194,9 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                       </button>
                     )}
                   </div>
+                )}
+                {source.alwaysConnected && (
+                  <span className="text-xs text-slate-500">Default</span>
                 )}
                 {source.requiresPro && !source.available && (
                   <Link
