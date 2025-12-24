@@ -221,6 +221,33 @@ describe('API Client', () => {
       expect(result).toEqual({ user: { id: 'user-123' } });
     });
 
+    it('should return user object when API returns { user: {...} } format', async () => {
+      // This is the actual format returned by /api/auth/session endpoint
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ user: { id: 'user-123', email: 'test@example.com' } }),
+      });
+
+      const result = await api.getSession();
+
+      // Should return the user object as a truthy session indicator
+      expect(result).toEqual({ id: 'user-123', email: 'test@example.com' });
+    });
+
+    it('should return session object when API returns { session: {...} } format', async () => {
+      // Legacy format support
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ session: { access_token: 'token', user_id: 'user-123' } }),
+      });
+
+      const result = await api.getSession();
+
+      expect(result).toEqual({ access_token: 'token', user_id: 'user-123' });
+    });
+
     it('should return null when session API fails', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -235,6 +262,18 @@ describe('API Client', () => {
 
     it('should return null on network error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
+
+      const result = await api.getSession();
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when API returns empty response', async () => {
+      mockStorageGet.mockResolvedValue({ session: { access_token: 'test-token' } });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
 
       const result = await api.getSession();
 

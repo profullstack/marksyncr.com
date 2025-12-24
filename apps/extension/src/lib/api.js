@@ -218,6 +218,8 @@ export async function signOut() {
 
 /**
  * Get the current session
+ * Note: The /api/auth/session endpoint returns { user: {...} } if authenticated
+ * We return a truthy value (the user object) to indicate a valid session exists
  */
 export async function getSession() {
   try {
@@ -228,7 +230,9 @@ export async function getSession() {
     }
     
     const data = await response.json();
-    return data.session;
+    // The session endpoint returns { user: {...} } if authenticated
+    // Return the user object as a truthy session indicator
+    return data.user || data.session || null;
   } catch (err) {
     console.error('Failed to get session:', err);
     return null;

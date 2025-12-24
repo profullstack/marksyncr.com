@@ -408,7 +408,7 @@ export const useStore = create(
 
           set(updates);
 
-          // Check for existing auth session
+          // Check for existing auth session (this also refreshes sources if authenticated)
           await get().checkAuth();
         } catch (err) {
           console.error('Failed to initialize store:', err);
