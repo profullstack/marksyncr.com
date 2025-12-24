@@ -25,6 +25,7 @@ import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
 import crypto from 'crypto';
 import { syncBookmarksToGitHub } from '@marksyncr/sources/oauth/github-sync';
+import { syncBookmarksToDropbox } from '@marksyncr/sources/oauth/dropbox-sync';
 
 /**
  * Handle CORS preflight requests
@@ -373,8 +374,7 @@ async function syncToExternalSources(supabase, userId, bookmarks, tombstones, ch
         if (source.provider === 'github') {
           await syncToGitHub(source, bookmarks, tombstones, checksum);
         } else if (source.provider === 'dropbox') {
-          // TODO: Implement Dropbox sync
-          console.log('[External Sync] Dropbox sync not yet implemented');
+          await syncToDropbox(source, bookmarks, tombstones, checksum);
         } else if (source.provider === 'google-drive') {
           // TODO: Implement Google Drive sync
           console.log('[External Sync] Google Drive sync not yet implemented');
@@ -429,6 +429,44 @@ async function syncToGitHub(source, bookmarks, tombstones, checksum) {
     });
   } catch (error) {
     console.error(`[GitHub Sync] Failed to sync to ${repository}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Sync bookmarks to Dropbox
+ * @param {object} source - Sync source configuration from database
+ * @param {Array} bookmarks - Bookmarks to sync
+ * @param {Array} tombstones - Tombstones for deleted bookmarks
+ * @param {string} checksum - Checksum of the bookmark data
+ */
+async function syncToDropbox(source, bookmarks, tombstones, checksum) {
+  const { access_token, file_path } = source;
+
+  if (!access_token) {
+    console.error('[Dropbox Sync] No access token found for Dropbox source');
+    return;
+  }
+
+  const dropboxPath = file_path || '/Apps/MarkSyncr/bookmarks.json';
+  console.log(`[Dropbox Sync] Syncing ${bookmarks.length} bookmarks to ${dropboxPath}`);
+
+  try {
+    const result = await syncBookmarksToDropbox(
+      access_token,
+      dropboxPath,
+      bookmarks,
+      tombstones,
+      checksum
+    );
+
+    console.log(`[Dropbox Sync] Successfully synced to ${dropboxPath}:`, {
+      updated: result.updated,
+      bookmarkCount: result.bookmarkCount,
+      rev: result.rev,
+    });
+  } catch (error) {
+    console.error(`[Dropbox Sync] Failed to sync to ${dropboxPath}:`, error);
     throw error;
   }
 }

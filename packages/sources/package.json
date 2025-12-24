@@ -17,6 +17,7 @@
     "./oauth/github-repo": "./src/oauth/github-repo.ts",
     "./oauth/github-sync": "./src/oauth/github-sync.ts",
     "./oauth/dropbox-oauth": "./src/oauth/dropbox-oauth.js",
+    "./oauth/dropbox-sync": "./src/oauth/dropbox-sync.ts",
     "./oauth/google-oauth": "./src/oauth/google-oauth.js"
   },
   "scripts": {
