@@ -43,8 +43,8 @@ export async function GET() {
     const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/connect/dropbox/callback`;
     const state = generateState();
 
-    // Build authorization URL
-    const authUrl = buildAuthorizationUrl(clientId, redirectUri, state);
+    // Build authorization URL - pass state as options object
+    const authUrl = buildAuthorizationUrl(clientId, redirectUri, { state });
 
     // Store state in cookie for verification
     const response = NextResponse.redirect(authUrl);
