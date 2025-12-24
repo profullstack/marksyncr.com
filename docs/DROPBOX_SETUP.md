@@ -10,6 +10,17 @@ The Dropbox integration follows a similar pattern to GitHub:
 3. Bookmarks are stored as a JSON file in Dropbox
 4. Updates only occur when checksum differs (avoiding unnecessary writes)
 
+## ⚠️ Important: OAuth Scopes
+
+The OAuth flow now requests these scopes automatically:
+- `files.content.read` - Read file contents (to check existing bookmarks)
+- `files.content.write` - Write file contents (to save bookmarks)
+- `account_info.read` - Read account info (for user display)
+
+**If you previously connected Dropbox and see scope errors**, you need to:
+1. Disconnect Dropbox from the dashboard
+2. Reconnect Dropbox (this will request the new scopes)
+
 ---
 
 ## Step 1: Create a Dropbox App

@@ -41,6 +41,40 @@ describe('Dropbox OAuth', () => {
       expect(parsedUrl.searchParams.get('token_access_type')).toBe('offline');
     });
 
+    it('should include default scopes for file access', () => {
+      const url = buildAuthorizationUrl(mockClientId, mockRedirectUri);
+      const parsedUrl = new URL(url);
+      const scope = parsedUrl.searchParams.get('scope');
+
+      expect(scope).not.toBeNull();
+      expect(scope).toContain('files.content.read');
+      expect(scope).toContain('files.content.write');
+      expect(scope).toContain('account_info.read');
+    });
+
+    it('should use custom scopes when provided', () => {
+      const customScopes = ['files.metadata.read', 'sharing.read'];
+      const url = buildAuthorizationUrl(mockClientId, mockRedirectUri, { scopes: customScopes });
+      const parsedUrl = new URL(url);
+      const scope = parsedUrl.searchParams.get('scope');
+
+      expect(scope).toBe('files.metadata.read sharing.read');
+      // Should NOT include default scopes when custom scopes are provided
+      expect(scope).not.toContain('files.content.write');
+    });
+
+    it('should format scopes as space-separated string', () => {
+      const url = buildAuthorizationUrl(mockClientId, mockRedirectUri);
+      const parsedUrl = new URL(url);
+      const scope = parsedUrl.searchParams.get('scope');
+
+      // Scopes should be space-separated
+      expect(scope).toMatch(/^\S+(\s\S+)*$/);
+      // Should have exactly 3 default scopes
+      const scopeArray = scope?.split(' ') ?? [];
+      expect(scopeArray).toHaveLength(3);
+    });
+
     it('should include state parameter when provided as options object', () => {
       const state = 'random_state_string_123';
       const url = buildAuthorizationUrl(mockClientId, mockRedirectUri, { state });

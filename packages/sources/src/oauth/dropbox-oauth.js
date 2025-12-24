@@ -47,20 +47,36 @@ async function generatePKCE() {
 }
 
 /**
+ * Default scopes required for MarkSyncr bookmark sync
+ * - files.content.read: Read file content (to check existing bookmarks)
+ * - files.content.write: Write file content (to save bookmarks)
+ * - account_info.read: Read account info (for user display)
+ */
+const DEFAULT_SCOPES = [
+  'files.content.read',
+  'files.content.write',
+  'account_info.read',
+];
+
+/**
  * Build Dropbox authorization URL with PKCE
  * @param {string} clientId - Dropbox App key
  * @param {string} redirectUri - Redirect URI after authorization
  * @param {object} [options] - Additional options
  * @param {string} [options.state] - State parameter for CSRF protection
  * @param {string} [options.codeChallenge] - PKCE code challenge
+ * @param {string[]} [options.scopes] - OAuth scopes to request
  * @returns {string} Authorization URL
  */
 export function buildAuthorizationUrl(clientId, redirectUri, options = {}) {
+  const scopes = options.scopes || DEFAULT_SCOPES;
+  
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     token_access_type: 'offline', // Get refresh token
+    scope: scopes.join(' '), // Space-separated scopes
   });
 
   if (options.state) {
