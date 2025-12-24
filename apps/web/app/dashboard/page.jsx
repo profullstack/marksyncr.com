@@ -370,7 +370,7 @@ function QuickActionsCard() {
       <h2 className="mb-4 text-lg font-semibold text-slate-900">Quick Actions</h2>
       <div className="space-y-3">
         <a
-          href="https://chrome.google.com/webstore"
+          href="https://chromewebstore.google.com/detail/marksyncr/hjcjjcpialiakkalcgadnfnoomdaegjg"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
