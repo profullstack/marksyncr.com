@@ -863,6 +863,17 @@ async function performSync(sourceId) {
 async function applyTombstonesToLocal(tombstones, localBookmarks) {
   let deletedCount = 0;
   
+  console.log(`[MarkSyncr] applyTombstonesToLocal: ${tombstones.length} tombstones, ${localBookmarks.length} local bookmarks`);
+  
+  // Debug: Log first few tombstones
+  if (tombstones.length > 0) {
+    console.log('[MarkSyncr] Sample tombstones:', tombstones.slice(0, 3).map(t => ({
+      url: t.url,
+      deletedAt: t.deletedAt,
+      deletedAtDate: new Date(t.deletedAt).toISOString(),
+    })));
+  }
+  
   // Create a map of tombstones by URL for quick lookup
   const tombstoneMap = new Map(tombstones.map(t => [t.url, t.deletedAt]));
   
@@ -872,18 +883,27 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
       // Check if tombstone is newer than the bookmark's dateAdded
       // If tombstone is newer, delete the bookmark
       const bookmarkTime = bookmark.dateAdded || 0;
+      
+      console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
+      console.log(`[MarkSyncr]   - Bookmark dateAdded: ${bookmarkTime} (${new Date(bookmarkTime).toISOString()})`);
+      console.log(`[MarkSyncr]   - Tombstone deletedAt: ${tombstoneTime} (${new Date(tombstoneTime).toISOString()})`);
+      console.log(`[MarkSyncr]   - Should delete: ${tombstoneTime > bookmarkTime}`);
+      
       if (tombstoneTime > bookmarkTime) {
         try {
           await browser.bookmarks.remove(bookmark.id);
           deletedCount++;
-          console.log(`[MarkSyncr] Deleted local bookmark (tombstoned): ${bookmark.url}`);
+          console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
         } catch (err) {
-          console.warn(`[MarkSyncr] Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
+          console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
         }
+      } else {
+        console.log(`[MarkSyncr] ⊘ Skipped deletion (bookmark is newer than tombstone): ${bookmark.url}`);
       }
     }
   }
   
+  console.log(`[MarkSyncr] applyTombstonesToLocal complete: deleted ${deletedCount} bookmarks`);
   return deletedCount;
 }
 
@@ -1755,3 +1775,4 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
+
