@@ -747,6 +747,11 @@ async function performSync(sourceId) {
       console.log(`[MarkSyncr] Local bookmarks: ${localFlat.length}`);
       console.log(`[MarkSyncr] Local tombstones: ${localTombstones.length}`);
       
+      // Debug: Log sample local tombstones
+      if (localTombstones.length > 0) {
+        console.log('[MarkSyncr] Sample local tombstones:', JSON.stringify(localTombstones.slice(0, 3)));
+      }
+      
       // Step 2: Get bookmarks and tombstones from cloud
       console.log('[MarkSyncr] Fetching cloud bookmarks...');
       const cloudData = await getBookmarksFromCloud();
@@ -875,19 +880,22 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
   }
   
   // Create a map of tombstones by URL for quick lookup
-  const tombstoneMap = new Map(tombstones.map(t => [t.url, t.deletedAt]));
+  // Ensure deletedAt is a number (could be string from JSON)
+  const tombstoneMap = new Map(tombstones.map(t => [t.url, Number(t.deletedAt) || 0]));
   
   for (const bookmark of localBookmarks) {
     const tombstoneTime = tombstoneMap.get(bookmark.url);
-    if (tombstoneTime) {
+    if (tombstoneTime !== undefined) {
       // Check if tombstone is newer than the bookmark's dateAdded
       // If tombstone is newer, delete the bookmark
-      const bookmarkTime = bookmark.dateAdded || 0;
+      // Ensure bookmarkTime is a number (browser API returns milliseconds)
+      const bookmarkTime = Number(bookmark.dateAdded) || 0;
       
       console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
       console.log(`[MarkSyncr]   - Bookmark dateAdded: ${bookmarkTime} (${new Date(bookmarkTime).toISOString()})`);
       console.log(`[MarkSyncr]   - Tombstone deletedAt: ${tombstoneTime} (${new Date(tombstoneTime).toISOString()})`);
       console.log(`[MarkSyncr]   - Should delete: ${tombstoneTime > bookmarkTime}`);
+      console.log(`[MarkSyncr]   - Types: bookmarkTime=${typeof bookmarkTime}, tombstoneTime=${typeof tombstoneTime}`);
       
       if (tombstoneTime > bookmarkTime) {
         try {
@@ -1081,6 +1089,12 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
         
         // Create the bookmark with index to preserve order
         // Note: When adding new bookmarks, we use the index if available
+        // IMPORTANT: We do NOT set dateAdded here because browser.bookmarks.create
+        // does not support setting dateAdded. The browser will assign the current time.
+        // This is fine because:
+        // 1. New bookmarks from cloud should have dateAdded > any existing tombstones
+        // 2. The filtering in Step 6 already ensures we only add bookmarks that are
+        //    newer than their tombstones (if any)
         const createOptions = {
           parentId: targetFolderId,
           title: bookmark.title ?? '',
@@ -1775,4 +1789,7 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
+
+
+
 

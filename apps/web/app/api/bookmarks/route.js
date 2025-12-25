@@ -137,6 +137,11 @@ export async function GET(request) {
     console.log(`[Bookmarks API GET] Raw data type: ${Array.isArray(rawBookmarks) ? 'array' : typeof rawBookmarks}`);
     console.log(`[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks, ${tombstones.length} tombstones`);
     console.log(`[Bookmarks API GET] Version: ${cloudBookmarks?.version || 0}`);
+    
+    // Debug: Log sample tombstones to verify they're being returned correctly
+    if (tombstones.length > 0) {
+      console.log(`[Bookmarks API GET] Sample tombstones:`, JSON.stringify(tombstones.slice(0, 5)));
+    }
 
     return NextResponse.json({
       bookmarks: bookmarksArray,
@@ -548,6 +553,14 @@ export async function POST(request) {
     // Merge tombstones first
     const mergedTombstones = mergeTombstones(existingTombstones, incomingTombstones);
     console.log(`[Bookmarks API] Merged tombstones: ${mergedTombstones.length}`);
+    
+    // Debug: Log sample incoming and merged tombstones
+    if (incomingTombstones.length > 0) {
+      console.log(`[Bookmarks API] Sample incoming tombstones:`, JSON.stringify(incomingTombstones.slice(0, 3)));
+    }
+    if (mergedTombstones.length > 0) {
+      console.log(`[Bookmarks API] Sample merged tombstones:`, JSON.stringify(mergedTombstones.slice(0, 3)));
+    }
 
     // Merge incoming bookmarks with existing
     const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
