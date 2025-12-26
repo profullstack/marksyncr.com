@@ -390,7 +390,7 @@ function QuickActionsCard() {
           </div>
         </a>
         <a
-          href="https://addons.mozilla.org"
+          href="https://addons.mozilla.org/en-US/firefox/addon/marksyncr/"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center rounded-lg border border-slate-200 p-3 hover:bg-slate-50"

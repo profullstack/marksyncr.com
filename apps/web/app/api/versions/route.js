@@ -27,6 +27,20 @@ const METHODS = ['GET', 'POST', 'OPTIONS'];
  * excluding dateAdded (which changes when bookmarks are synced to a new browser)
  * and other metadata fields.
  */
+/**
+ * Normalize bookmarks for checksum comparison
+ * This MUST match the normalization in:
+ * - apps/web/app/api/bookmarks/route.js
+ * - apps/extension/src/background/index.js
+ *
+ * We extract only the fields that matter for content comparison,
+ * excluding dateAdded (which changes when bookmarks are synced to a new browser)
+ * and other metadata fields.
+ *
+ * IMPORTANT: Do NOT sort by type - this would break the interleaved order
+ * of folders and bookmarks. The sorting must match the other implementations
+ * exactly to produce consistent checksums.
+ */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
   
@@ -49,14 +63,13 @@ function normalizeItemsForChecksum(items) {
       };
     }
   }).sort((a, b) => {
-    // Sort by type first (folders before bookmarks for consistent ordering)
-    if (a.type !== b.type) {
-      return a.type === 'folder' ? -1 : 1;
-    }
-    // Then by folderPath
+    // Sort by folderPath first, then by index within the folder
+    // IMPORTANT: Do NOT sort by type - this would break the interleaved order
+    // of folders and bookmarks. When a user moves a folder from position 3 to
+    // the last position, the index should be preserved, not reset based on type.
     const folderCompare = a.folderPath.localeCompare(b.folderPath);
     if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder
+    // Then by index within the folder to preserve original order
     return (a.index ?? 0) - (b.index ?? 0);
   });
 }

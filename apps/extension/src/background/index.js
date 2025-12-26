@@ -1763,6 +1763,37 @@ async function forcePull() {
       
       console.log(`[MarkSyncr] Force Pull complete: ${importedCount} bookmarks, ${foldersCreated} folders`);
       
+      // CRITICAL: After Force Pull, sync the pulled bookmarks back to cloud_bookmarks
+      // This ensures the next regular sync sees matching data and doesn't revert changes.
+      // Without this, the next sync would compare local bookmarks (from version history)
+      // with cloud_bookmarks (which might have older data), see differences, and push
+      // the "merged" result back to cloud - potentially reverting to an older version.
+      try {
+        console.log('[MarkSyncr] Force Pull: Syncing pulled bookmarks to cloud_bookmarks...');
+        const finalTree = await browser.bookmarks.getTree();
+        const finalFlat = flattenBookmarkTree(finalTree);
+        
+        // Clear tombstones since we just did a full replacement
+        const emptyTombstones = [];
+        
+        const syncResult = await syncBookmarksToCloud(finalFlat, detectBrowser(), emptyTombstones);
+        console.log('[MarkSyncr] Force Pull: cloud_bookmarks updated:', syncResult);
+        
+        // Store the new checksum so next sync knows we're in sync
+        if (syncResult.checksum) {
+          await storeLastCloudChecksum(syncResult.checksum);
+          console.log('[MarkSyncr] Force Pull: Stored cloud checksum:', syncResult.checksum);
+        }
+        
+        // Clear local tombstones since we just did a full replacement
+        await storeTombstones([]);
+        console.log('[MarkSyncr] Force Pull: Cleared local tombstones');
+      } catch (syncErr) {
+        console.error('[MarkSyncr] Force Pull: Failed to sync to cloud_bookmarks:', syncErr);
+        // Don't fail the Force Pull - the local bookmarks were updated successfully
+        // The next regular sync will eventually sync the data
+      }
+      
       return {
         success: true,
         stats,
