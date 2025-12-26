@@ -44,14 +44,13 @@ function normalizeItemsForChecksum(items) {
       };
     }
   }).sort((a, b) => {
-    // Sort by type first (folders before bookmarks for consistent ordering)
-    if (a.type !== b.type) {
-      return a.type === 'folder' ? -1 : 1;
-    }
-    // Then by folderPath
+    // Sort by folderPath first, then by index within the folder
+    // IMPORTANT: Do NOT sort by type - this would break the interleaved order
+    // of folders and bookmarks. When a user moves a folder from position 3 to
+    // the last position, the index should be preserved, not reset based on type.
     const folderCompare = a.folderPath.localeCompare(b.folderPath);
     if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder
+    // Then by index within the folder to preserve original order
     return (a.index ?? 0) - (b.index ?? 0);
   });
 }
@@ -227,7 +226,7 @@ describe('Folder Ordering', () => {
   });
 
   describe('normalizeItemsForChecksum', () => {
-    it('should normalize both bookmarks and folders', () => {
+    it('should normalize both bookmarks and folders preserving index order', () => {
       const items = [
         { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: 'Work', index: 0, dateAdded: 1000 },
         { type: 'folder', title: 'Work', folderPath: '', index: 0 },
@@ -238,10 +237,20 @@ describe('Folder Ordering', () => {
       
       expect(normalized).toHaveLength(3);
       
-      // Folders should come first (sorted by type)
-      expect(normalized[0].type).toBe('folder');
-      expect(normalized[1].type).toBe('folder');
-      expect(normalized[2].type).toBe('bookmark');
+      // Items should be sorted by folderPath first, then by index
+      // Root level (folderPath='') items come first, sorted by index
+      expect(normalized[0].folderPath).toBe('');
+      expect(normalized[0].index).toBe(0);
+      expect(normalized[0].title).toBe('Work');
+      
+      expect(normalized[1].folderPath).toBe('');
+      expect(normalized[1].index).toBe(1);
+      expect(normalized[1].title).toBe('Personal');
+      
+      // Then items in 'Work' folder
+      expect(normalized[2].folderPath).toBe('Work');
+      expect(normalized[2].index).toBe(0);
+      expect(normalized[2].title).toBe('Example');
     });
 
     it('should sort folders by folderPath then index', () => {
