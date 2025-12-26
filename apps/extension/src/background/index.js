@@ -909,12 +909,15 @@ async function performSync(sourceId) {
       }
       
       // Step 2: Get bookmarks and tombstones from cloud
-      console.log('[MarkSyncr] Fetching cloud bookmarks...');
+      console.log('[MarkSyncr] 📥 Fetching cloud bookmarks...');
       const cloudData = await getBookmarksFromCloud();
       const cloudBookmarks = cloudData.bookmarks || [];
       const cloudTombstones = cloudData.tombstones || [];
-      console.log(`[MarkSyncr] Cloud bookmarks: ${cloudBookmarks.length}`);
-      console.log(`[MarkSyncr] Cloud tombstones: ${cloudTombstones.length}`);
+      console.log(`[MarkSyncr] 📥 Cloud data received:`);
+      console.log(`  - Bookmarks: ${cloudBookmarks.length}`);
+      console.log(`  - Tombstones: ${cloudTombstones.length}`);
+      console.log(`  - Cloud checksum: ${cloudData.checksum || 'none'}`);
+      console.log(`  - Cloud version: ${cloudData.version || 'none'}`);
       
       // Step 3: Apply cloud tombstones to local bookmarks (delete locally if deleted elsewhere)
       let deletedLocally = 0;
@@ -960,7 +963,14 @@ async function performSync(sourceId) {
         
         return bookmarkDate > tombstoneDate;
       });
-      console.log(`[MarkSyncr] New bookmarks from cloud (after tombstone date check): ${newFromCloud.length}`);
+      console.log(`[MarkSyncr] 🔍 New bookmarks from cloud (after tombstone date check): ${newFromCloud.length}`);
+      if (newFromCloud.length > 0) {
+        console.log('[MarkSyncr] 🔍 Sample new bookmarks from cloud:', newFromCloud.slice(0, 3).map(b => ({
+          url: b.url,
+          title: b.title,
+          folderPath: b.folderPath,
+        })));
+      }
       
       // Step 6.5: Find local bookmarks that are not in cloud (local additions to push)
       // This is used to determine if we have local changes that need to be pushed
@@ -2011,23 +2021,40 @@ browser.runtime.onMessage.addListener((message, sender) => {
 // Alarm handler - registered synchronously for Firefox MV3 compatibility
 browser.alarms.onAlarm.addListener(async (alarm) => {
   const browserInfo = detectBrowser();
-  console.log(`[MarkSyncr] Alarm fired: ${alarm.name} at ${new Date().toISOString()} (${browserInfo})`);
+  const timestamp = new Date().toISOString();
+  console.log(`[MarkSyncr] ⏰ Alarm fired: ${alarm.name} at ${timestamp} (${browserInfo})`);
   
   if (alarm.name === SYNC_ALARM_NAME) {
-    console.log('[MarkSyncr] Auto-sync alarm triggered, starting sync...');
+    console.log('[MarkSyncr] ⏰ Auto-sync alarm triggered, starting periodic sync...');
     
     // Check if user is logged in before syncing
     const loggedIn = await isLoggedIn();
     if (!loggedIn) {
-      console.log('[MarkSyncr] Auto-sync skipped: user not logged in');
+      console.log('[MarkSyncr] ⏰ Auto-sync skipped: user not logged in');
       return;
     }
     
+    console.log('[MarkSyncr] ⏰ User is logged in, proceeding with periodic sync...');
+    
     try {
       const result = await performSync();
-      console.log('[MarkSyncr] Auto-sync completed:', result);
+      
+      // Enhanced logging for periodic sync results
+      if (result.success) {
+        if (result.skipped) {
+          console.log('[MarkSyncr] ⏰ Periodic sync: No changes detected (checksums match)');
+        } else {
+          console.log(`[MarkSyncr] ⏰ Periodic sync completed successfully:`);
+          console.log(`  - Added from cloud: ${result.addedFromCloud || 0}`);
+          console.log(`  - Deleted locally: ${result.deletedLocally || 0}`);
+          console.log(`  - Pushed to cloud: ${result.pushedToCloud || 0}`);
+          console.log(`  - Total bookmarks: ${result.stats?.total || 'unknown'}`);
+        }
+      } else {
+        console.warn('[MarkSyncr] ⏰ Periodic sync failed:', result.error);
+      }
     } catch (err) {
-      console.error('[MarkSyncr] Auto-sync failed:', err);
+      console.error('[MarkSyncr] ⏰ Periodic sync error:', err);
     }
   }
 });
