@@ -227,9 +227,13 @@ export async function GET(request) {
 }
 
 /**
- * Extract flat array of bookmarks from nested format
+ * Extract flat array of bookmarks AND folders from nested format
  * The database might have bookmarks in nested format: { roots: { toolbar: { children: [...] } } }
- * This function extracts all bookmarks into a flat array
+ * This function extracts all bookmarks AND folders into a flat array, preserving index for ordering
+ *
+ * IMPORTANT: This function must extract BOTH bookmarks and folders with their index values
+ * to preserve the interleaved order. Without folder entries, the extension cannot properly
+ * reconstruct the original order when folders are mixed with bookmarks.
  */
 function extractBookmarksFromNested(data) {
   if (!data) return [];
@@ -239,27 +243,44 @@ function extractBookmarksFromNested(data) {
   
   // If it has a 'roots' property, extract from nested format
   if (data.roots) {
-    const bookmarks = [];
+    const items = [];
     
-    function extractFromNode(node, path = '') {
+    function extractFromNode(node, path = '', nodeIndex = 0) {
       if (!node) return;
       
       // If it's a bookmark (has url)
       if (node.url) {
-        bookmarks.push({
+        items.push({
+          type: 'bookmark',
           url: node.url,
           title: node.title ?? '',
           folderPath: path,
           dateAdded: node.dateAdded ? new Date(node.dateAdded).getTime() : Date.now(),
+          index: node.index ?? nodeIndex,
         });
         return;
       }
       
-      // If it has children, recurse
+      // If it has children, it's a folder - add folder entry AND recurse
       if (node.children && Array.isArray(node.children)) {
         const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
-        for (const child of node.children) {
-          extractFromNode(child, newPath);
+        
+        // Add folder entry (only if it has a title and is not a root folder)
+        // Root folders are identified by being direct children of roots object
+        if (node.title && path) {
+          items.push({
+            type: 'folder',
+            title: node.title,
+            folderPath: path, // Parent path (where this folder lives)
+            dateAdded: node.dateAdded ? new Date(node.dateAdded).getTime() : Date.now(),
+            index: node.index ?? nodeIndex,
+          });
+        }
+        
+        // Recurse into children with their index
+        for (let i = 0; i < node.children.length; i++) {
+          const child = node.children[i];
+          extractFromNode(child, newPath, child.index ?? i);
         }
       }
     }
@@ -268,13 +289,14 @@ function extractBookmarksFromNested(data) {
     for (const [rootKey, rootNode] of Object.entries(data.roots)) {
       if (rootNode && rootNode.children) {
         const rootPath = rootNode.title || rootKey;
-        for (const child of rootNode.children) {
-          extractFromNode(child, rootPath);
+        for (let i = 0; i < rootNode.children.length; i++) {
+          const child = rootNode.children[i];
+          extractFromNode(child, rootPath, child.index ?? i);
         }
       }
     }
     
-    return bookmarks;
+    return items;
   }
   
   return [];
