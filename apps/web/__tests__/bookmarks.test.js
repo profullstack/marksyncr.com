@@ -1478,7 +1478,10 @@ describe('Tombstone Tracking for Deletion Sync', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should remove bookmarks that have tombstones newer than their dateAdded', async () => {
+    it('should NOT remove bookmarks on server - tombstones are applied by extensions only', async () => {
+      // IMPORTANT: Server should NOT apply tombstones to bookmarks.
+      // Tombstones are stored and merged, but only browser extensions apply them locally.
+      // This prevents the bug where bookmarks were being deleted automatically.
       const existingBookmarks = [
         { id: '1', url: 'https://to-delete.com', title: 'To Delete', dateAdded: 1000 },
         { id: '2', url: 'https://keep.com', title: 'Keep', dateAdded: 3000 },
@@ -1500,8 +1503,9 @@ describe('Tombstone Tracking for Deletion Sync', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // Should have 1 bookmark (keep.com) after applying tombstone
-      expect(data.merged).toBe(1);
+      // Server should keep ALL bookmarks - tombstones are NOT applied server-side
+      // Extensions will apply tombstones locally when they sync
+      expect(data.merged).toBe(2);
     });
 
     it('should NOT remove bookmarks if tombstone is older than dateAdded', async () => {
