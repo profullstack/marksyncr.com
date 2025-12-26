@@ -1730,18 +1730,23 @@ describe('Checksum-Based Skip Write Optimization', () => {
     it('should skip database write when checksum matches existing data', async () => {
       // Same bookmarks that would produce the same checksum
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
       ];
 
       // Pre-calculate the checksum that would be generated
-      // The server normalizes and sorts by URL, so we need to match that
+      // The server normalizes and sorts by folderPath + index, so we need to match that
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
-      })).sort((a, b) => a.url.localeCompare(b.url));
+        index: b.index ?? 0,
+      })).sort((a, b) => {
+        const folderCompare = a.folderPath.localeCompare(b.folderPath);
+        if (folderCompare !== 0) return folderCompare;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
       const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
@@ -1832,20 +1837,25 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should write to database when tombstones change even if bookmarks are same', async () => {
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
       ];
       const newTombstones = [
         { url: 'https://deleted.com', deletedAt: Date.now() },
       ];
 
-      // Calculate checksum for bookmarks
+      // Calculate checksum for bookmarks (including index)
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
-      })).sort((a, b) => a.url.localeCompare(b.url));
+        index: b.index ?? 0,
+      })).sort((a, b) => {
+        const folderCompare = a.folderPath.localeCompare(b.folderPath);
+        if (folderCompare !== 0) return folderCompare;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
       const bookmarkChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
@@ -1874,7 +1884,7 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should return existing checksum when skipping write', async () => {
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
       ];
 
       const crypto = await import('crypto');
@@ -1883,7 +1893,12 @@ describe('Checksum-Based Skip Write Optimization', () => {
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
-      })).sort((a, b) => a.url.localeCompare(b.url));
+        index: b.index ?? 0,
+      })).sort((a, b) => {
+        const folderCompare = a.folderPath.localeCompare(b.folderPath);
+        if (folderCompare !== 0) return folderCompare;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
       const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
@@ -1909,7 +1924,7 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should handle repeated syncs with same data without incrementing version', async () => {
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
       ];
 
       const crypto = await import('crypto');
@@ -1918,7 +1933,12 @@ describe('Checksum-Based Skip Write Optimization', () => {
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
-      })).sort((a, b) => a.url.localeCompare(b.url));
+        index: b.index ?? 0,
+      })).sort((a, b) => {
+        const folderCompare = a.folderPath.localeCompare(b.folderPath);
+        if (folderCompare !== 0) return folderCompare;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
       const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 
       // Simulate multiple syncs with same data
@@ -1949,14 +1969,15 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
   describe('Checksum Comparison Edge Cases', () => {
     it('should detect change when bookmark order differs but content is same', async () => {
-      // Bookmarks in different order should produce SAME checksum (sorted by URL)
+      // Bookmarks in different folders should produce SAME checksum regardless of input order
+      // (sorted by folderPath then index)
       const bookmarksOrder1 = [
-        { id: '1', url: 'https://a.com', title: 'A', folderPath: '', dateAdded: 1000 },
-        { id: '2', url: 'https://b.com', title: 'B', folderPath: '', dateAdded: 2000 },
+        { id: '1', url: 'https://a.com', title: 'A', folderPath: 'Folder A', dateAdded: 1000, index: 0 },
+        { id: '2', url: 'https://b.com', title: 'B', folderPath: 'Folder B', dateAdded: 2000, index: 0 },
       ];
       const bookmarksOrder2 = [
-        { id: '2', url: 'https://b.com', title: 'B', folderPath: '', dateAdded: 2000 },
-        { id: '1', url: 'https://a.com', title: 'A', folderPath: '', dateAdded: 1000 },
+        { id: '2', url: 'https://b.com', title: 'B', folderPath: 'Folder B', dateAdded: 2000, index: 0 },
+        { id: '1', url: 'https://a.com', title: 'A', folderPath: 'Folder A', dateAdded: 1000, index: 0 },
       ];
 
       const crypto = await import('crypto');
@@ -1965,7 +1986,12 @@ describe('Checksum-Based Skip Write Optimization', () => {
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
-      })).sort((a, b) => a.url.localeCompare(b.url));
+        index: b.index ?? 0,
+      })).sort((a, b) => {
+        const folderCompare = a.folderPath.localeCompare(b.folderPath);
+        if (folderCompare !== 0) return folderCompare;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
       const checksum1 = crypto.createHash('sha256').update(JSON.stringify(normalized1)).digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
@@ -1985,17 +2011,18 @@ describe('Checksum-Based Skip Write Optimization', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // Should be skipped because content is the same (just different order)
+      // Should be skipped because content is the same (just different input order)
       expect(data.skipped).toBe(true);
     });
 
     it('should detect change when extra fields differ but core fields are same', async () => {
-      // Extra fields like 'id', 'index', 'source' should be ignored in checksum
+      // Extra fields like 'id', 'source' should be ignored in checksum
+      // Note: 'index' is now part of the checksum, so it must match
       const bookmarksWithExtras = [
         { id: 'browser-123', url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5, source: 'chrome' },
       ];
       const bookmarksMinimal = [
-        { url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000 },
+        { url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5 },
       ];
 
       const crypto = await import('crypto');
@@ -2004,7 +2031,12 @@ describe('Checksum-Based Skip Write Optimization', () => {
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
-      })).sort((a, b) => a.url.localeCompare(b.url));
+        index: b.index ?? 0,
+      })).sort((a, b) => {
+        const folderCompare = a.folderPath.localeCompare(b.folderPath);
+        if (folderCompare !== 0) return folderCompare;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
       const checksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
@@ -2024,7 +2056,7 @@ describe('Checksum-Based Skip Write Optimization', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // Should be skipped because core fields are the same
+      // Should be skipped because core fields (including index) are the same
       expect(data.skipped).toBe(true);
     });
   });

@@ -9,6 +9,11 @@ import crypto from 'crypto';
 /**
  * Normalize bookmarks for checksum comparison
  * This is a copy of the server-side function for testing
+ *
+ * IMPORTANT: We include index to detect order changes within folders.
+ * We sort by folderPath + index to ensure consistent ordering that
+ * reflects the actual bookmark order in the browser.
+ *
  * @param {Array} bookmarks - Array of bookmarks to normalize
  * @returns {Array} - Normalized bookmarks with only comparable fields
  */
@@ -19,7 +24,15 @@ function normalizeBookmarksForChecksum(bookmarks) {
     title: b.title ?? '',
     folderPath: b.folderPath || b.folder_path || '',
     dateAdded: b.dateAdded || 0,
-  })).sort((a, b) => a.url.localeCompare(b.url));
+    // Include index to detect order changes within folders
+    index: b.index ?? 0,
+  })).sort((a, b) => {
+    // Sort by folderPath first, then by index within the folder
+    // This preserves the actual bookmark order
+    const folderCompare = a.folderPath.localeCompare(b.folderPath);
+    if (folderCompare !== 0) return folderCompare;
+    return (a.index ?? 0) - (b.index ?? 0);
+  });
 }
 
 /**
@@ -33,7 +46,7 @@ function generateChecksum(data) {
 
 describe('Checksum Normalization', () => {
   describe('normalizeBookmarksForChecksum', () => {
-    it('should extract only comparable fields', () => {
+    it('should extract only comparable fields including index', () => {
       const bookmarks = [
         {
           id: 'browser-id-123',
@@ -55,25 +68,28 @@ describe('Checksum Normalization', () => {
         title: 'Example',
         folderPath: 'Bookmarks Bar',
         dateAdded: 1700000000000,
+        index: 5, // index is now included for order detection
       });
       expect(normalized[0]).not.toHaveProperty('id');
-      expect(normalized[0]).not.toHaveProperty('index');
       expect(normalized[0]).not.toHaveProperty('source');
       expect(normalized[0]).not.toHaveProperty('extraField');
     });
 
-    it('should sort bookmarks by URL for consistent ordering', () => {
+    it('should sort bookmarks by folderPath then index for consistent ordering', () => {
       const bookmarks = [
-        { url: 'https://zebra.com', title: 'Zebra', dateAdded: 1 },
-        { url: 'https://apple.com', title: 'Apple', dateAdded: 2 },
-        { url: 'https://mango.com', title: 'Mango', dateAdded: 3 },
+        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder A', dateAdded: 1, index: 2 },
+        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 2, index: 0 },
+        { url: 'https://mango.com', title: 'Mango', folderPath: 'Folder A', dateAdded: 3, index: 1 },
+        { url: 'https://banana.com', title: 'Banana', folderPath: 'Folder B', dateAdded: 4, index: 0 },
       ];
 
       const normalized = normalizeBookmarksForChecksum(bookmarks);
 
-      expect(normalized[0].url).toBe('https://apple.com');
-      expect(normalized[1].url).toBe('https://mango.com');
-      expect(normalized[2].url).toBe('https://zebra.com');
+      // Should be sorted by folderPath first, then by index within folder
+      expect(normalized[0].url).toBe('https://apple.com'); // Folder A, index 0
+      expect(normalized[1].url).toBe('https://mango.com'); // Folder A, index 1
+      expect(normalized[2].url).toBe('https://zebra.com'); // Folder A, index 2
+      expect(normalized[3].url).toBe('https://banana.com'); // Folder B, index 0
     });
 
     it('should handle empty title with empty string', () => {
@@ -92,16 +108,17 @@ describe('Checksum Normalization', () => {
 
     it('should handle both folderPath and folder_path', () => {
       const bookmarks = [
-        { url: 'https://a.com', folderPath: 'Path A', dateAdded: 1 },
-        { url: 'https://b.com', folder_path: 'Path B', dateAdded: 2 },
-        { url: 'https://c.com', dateAdded: 3 },
+        { url: 'https://a.com', folderPath: 'Path A', dateAdded: 1, index: 0 },
+        { url: 'https://b.com', folder_path: 'Path B', dateAdded: 2, index: 0 },
+        { url: 'https://c.com', dateAdded: 3, index: 0 },
       ];
 
       const normalized = normalizeBookmarksForChecksum(bookmarks);
 
-      expect(normalized[0].folderPath).toBe('Path A');
-      expect(normalized[1].folderPath).toBe('Path B');
-      expect(normalized[2].folderPath).toBe('');
+      // Sorted by folderPath then index: '' < 'Path A' < 'Path B'
+      expect(normalized[0].folderPath).toBe(''); // Empty string sorts first
+      expect(normalized[1].folderPath).toBe('Path A');
+      expect(normalized[2].folderPath).toBe('Path B');
     });
 
     it('should handle missing dateAdded with 0', () => {
@@ -138,15 +155,17 @@ describe('Checksum Normalization', () => {
       expect(checksum1).toBe(checksum2);
     });
 
-    it('should generate same checksum regardless of bookmark order', () => {
+    it('should generate same checksum regardless of input array order when same folder and index', () => {
+      // Bookmarks in different folders with same index should produce same checksum
+      // regardless of input array order (sorted by folderPath then index)
       const bookmarks1 = [
-        { url: 'https://zebra.com', title: 'Zebra', dateAdded: 1 },
-        { url: 'https://apple.com', title: 'Apple', dateAdded: 2 },
+        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder B', dateAdded: 1, index: 0 },
+        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 2, index: 0 },
       ];
 
       const bookmarks2 = [
-        { url: 'https://apple.com', title: 'Apple', dateAdded: 2 },
-        { url: 'https://zebra.com', title: 'Zebra', dateAdded: 1 },
+        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 2, index: 0 },
+        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder B', dateAdded: 1, index: 0 },
       ];
 
       const checksum1 = generateChecksum(bookmarks1);
@@ -155,7 +174,26 @@ describe('Checksum Normalization', () => {
       expect(checksum1).toBe(checksum2);
     });
 
-    it('should generate same checksum regardless of extra fields', () => {
+    it('should generate different checksum when bookmark order changes within folder', () => {
+      // Same bookmarks but different order within the same folder
+      const bookmarks1 = [
+        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 1, index: 0 },
+        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder A', dateAdded: 2, index: 1 },
+      ];
+
+      const bookmarks2 = [
+        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder A', dateAdded: 2, index: 0 },
+        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 1, index: 1 },
+      ];
+
+      const checksum1 = generateChecksum(bookmarks1);
+      const checksum2 = generateChecksum(bookmarks2);
+
+      // Checksums should be different because the order (index) changed
+      expect(checksum1).not.toBe(checksum2);
+    });
+
+    it('should generate same checksum regardless of extra fields (excluding index)', () => {
       const bookmarksWithExtras = [
         {
           id: 'browser-123',
@@ -174,6 +212,7 @@ describe('Checksum Normalization', () => {
           title: 'Example',
           folderPath: 'Bar',
           dateAdded: 1700000000000,
+          index: 5, // index must match since it's now part of checksum
         },
       ];
 
@@ -280,17 +319,18 @@ describe('Checksum Normalization', () => {
           title: 'Test Site',
           folderPath: 'Bookmarks Bar',
           dateAdded: 1700000001000,
-          index: 1,
+          index: 0, // Different folder, so index 0 is valid
         },
       ];
 
-      // Server style (normalized, with folder_path variant)
+      // Server style (normalized, with folder_path variant and index)
       const serverBookmarks = [
         {
           url: 'https://example.com',
           title: 'Example Site',
           folder_path: 'Bookmarks Bar/Work',
           dateAdded: 1700000000000,
+          index: 0, // index must match for checksum compatibility
           source: 'chrome',
         },
         {
@@ -298,6 +338,7 @@ describe('Checksum Normalization', () => {
           title: 'Test Site',
           folder_path: 'Bookmarks Bar',
           dateAdded: 1700000001000,
+          index: 0, // index must match for checksum compatibility
           source: 'chrome',
         },
       ];
@@ -306,6 +347,50 @@ describe('Checksum Normalization', () => {
       const serverChecksum = generateChecksum(serverBookmarks);
 
       expect(browserChecksum).toBe(serverChecksum);
+    });
+
+    it('should generate different checksum when index changes (order detection)', () => {
+      // Browser bookmarks with original order
+      const originalOrder = [
+        {
+          url: 'https://example.com',
+          title: 'Example Site',
+          folderPath: 'Bookmarks Bar',
+          dateAdded: 1700000000000,
+          index: 0,
+        },
+        {
+          url: 'https://test.com',
+          title: 'Test Site',
+          folderPath: 'Bookmarks Bar',
+          dateAdded: 1700000001000,
+          index: 1,
+        },
+      ];
+
+      // Same bookmarks but reordered (swapped positions)
+      const reorderedBookmarks = [
+        {
+          url: 'https://test.com',
+          title: 'Test Site',
+          folderPath: 'Bookmarks Bar',
+          dateAdded: 1700000001000,
+          index: 0, // Now first
+        },
+        {
+          url: 'https://example.com',
+          title: 'Example Site',
+          folderPath: 'Bookmarks Bar',
+          dateAdded: 1700000000000,
+          index: 1, // Now second
+        },
+      ];
+
+      const originalChecksum = generateChecksum(originalOrder);
+      const reorderedChecksum = generateChecksum(reorderedBookmarks);
+
+      // Checksums should be different because order changed
+      expect(originalChecksum).not.toBe(reorderedChecksum);
     });
 
     it('should handle mixed folderPath and folder_path in same array', () => {

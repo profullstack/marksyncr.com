@@ -41,6 +41,11 @@ export async function OPTIONS(request) {
  * Normalize bookmarks for checksum comparison
  * Extracts only the fields that matter for content comparison,
  * matching the extension-side normalization
+ *
+ * IMPORTANT: We include index to detect order changes within folders.
+ * We sort by folderPath + index to ensure consistent ordering that
+ * reflects the actual bookmark order in the browser.
+ *
  * @param {Array} bookmarks - Array of bookmarks to normalize
  * @returns {Array} - Normalized bookmarks with only comparable fields
  */
@@ -51,7 +56,15 @@ function normalizeBookmarksForChecksum(bookmarks) {
     title: b.title ?? '',
     folderPath: b.folderPath || b.folder_path || '',
     dateAdded: b.dateAdded || 0,
-  })).sort((a, b) => a.url.localeCompare(b.url)); // Sort by URL for consistent ordering
+    // Include index to detect order changes within folders
+    index: b.index ?? 0,
+  })).sort((a, b) => {
+    // Sort by folderPath first, then by index within the folder
+    // This preserves the actual bookmark order
+    const folderCompare = a.folderPath.localeCompare(b.folderPath);
+    if (folderCompare !== 0) return folderCompare;
+    return (a.index ?? 0) - (b.index ?? 0);
+  });
 }
 
 /**
