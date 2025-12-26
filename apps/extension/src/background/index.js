@@ -1606,6 +1606,13 @@ async function forcePush() {
 
 /**
  * Force Pull - Overwrite local bookmarks with cloud data
+ *
+ * IMPORTANT: This function now gets data from cloud_bookmarks (via /api/bookmarks)
+ * instead of from version history (bookmark_versions). This ensures Force Pull
+ * always gets the LATEST data, not potentially stale version history data.
+ *
+ * The version history is for rollback purposes, not for Force Pull.
+ *
  * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
  */
 async function forcePull() {
@@ -1622,19 +1629,23 @@ async function forcePull() {
       };
     }
     
-    // Get latest version from cloud
-    const versionData = await getLatestVersionFromCloud();
-    if (!versionData || !versionData.version?.bookmarkData) {
+    // Get bookmarks from cloud_bookmarks (the authoritative source)
+    // NOT from version history, which might have older data
+    console.log('[MarkSyncr] Force Pull: Fetching bookmarks from cloud_bookmarks...');
+    const cloudData = await getBookmarksFromCloud();
+    
+    if (!cloudData || !cloudData.bookmarks || cloudData.bookmarks.length === 0) {
       return {
         success: false,
         error: 'No bookmark data found in cloud. Please sync first.',
       };
     }
     
-    const cloudBookmarks = versionData.version.bookmarkData;
+    const cloudBookmarksFlat = cloudData.bookmarks;
     const browserType = detectBrowser();
     console.log(`[MarkSyncr] Force Pull: browser=${browserType}`);
-    console.log('[MarkSyncr] Retrieved cloud bookmarks:', cloudBookmarks);
+    console.log(`[MarkSyncr] Force Pull: Retrieved ${cloudBookmarksFlat.length} bookmarks from cloud_bookmarks`);
+    console.log(`[MarkSyncr] Force Pull: Cloud checksum: ${cloudData.checksum}`);
     
     // Get current browser bookmarks to find root folders
     const currentTree = await browser.bookmarks.getTree();
@@ -1691,68 +1702,25 @@ async function forcePull() {
         }
       }
       
-      // Recreate bookmarks from cloud data
-      // Handle the case where cloud has "menu" but browser doesn't (e.g., Opera importing from Firefox)
+      // Recreate bookmarks from cloud data (flat format from cloud_bookmarks)
+      // The flat format has items with folderPath like "Bookmarks Bar/Subfolder"
+      // We need to recreate the folder structure and place bookmarks correctly
       let importedCount = 0;
       let foldersCreated = 0;
       
-      // Define the mapping from cloud roots to local roots
-      // If a cloud root doesn't have a matching local root, fall back to 'other'
-      const cloudRoots = cloudBookmarks.roots || {};
-      const rootMapping = {
-        toolbar: rootFolders.toolbar || rootFolders.other,
-        menu: rootFolders.menu || rootFolders.other, // Fall back to 'other' if no menu (Opera, Chrome)
-        other: rootFolders.other || rootFolders.toolbar,
-      };
+      console.log(`[MarkSyncr] Force Pull: Recreating ${cloudBookmarksFlat.length} items from flat format`);
       
-      console.log('[MarkSyncr] Force Pull: Root mapping:', {
-        toolbar: rootMapping.toolbar?.title || 'none',
-        menu: rootMapping.menu?.title || 'none',
-        other: rootMapping.other?.title || 'none',
-      });
+      // Use the same addCloudBookmarksToLocal function that regular sync uses
+      // This handles folder creation and bookmark placement correctly
+      await addCloudBookmarksToLocal(cloudBookmarksFlat);
       
-      // Track which cloud roots we've processed to avoid duplicates
-      const processedCloudRoots = new Set();
+      // Count what was created
+      const finalTree = await browser.bookmarks.getTree();
+      const finalStats = countBookmarks(finalTree);
+      importedCount = finalStats.total;
+      foldersCreated = finalStats.folders;
       
-      for (const [cloudRootKey, cloudRoot] of Object.entries(cloudRoots)) {
-        if (!cloudRoot?.children || cloudRoot.children.length === 0) {
-          console.log(`[MarkSyncr] Force Pull: Skipping empty cloud root: ${cloudRootKey}`);
-          continue;
-        }
-        
-        const targetFolder = rootMapping[cloudRootKey];
-        if (!targetFolder) {
-          console.warn(`[MarkSyncr] Force Pull: No target folder for cloud root: ${cloudRootKey}`);
-          continue;
-        }
-        
-        // If this target folder was already used for a different cloud root,
-        // we need to append to it rather than replace
-        const isSharedTarget = processedCloudRoots.has(targetFolder.id);
-        
-        console.log(`[MarkSyncr] Force Pull: Importing ${cloudRoot.children.length} items from cloud.${cloudRootKey} to ${targetFolder.title} (shared=${isSharedTarget})`);
-        
-        // Get current index to append after existing items if this is a shared target
-        let startIndex = 0;
-        if (isSharedTarget) {
-          try {
-            const existingChildren = await browser.bookmarks.getChildren(targetFolder.id);
-            startIndex = existingChildren.length;
-            console.log(`[MarkSyncr] Force Pull: Appending at index ${startIndex} (shared target)`);
-          } catch (err) {
-            console.warn('[MarkSyncr] Failed to get existing children count:', err);
-          }
-        }
-        
-        // Recreate from cloud data
-        const result = await recreateBookmarks(targetFolder.id, cloudRoot.children, startIndex);
-        importedCount += result.bookmarks;
-        foldersCreated += result.folders;
-        
-        processedCloudRoots.add(targetFolder.id);
-        
-        console.log(`[MarkSyncr] Force Pull: Imported ${result.bookmarks} bookmarks, ${result.folders} folders from ${cloudRootKey}`);
-      }
+      console.log(`[MarkSyncr] Force Pull: Created ${importedCount} bookmarks, ${foldersCreated} folders`);
       
       // Update last sync time
       await browser.storage.local.set({
