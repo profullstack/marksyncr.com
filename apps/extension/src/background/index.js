@@ -789,8 +789,12 @@ function flattenBookmarkTree(tree) {
         // It's a folder - add folder metadata
         const folderPath = node.title ? (parentPath ? `${parentPath}/${node.title}` : node.title) : parentPath;
         
-        // Only add folder entry if it has a title (skip root nodes without titles)
-        if (node.title) {
+        // Only add folder entry if:
+        // 1. It has a title (skip root nodes without titles)
+        // 2. It's NOT a root-level folder (parentPath is not empty)
+        // Root folders like "Bookmarks Bar", "Other Bookmarks" already exist in the browser
+        // and shouldn't be recreated during sync
+        if (node.title && parentPath) {
           items.push({
             type: 'folder',
             id: node.id,

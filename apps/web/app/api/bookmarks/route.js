@@ -569,12 +569,15 @@ export async function POST(request) {
 
     // Normalize bookmarks structure
     // Preserve empty titles - don't replace with URL
+    // IMPORTANT: Preserve type and index fields for proper checksum comparison
     const normalizedBookmarks = bookmarks.map(bookmark => ({
       id: bookmark.id,
+      type: bookmark.type || 'bookmark', // Preserve type (bookmark or folder)
       url: bookmark.url,
       title: bookmark.title ?? '',
       folderPath: bookmark.folderPath || bookmark.folder_path || '',
       dateAdded: bookmark.dateAdded || Date.now(),
+      index: bookmark.index ?? 0, // Preserve index for ordering
       source,
     }));
 
