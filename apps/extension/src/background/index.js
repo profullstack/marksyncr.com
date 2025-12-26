@@ -935,8 +935,13 @@ async function performSync(sourceId) {
       // Step 6: Find bookmarks in cloud that are not in local (and not tombstoned)
       // Important: Only filter out bookmarks where the tombstone is NEWER than the bookmark
       // This allows re-added bookmarks (from other browsers) to sync correctly
-      const localUrls = new Set(updatedLocalFlat.map(b => b.url));
+      const localUrls = new Set(updatedLocalFlat.filter(b => b.url).map(b => b.url));
       const newFromCloud = cloudBookmarks.filter(cb => {
+        // Skip folders (they don't have URLs)
+        if (!cb.url) {
+          return false;
+        }
+        
         // Skip if bookmark already exists locally
         if (localUrls.has(cb.url)) {
           return false;
@@ -956,6 +961,19 @@ async function performSync(sourceId) {
         return bookmarkDate > tombstoneDate;
       });
       console.log(`[MarkSyncr] New bookmarks from cloud (after tombstone date check): ${newFromCloud.length}`);
+      
+      // Step 6.5: Find local bookmarks that are not in cloud (local additions to push)
+      // This is used to determine if we have local changes that need to be pushed
+      const cloudUrls = new Set(cloudBookmarks.filter(b => b.url).map(b => b.url));
+      const localAdditions = updatedLocalFlat.filter(lb => {
+        // Skip folders (they don't have URLs)
+        if (!lb.url) {
+          return false;
+        }
+        // Check if this local bookmark exists in cloud
+        return !cloudUrls.has(lb.url);
+      });
+      console.log(`[MarkSyncr] Local additions (not in cloud): ${localAdditions.length}`);
       
       // Step 7: Add new cloud bookmarks to local browser
       if (newFromCloud.length > 0) {
@@ -977,10 +995,19 @@ async function performSync(sourceId) {
       console.log(`[MarkSyncr] Local checksum: ${localChecksum}`);
       console.log(`[MarkSyncr] Cloud checksum: ${cloudChecksum}`);
       
+      // Determine if we have local changes to push to cloud
+      // Local changes = bookmarks that exist locally but not in cloud (before this sync)
+      // OR tombstones that need to be synced
+      const hasLocalChangesToPush = localAdditions.length > 0 ||
+                                     localTombstones.length > cloudTombstones.length ||
+                                     deletedLocally > 0;
+      
       // Check if there were any changes during this sync
       const hasChanges = newFromCloud.length > 0 ||
                          deletedLocally > 0 ||
                          localChecksum !== cloudChecksum;
+      
+      console.log(`[MarkSyncr] Has changes: ${hasChanges}, Has local changes to push: ${hasLocalChangesToPush}`);
       
       if (!hasChanges) {
         console.log('[MarkSyncr] No changes detected - checksums match and no new bookmarks');
@@ -998,6 +1025,7 @@ async function performSync(sourceId) {
           stats,
           addedFromCloud: 0,
           deletedLocally: 0,
+          pushedToCloud: 0,
           skipped: true,
           message: 'No new updates',
         };
@@ -1013,20 +1041,27 @@ async function performSync(sourceId) {
         await storeLastCloudChecksum(syncResult.checksum);
       }
 
-      // Step 10: Save version history (only when there are actual changes)
-      console.log('[MarkSyncr] Saving version history...');
-      const versionResult = await saveVersionToCloud(
-        mergedData,
-        detectBrowser(),
-        `${detectBrowser()}-extension`,
-        {
-          type: 'two_way_sync',
-          addedFromCloud: newFromCloud.length,
-          deletedLocally,
-          tombstones: mergedTombstones.length,
-        }
-      );
-      console.log('[MarkSyncr] Version saved:', versionResult);
+      // Step 10: Save version history ONLY when we have local changes being pushed to cloud
+      // This prevents version history from being cluttered with "pull-only" syncs
+      // Version history should only record when THIS browser pushes changes to cloud/3rd-party storage
+      if (hasLocalChangesToPush) {
+        console.log('[MarkSyncr] Saving version history (local changes pushed to cloud)...');
+        const versionResult = await saveVersionToCloud(
+          mergedData,
+          detectBrowser(),
+          `${detectBrowser()}-extension`,
+          {
+            type: 'two_way_sync',
+            addedFromCloud: newFromCloud.length,
+            deletedLocally,
+            pushedToCloud: localAdditions.length,
+            tombstones: mergedTombstones.length,
+          }
+        );
+        console.log('[MarkSyncr] Version saved:', versionResult);
+      } else {
+        console.log('[MarkSyncr] Skipping version history (only pulled from cloud, no local changes pushed)');
+      }
       
       // Step 11: Cleanup old tombstones (older than 30 days)
       await cleanupOldTombstones();
@@ -1043,6 +1078,7 @@ async function performSync(sourceId) {
         stats,
         addedFromCloud: newFromCloud.length,
         deletedLocally,
+        pushedToCloud: localAdditions.length,
       };
     } catch (cloudErr) {
       console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
