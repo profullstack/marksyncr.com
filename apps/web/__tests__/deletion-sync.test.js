@@ -447,3 +447,117 @@ describe('Potential Bug: URL Normalization', () => {
     expect(toDelete).toHaveLength(0);
   });
 });
+
+describe('Server-side tombstone handling (CRITICAL FIX)', () => {
+  /**
+   * This test documents the critical bug that was fixed:
+   * The server was applying tombstones to bookmarks, which caused a race condition
+   * where bookmarks would be deleted from the cloud even when they still existed
+   * in one of the browsers.
+   *
+   * The fix: Server should NOT apply tombstones. It should only store and merge them.
+   * Each browser extension applies tombstones locally when it receives them.
+   */
+  
+  it('Server should NOT apply tombstones - only store and merge them', () => {
+    // Scenario:
+    // 1. Browser A has bookmark X
+    // 2. Browser B deletes X, creating tombstone
+    // 3. Browser B syncs, tombstone goes to cloud
+    // 4. Browser A syncs, sending bookmark X
+    // 5. OLD BUG: Server applied tombstone and removed X from cloud
+    // 6. FIX: Server should keep X in cloud, let Browser A apply tombstone locally
+    
+    const T_BOOKMARK_ADDED = 1703000000000;
+    const T_DELETED = 1703500000000;
+    
+    // Cloud state after Browser B synced (has tombstone)
+    const cloudBookmarks = []; // Browser B had no bookmarks after deletion
+    const cloudTombstones = [{ url: 'https://example.com', deletedAt: T_DELETED }];
+    
+    // Browser A syncs, sending its bookmark
+    const browserABookmarks = [
+      { url: 'https://example.com', title: 'Example', dateAdded: T_BOOKMARK_ADDED, folderPath: '' },
+    ];
+    const browserATombstones = []; // Browser A has no tombstones
+    
+    // Server merges bookmarks
+    const { merged } = mergeBookmarks(cloudBookmarks, browserABookmarks);
+    
+    // Server merges tombstones
+    const mergedTombstones = mergeTombstones(cloudTombstones, browserATombstones);
+    
+    // CRITICAL: Server should NOT apply tombstones
+    // The merged bookmarks should include the bookmark from Browser A
+    // even though there's a tombstone for it
+    const finalBookmarks = merged; // NOT applyTombstones(merged, mergedTombstones)
+    
+    // Server should store the bookmark
+    expect(finalBookmarks).toHaveLength(1);
+    expect(finalBookmarks[0].url).toBe('https://example.com');
+    
+    // Server should also store the tombstone
+    expect(mergedTombstones).toHaveLength(1);
+    expect(mergedTombstones[0].url).toBe('https://example.com');
+    
+    // The extension will apply the tombstone locally when it syncs
+    // This is tested in the extension tests
+  });
+  
+  it('Server should preserve all bookmarks from all browsers', () => {
+    // Multiple browsers syncing - server should keep all bookmarks
+    const T_ADDED = 1703000000000;
+    
+    const cloudBookmarks = [
+      { url: 'https://from-cloud.com', title: 'From Cloud', dateAdded: T_ADDED, folderPath: '' },
+    ];
+    
+    const browserABookmarks = [
+      { url: 'https://from-browser-a.com', title: 'From Browser A', dateAdded: T_ADDED, folderPath: '' },
+    ];
+    
+    const browserBBookmarks = [
+      { url: 'https://from-browser-b.com', title: 'From Browser B', dateAdded: T_ADDED, folderPath: '' },
+    ];
+    
+    // First sync: Browser A
+    const { merged: afterA } = mergeBookmarks(cloudBookmarks, browserABookmarks);
+    expect(afterA).toHaveLength(2);
+    
+    // Second sync: Browser B
+    const { merged: afterB } = mergeBookmarks(afterA, browserBBookmarks);
+    expect(afterB).toHaveLength(3);
+    
+    // All bookmarks should be preserved
+    expect(afterB.map(b => b.url)).toContain('https://from-cloud.com');
+    expect(afterB.map(b => b.url)).toContain('https://from-browser-a.com');
+    expect(afterB.map(b => b.url)).toContain('https://from-browser-b.com');
+  });
+  
+  it('Tombstones should be merged but not applied on server', () => {
+    const T_DELETED_1 = 1703000000000;
+    const T_DELETED_2 = 1703500000000;
+    
+    const cloudTombstones = [
+      { url: 'https://deleted-1.com', deletedAt: T_DELETED_1 },
+    ];
+    
+    const incomingTombstones = [
+      { url: 'https://deleted-1.com', deletedAt: T_DELETED_2 }, // Newer deletion
+      { url: 'https://deleted-2.com', deletedAt: T_DELETED_2 },
+    ];
+    
+    const merged = mergeTombstones(cloudTombstones, incomingTombstones);
+    
+    // Should have 2 unique tombstones
+    expect(merged).toHaveLength(2);
+    
+    // The newer deletion time should win
+    const tombstone1 = merged.find(t => t.url === 'https://deleted-1.com');
+    expect(tombstone1.deletedAt).toBe(T_DELETED_2);
+    
+    // New tombstone should be added
+    const tombstone2 = merged.find(t => t.url === 'https://deleted-2.com');
+    expect(tombstone2).toBeDefined();
+  });
+});

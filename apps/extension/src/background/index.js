@@ -18,6 +18,9 @@ const TOMBSTONES_STORAGE_KEY = 'marksyncr-tombstones';
 // Flag to disable tombstone creation during Force Pull operations
 let isForcePullInProgress = false;
 
+// Flag to prevent sync loops - when true, bookmark changes won't trigger new syncs
+let isSyncInProgress = false;
+
 /**
  * Get API base URL - uses VITE_APP_URL from build config or falls back to production URL
  */
@@ -561,6 +564,12 @@ function setupBookmarkListeners() {
   browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
     console.log('[MarkSyncr] Bookmark created:', bookmark.title);
     
+    // Skip processing during sync operations to prevent sync loops
+    if (isSyncInProgress || isForcePullInProgress) {
+      console.log('[MarkSyncr] Skipping bookmark created handler (sync in progress)');
+      return;
+    }
+    
     // If a bookmark is re-added, remove its tombstone
     if (bookmark.url) {
       await removeTombstone(bookmark.url);
@@ -573,12 +582,12 @@ function setupBookmarkListeners() {
   browser.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
     console.log('[MarkSyncr] Bookmark removed:', id, removeInfo);
     
-    // Skip tombstone creation during Force Pull operations
+    // Skip tombstone creation during sync operations to prevent sync loops
     // Force Pull clears all bookmarks before recreating from cloud,
     // so we don't want to create tombstones for those deletions
-    if (isForcePullInProgress) {
-      console.log('[MarkSyncr] Skipping tombstone (Force Pull in progress)');
-      return; // Don't schedule sync either during Force Pull
+    if (isSyncInProgress || isForcePullInProgress) {
+      console.log('[MarkSyncr] Skipping tombstone (sync in progress)');
+      return; // Don't schedule sync either during sync operations
     }
     
     // Get the URL of the removed bookmark from removeInfo.node
@@ -597,12 +606,26 @@ function setupBookmarkListeners() {
   // Listen for bookmark changes
   browser.bookmarks.onChanged.addListener((id, changeInfo) => {
     console.log('[MarkSyncr] Bookmark changed:', id);
+    
+    // Skip during sync operations to prevent sync loops
+    if (isSyncInProgress || isForcePullInProgress) {
+      console.log('[MarkSyncr] Skipping bookmark changed handler (sync in progress)');
+      return;
+    }
+    
     scheduleSync('bookmark-changed');
   });
 
   // Listen for bookmark moves
   browser.bookmarks.onMoved.addListener((id, moveInfo) => {
     console.log('[MarkSyncr] Bookmark moved:', id);
+    
+    // Skip during sync operations to prevent sync loops
+    if (isSyncInProgress || isForcePullInProgress) {
+      console.log('[MarkSyncr] Skipping bookmark moved handler (sync in progress)');
+      return;
+    }
+    
     scheduleSync('bookmark-moved');
   });
 }
@@ -682,6 +705,15 @@ function flattenBookmarkTree(tree) {
  */
 async function performSync(sourceId) {
   console.log('[MarkSyncr] performSync called with sourceId:', sourceId);
+  
+  // Prevent concurrent syncs and sync loops
+  if (isSyncInProgress) {
+    console.log('[MarkSyncr] Sync already in progress, skipping');
+    return { success: false, error: 'Sync already in progress' };
+  }
+  
+  isSyncInProgress = true;
+  console.log('[MarkSyncr] Sync started, setting isSyncInProgress=true');
   
   try {
     const storageData = await browser.storage.local.get([
@@ -856,11 +888,26 @@ async function performSync(sourceId) {
   } catch (err) {
     console.error('[MarkSyncr] Sync failed:', err);
     return { success: false, error: err.message };
+  } finally {
+    // Always reset the sync flag, even if an error occurred
+    isSyncInProgress = false;
+    console.log('[MarkSyncr] Sync completed, setting isSyncInProgress=false');
   }
 }
 
 /**
  * Apply tombstones from cloud to local bookmarks (delete bookmarks that were deleted elsewhere)
+ *
+ * IMPORTANT: We do NOT compare dateAdded vs deletedAt here because:
+ * 1. When bookmarks are synced from cloud to local, browser.bookmarks.create()
+ *    assigns the CURRENT time as dateAdded (we can't set it)
+ * 2. This means locally-synced bookmarks always have dateAdded > tombstone.deletedAt
+ * 3. So we would never delete them, breaking cross-browser deletion sync
+ *
+ * Instead, we simply delete any local bookmark that has a matching tombstone.
+ * The date comparison is only used when deciding whether to ADD bookmarks from cloud
+ * (in Step 6 of performSync), where we skip adding if tombstone is newer.
+ *
  * @param {Array<{url: string, deletedAt: number}>} tombstones - Tombstones from cloud
  * @param {Array} localBookmarks - Current local bookmarks
  * @returns {Promise<number>} - Number of bookmarks deleted
@@ -872,41 +919,43 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
   
   // Debug: Log first few tombstones
   if (tombstones.length > 0) {
-    console.log('[MarkSyncr] Sample tombstones:', tombstones.slice(0, 3).map(t => ({
+    console.log('[MarkSyncr] Sample tombstones:', tombstones.slice(0, 5).map(t => ({
       url: t.url,
       deletedAt: t.deletedAt,
       deletedAtDate: new Date(t.deletedAt).toISOString(),
     })));
   }
   
-  // Create a map of tombstones by URL for quick lookup
-  // Ensure deletedAt is a number (could be string from JSON)
-  const tombstoneMap = new Map(tombstones.map(t => [t.url, Number(t.deletedAt) || 0]));
+  // Debug: Log first few local bookmarks
+  if (localBookmarks.length > 0) {
+    console.log('[MarkSyncr] Sample local bookmarks:', localBookmarks.slice(0, 5).map(b => ({
+      url: b.url,
+      title: b.title,
+    })));
+  }
+  
+  // Create a set of tombstoned URLs for quick lookup
+  const tombstonedUrls = new Set(tombstones.map(t => t.url));
+  
+  // Debug: Check for any matches
+  let matchCount = 0;
+  for (const bookmark of localBookmarks) {
+    if (tombstonedUrls.has(bookmark.url)) {
+      matchCount++;
+    }
+  }
+  console.log(`[MarkSyncr] Found ${matchCount} local bookmarks that match tombstones`);
   
   for (const bookmark of localBookmarks) {
-    const tombstoneTime = tombstoneMap.get(bookmark.url);
-    if (tombstoneTime !== undefined) {
-      // Check if tombstone is newer than the bookmark's dateAdded
-      // If tombstone is newer, delete the bookmark
-      // Ensure bookmarkTime is a number (browser API returns milliseconds)
-      const bookmarkTime = Number(bookmark.dateAdded) || 0;
-      
+    if (tombstonedUrls.has(bookmark.url)) {
       console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
-      console.log(`[MarkSyncr]   - Bookmark dateAdded: ${bookmarkTime} (${new Date(bookmarkTime).toISOString()})`);
-      console.log(`[MarkSyncr]   - Tombstone deletedAt: ${tombstoneTime} (${new Date(tombstoneTime).toISOString()})`);
-      console.log(`[MarkSyncr]   - Should delete: ${tombstoneTime > bookmarkTime}`);
-      console.log(`[MarkSyncr]   - Types: bookmarkTime=${typeof bookmarkTime}, tombstoneTime=${typeof tombstoneTime}`);
       
-      if (tombstoneTime > bookmarkTime) {
-        try {
-          await browser.bookmarks.remove(bookmark.id);
-          deletedCount++;
-          console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
-        } catch (err) {
-          console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
-        }
-      } else {
-        console.log(`[MarkSyncr] ⊘ Skipped deletion (bookmark is newer than tombstone): ${bookmark.url}`);
+      try {
+        await browser.bookmarks.remove(bookmark.id);
+        deletedCount++;
+        console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
+      } catch (err) {
+        console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
       }
     }
   }
@@ -1789,6 +1838,12 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
+
+
+
+
+
+
 
 
 

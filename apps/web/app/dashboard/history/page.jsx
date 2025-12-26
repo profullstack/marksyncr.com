@@ -11,6 +11,7 @@ import Image from 'next/image';
 export default function HistoryPage() {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [retentionLimit, setRetentionLimit] = useState(5);
   const [selectedVersion, setSelectedVersion] = useState(null);
@@ -20,28 +21,50 @@ export default function HistoryPage() {
   const [loadingVersionData, setLoadingVersionData] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     fetchVersionHistory();
   }, []);
 
-  const fetchVersionHistory = async () => {
+  const fetchVersionHistory = async (loadMore = false) => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/versions?limit=50');
+      if (loadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setOffset(0);
+      }
+      
+      const currentOffset = loadMore ? offset : 0;
+      const response = await fetch(`/api/versions?limit=${PAGE_SIZE}&offset=${currentOffset}`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch version history');
       }
 
-      setVersions(data.versions);
+      if (loadMore) {
+        setVersions(prev => [...prev, ...data.versions]);
+      } else {
+        setVersions(data.versions);
+      }
+      
       setRetentionLimit(data.retentionLimit);
+      setHasMore(data.versions.length === PAGE_SIZE);
+      setOffset(currentOffset + data.versions.length);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    fetchVersionHistory(true);
   };
 
   const fetchVersionData = useCallback(async (version) => {
@@ -480,13 +503,21 @@ export default function HistoryPage() {
         )}
 
         {/* Load More */}
-        {versions.length >= 20 && (
+        {hasMore && versions.length > 0 && (
           <div className="mt-6 text-center">
             <button
-              onClick={() => {/* TODO: Implement pagination */}}
-              className="text-blue-600 hover:text-blue-700"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 border border-blue-200 rounded-lg hover:bg-blue-50"
             >
-              Load more versions
+              {loadingMore ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  Loading...
+                </span>
+              ) : (
+                'Load more versions'
+              )}
             </button>
           </div>
         )}

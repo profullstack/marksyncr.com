@@ -565,12 +565,23 @@ export async function POST(request) {
     // Merge incoming bookmarks with existing
     const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
     
-    // Apply tombstones to remove deleted bookmarks
-    const finalBookmarks = applyTombstones(merged, mergedTombstones);
-    const deleted = merged.length - finalBookmarks.length;
+    // IMPORTANT: Do NOT apply tombstones on the server side!
+    // The server should store ALL bookmarks and tombstones.
+    // Each browser extension applies tombstones locally when it receives them.
+    // This prevents the race condition where:
+    // 1. Browser A has bookmark X, Browser B deletes it
+    // 2. Browser B syncs, creating tombstone
+    // 3. Browser A syncs, sending bookmark X
+    // 4. If server applied tombstones, X would be deleted from cloud
+    // 5. But Browser A still has X locally, causing sync issues
+    //
+    // Instead, the extension's applyTombstonesToLocal() handles deletion
+    // when it receives tombstones from the cloud.
+    const finalBookmarks = merged;
+    const deleted = 0; // Server doesn't delete, extensions do
     
     console.log(`[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`);
-    console.log(`[Bookmarks API] After applying tombstones: ${finalBookmarks.length} (${deleted} deleted)`);
+    console.log(`[Bookmarks API] Tombstones stored: ${mergedTombstones.length} (applied by extensions, not server)`);
 
     // Generate checksum for the final bookmark data
     const checksum = generateChecksum(finalBookmarks);
