@@ -7,8 +7,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock Supabase responses
 const mockRpc = vi.fn();
+const mockSelect = vi.fn();
+const mockFrom = vi.fn(() => ({
+  select: mockSelect,
+}));
+
+// Chain for select queries
+const mockSelectChain = {
+  eq: vi.fn().mockReturnThis(),
+  order: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+};
+
 const mockSupabase = {
   rpc: mockRpc,
+  from: mockFrom,
 };
 
 // Mock user for authenticated requests
@@ -23,11 +36,6 @@ vi.mock('@/lib/auth-helper', () => ({
     'Access-Control-Allow-Credentials': 'true',
   })),
   getAuthenticatedUser: vi.fn(),
-}));
-
-// Mock @marksyncr/core
-vi.mock('@marksyncr/core', () => ({
-  generateChecksum: vi.fn(() => Promise.resolve('mock-checksum-abc123')),
 }));
 
 // Import after mocks
@@ -53,6 +61,16 @@ function createMockRequest(options = {}) {
 describe('Versions API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Set up the from().select() chain for POST deduplication check
+    // Default: no existing versions (so new version will be created)
+    mockSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        order: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      }),
+    });
   });
 
   afterEach(() => {
@@ -358,7 +376,7 @@ describe('Versions API', () => {
       const mockVersion = {
         id: 'v1',
         version: 1,
-        checksum: 'mock-checksum-abc123',
+        checksum: 'computed-checksum',
         created_at: '2024-01-01T00:00:00Z',
       };
 
@@ -389,7 +407,7 @@ describe('Versions API', () => {
       expect(data.version).toEqual({
         id: 'v1',
         version: 1,
-        checksum: 'mock-checksum-abc123',
+        checksum: 'computed-checksum',
         createdAt: '2024-01-01T00:00:00Z',
       });
     });
@@ -418,10 +436,11 @@ describe('Versions API', () => {
 
       await POST(request);
 
+      // Checksum is now computed using generateNormalizedChecksum, not mocked
       expect(mockRpc).toHaveBeenCalledWith('save_bookmark_version', {
         p_user_id: 'user-123',
         p_bookmark_data: bookmarkData,
-        p_checksum: 'mock-checksum-abc123',
+        p_checksum: expect.any(String), // Checksum is computed, not mocked
         p_source_type: 'firefox',
         p_source_name: 'Firefox Browser',
         p_device_id: 'device-456',
@@ -450,10 +469,11 @@ describe('Versions API', () => {
 
       await POST(request);
 
+      // Checksum is now computed using generateNormalizedChecksum, not mocked
       expect(mockRpc).toHaveBeenCalledWith('save_bookmark_version', {
         p_user_id: 'user-123',
         p_bookmark_data: bookmarkData,
-        p_checksum: 'mock-checksum-abc123',
+        p_checksum: expect.any(String), // Checksum is computed, not mocked
         p_source_type: 'chrome',
         p_source_name: null,
         p_device_id: null,
@@ -513,6 +533,113 @@ describe('Versions API', () => {
         checksum: undefined,
         createdAt: undefined,
       });
+    });
+
+    it('should skip creating new version if checksum matches latest version (deduplication)', async () => {
+      // The checksum for { roots: {} } is computed by generateNormalizedChecksum
+      // We need to mock the from().select() chain to return a version with matching checksum
+      const existingChecksum = '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945';
+      
+      // Mock the deduplication check to return an existing version with matching checksum
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue({
+              data: [{
+                id: 'existing-v1',
+                version: 5,
+                checksum: existingChecksum,
+                created_at: '2024-01-01T00:00:00Z',
+              }],
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: {
+          bookmarkData: { roots: {} }, // This produces the same checksum
+          sourceType: 'chrome',
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.skipped).toBe(true);
+      expect(data.message).toBe('No changes detected - version already exists');
+      expect(data.version).toEqual({
+        id: 'existing-v1',
+        version: 5,
+        checksum: existingChecksum,
+        createdAt: '2024-01-01T00:00:00Z',
+      });
+      
+      // Should NOT call save_bookmark_version when skipping
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('should create new version if checksum differs from latest version', async () => {
+      // Mock the deduplication check to return an existing version with DIFFERENT checksum
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue({
+              data: [{
+                id: 'existing-v1',
+                version: 5,
+                checksum: 'different-checksum-xyz',
+                created_at: '2024-01-01T00:00:00Z',
+              }],
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      const newVersion = {
+        id: 'new-v2',
+        version: 6,
+        checksum: 'new-checksum',
+        created_at: '2024-01-02T00:00:00Z',
+      };
+
+      mockRpc.mockResolvedValue({
+        data: newVersion,
+        error: null,
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: {
+          bookmarkData: { roots: {} },
+          sourceType: 'chrome',
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.skipped).toBeUndefined();
+      expect(data.version).toEqual({
+        id: 'new-v2',
+        version: 6,
+        checksum: 'new-checksum',
+        createdAt: '2024-01-02T00:00:00Z',
+      });
+      
+      // Should call save_bookmark_version when checksums differ
+      expect(mockRpc).toHaveBeenCalledWith('save_bookmark_version', expect.any(Object));
     });
   });
 });

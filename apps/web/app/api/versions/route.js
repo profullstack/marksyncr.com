@@ -4,12 +4,137 @@
  * POST /api/versions - Save a new version
  *
  * Authentication: Session cookie (web) OR Bearer token (extension)
+ *
+ * IMPORTANT: Version deduplication
+ * - Before creating a new version, we check if the latest version has the same checksum
+ * - If checksums match, we skip creating a new version to avoid cluttering history
+ * - This prevents duplicate entries when auto-sync runs every 5 minutes with no changes
  */
 
 import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
+import crypto from 'crypto';
 
 const METHODS = ['GET', 'POST', 'OPTIONS'];
+
+/**
+ * Normalize bookmarks for checksum comparison
+ * This MUST match the normalization in:
+ * - apps/web/app/api/bookmarks/route.js
+ * - apps/extension/src/background/index.js
+ *
+ * We extract only the fields that matter for content comparison,
+ * excluding dateAdded (which changes when bookmarks are synced to a new browser)
+ * and other metadata fields.
+ */
+function normalizeItemsForChecksum(items) {
+  if (!Array.isArray(items)) return [];
+  
+  return items.map(item => {
+    if (item.type === 'folder') {
+      return {
+        type: 'folder',
+        title: item.title ?? '',
+        folderPath: item.folderPath || item.folder_path || '',
+        index: item.index ?? 0,
+      };
+    } else {
+      // Bookmark entry (default for backwards compatibility)
+      return {
+        type: 'bookmark',
+        url: item.url,
+        title: item.title ?? '',
+        folderPath: item.folderPath || item.folder_path || '',
+        index: item.index ?? 0,
+      };
+    }
+  }).sort((a, b) => {
+    // Sort by type first (folders before bookmarks for consistent ordering)
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1;
+    }
+    // Then by folderPath
+    const folderCompare = a.folderPath.localeCompare(b.folderPath);
+    if (folderCompare !== 0) return folderCompare;
+    // Then by index within the folder
+    return (a.index ?? 0) - (b.index ?? 0);
+  });
+}
+
+/**
+ * Extract flat array of bookmarks from nested format
+ * The bookmarkData might be in nested format: { roots: { toolbar: { children: [...] } } }
+ */
+function extractBookmarksFromNested(data) {
+  if (!data) return [];
+  
+  // If it's already an array, return it
+  if (Array.isArray(data)) return data;
+  
+  // If it has a 'roots' property, extract from nested format
+  if (data.roots) {
+    const bookmarks = [];
+    
+    function extractFromNode(node, path = '', index = 0) {
+      if (!node) return;
+      
+      // If it's a bookmark (has url)
+      if (node.url) {
+        bookmarks.push({
+          type: 'bookmark',
+          url: node.url,
+          title: node.title ?? '',
+          folderPath: path,
+          index: node.index ?? index,
+        });
+        return;
+      }
+      
+      // If it's a folder with children
+      if (node.children && Array.isArray(node.children)) {
+        const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
+        
+        // Add folder entry if it has a title and is not a root
+        if (node.title && path) {
+          bookmarks.push({
+            type: 'folder',
+            title: node.title,
+            folderPath: path,
+            index: node.index ?? index,
+          });
+        }
+        
+        for (let i = 0; i < node.children.length; i++) {
+          extractFromNode(node.children[i], newPath, i);
+        }
+      }
+    }
+    
+    // Extract from each root
+    for (const [rootKey, rootNode] of Object.entries(data.roots)) {
+      if (rootNode && rootNode.children) {
+        const rootPath = rootNode.title || rootKey;
+        for (let i = 0; i < rootNode.children.length; i++) {
+          extractFromNode(rootNode.children[i], rootPath, i);
+        }
+      }
+    }
+    
+    return bookmarks;
+  }
+  
+  return [];
+}
+
+/**
+ * Generate checksum for bookmark data using normalized comparison
+ * This ensures consistent checksums across extension and server
+ */
+function generateNormalizedChecksum(bookmarkData) {
+  const items = extractBookmarksFromNested(bookmarkData);
+  const normalized = normalizeItemsForChecksum(items);
+  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
 
 /**
  * Handle CORS preflight requests
@@ -79,6 +204,11 @@ export async function GET(request) {
 /**
  * POST /api/versions
  * Save a new version (called after sync)
+ *
+ * IMPORTANT: This endpoint now performs checksum deduplication:
+ * - Before creating a new version, we check if the latest version has the same checksum
+ * - If checksums match, we return the existing version without creating a new one
+ * - This prevents duplicate entries when auto-sync runs every 5 minutes with no changes
  */
 export async function POST(request) {
   const headers = corsHeaders(request, METHODS);
@@ -100,9 +230,44 @@ export async function POST(request) {
       );
     }
 
-    // Compute checksum
-    const { generateChecksum } = await import('@marksyncr/core');
-    const checksum = await generateChecksum(bookmarkData);
+    // Compute checksum using normalized algorithm (matches extension and bookmarks API)
+    // This ensures consistent checksums regardless of dateAdded, exportedAt, etc.
+    const checksum = generateNormalizedChecksum(bookmarkData);
+    
+    console.log(`[Versions API] Computed normalized checksum: ${checksum}`);
+
+    // Check if the latest version has the same checksum (deduplication)
+    const { data: latestVersions, error: fetchError } = await supabase
+      .from('bookmark_versions')
+      .select('id, version, checksum, created_at')
+      .eq('user_id', user.id)
+      .order('version', { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Failed to fetch latest version:', fetchError);
+      // Continue anyway - we'll create a new version
+    }
+
+    const latestVersion = latestVersions?.[0];
+    
+    // If the latest version has the same checksum, skip creating a new version
+    if (latestVersion && latestVersion.checksum === checksum) {
+      console.log(`[Versions API] Checksum matches latest version ${latestVersion.version}, skipping duplicate`);
+      
+      return NextResponse.json({
+        version: {
+          id: latestVersion.id,
+          version: latestVersion.version,
+          checksum: latestVersion.checksum,
+          createdAt: latestVersion.created_at,
+        },
+        skipped: true,
+        message: 'No changes detected - version already exists',
+      }, { headers });
+    }
+
+    console.log(`[Versions API] Checksum differs from latest (${latestVersion?.checksum || 'none'}), creating new version`);
 
     const { data, error } = await supabase.rpc('save_bookmark_version', {
       p_user_id: user.id,
