@@ -1735,13 +1735,14 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
       // Pre-calculate the checksum that would be generated
       // The server normalizes and sorts by type, folderPath, then index
+      // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
+      // because browsers assign new dateAdded when syncing bookmarks
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
         type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
-        dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
         // Sort by type first (folders before bookmarks)
@@ -1849,13 +1850,13 @@ describe('Checksum-Based Skip Write Optimization', () => {
       ];
 
       // Calculate checksum for bookmarks (including type and index)
+      // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
         type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
-        dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
         // Sort by type first (folders before bookmarks)
@@ -1897,13 +1898,13 @@ describe('Checksum-Based Skip Write Optimization', () => {
         { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
       ];
 
+      // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
         type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
-        dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
         // Sort by type first (folders before bookmarks)
@@ -1942,13 +1943,13 @@ describe('Checksum-Based Skip Write Optimization', () => {
         { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
       ];
 
+      // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
         type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
-        dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
         // Sort by type first (folders before bookmarks)
@@ -2000,13 +2001,13 @@ describe('Checksum-Based Skip Write Optimization', () => {
         { id: '1', url: 'https://a.com', title: 'A', folderPath: 'Folder A', dateAdded: 1000, index: 0 },
       ];
 
+      // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
       const normalized1 = bookmarksOrder1.map(b => ({
         type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
-        dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
         // Sort by type first (folders before bookmarks)
@@ -2041,7 +2042,7 @@ describe('Checksum-Based Skip Write Optimization', () => {
     });
 
     it('should detect change when extra fields differ but core fields are same', async () => {
-      // Extra fields like 'id', 'source' should be ignored in checksum
+      // Extra fields like 'id', 'source', 'dateAdded' should be ignored in checksum
       // Note: 'index' is now part of the checksum, so it must match
       const bookmarksWithExtras = [
         { id: 'browser-123', url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5, source: 'chrome' },
@@ -2050,13 +2051,13 @@ describe('Checksum-Based Skip Write Optimization', () => {
         { url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5 },
       ];
 
+      // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
       const normalized = bookmarksMinimal.map(b => ({
         type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
-        dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
         // Sort by type first (folders before bookmarks)

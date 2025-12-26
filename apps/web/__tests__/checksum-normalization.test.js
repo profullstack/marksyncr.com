@@ -4,6 +4,14 @@
  *
  * Now includes folder support - folders are tracked with their index
  * to preserve complete ordering across browsers.
+ *
+ * NOTE: dateAdded is intentionally EXCLUDED from checksums because:
+ * 1. When bookmarks are synced from cloud to local browser, the browser
+ *    assigns the CURRENT time as dateAdded (we can't set it via API)
+ * 2. This causes the local dateAdded to differ from cloud dateAdded
+ * 3. Which causes checksums to never match, triggering unnecessary syncs
+ * 4. dateAdded is not user-editable, so changes to it don't represent
+ *    meaningful user changes that need to be synced
  */
 
 import { describe, it, expect } from 'vitest';
@@ -17,6 +25,8 @@ import crypto from 'crypto';
  * to detect order changes. Folders need index tracking too because
  * their position within their parent folder matters for preserving
  * the complete bookmark structure across browsers.
+ *
+ * NOTE: dateAdded is intentionally excluded - see file header comment
  *
  * @param {Array} items - Array of bookmarks and folders to normalize
  * @returns {Array} - Normalized items with only comparable fields
@@ -35,12 +45,12 @@ function normalizeItemsForChecksum(items) {
       };
     } else {
       // Bookmark entry (default for backwards compatibility)
+      // NOTE: dateAdded is intentionally excluded
       return {
         type: 'bookmark',
         url: item.url,
         title: item.title ?? '',
         folderPath: item.folderPath || item.folder_path || '',
-        dateAdded: item.dateAdded || 0,
         index: item.index ?? 0,
       };
     }
@@ -76,7 +86,7 @@ function generateChecksum(data) {
 
 describe('Checksum Normalization', () => {
   describe('normalizeBookmarksForChecksum', () => {
-    it('should extract only comparable fields including index and type', () => {
+    it('should extract only comparable fields including index and type (excluding dateAdded)', () => {
       const bookmarks = [
         {
           id: 'browser-id-123',
@@ -94,13 +104,15 @@ describe('Checksum Normalization', () => {
 
       expect(normalized).toHaveLength(1);
       expect(normalized[0]).toEqual({
-        type: 'bookmark', // type is now included
+        type: 'bookmark',
         url: 'https://example.com',
         title: 'Example',
         folderPath: 'Bookmarks Bar',
-        dateAdded: 1700000000000,
-        index: 5, // index is now included for order detection
+        index: 5,
       });
+      // dateAdded should be excluded to prevent checksum mismatches
+      // when browser assigns new dateAdded to synced bookmarks
+      expect(normalized[0]).not.toHaveProperty('dateAdded');
       expect(normalized[0]).not.toHaveProperty('id');
       expect(normalized[0]).not.toHaveProperty('source');
       expect(normalized[0]).not.toHaveProperty('extraField');
@@ -152,14 +164,15 @@ describe('Checksum Normalization', () => {
       expect(normalized[2].folderPath).toBe('Path B');
     });
 
-    it('should handle missing dateAdded with 0', () => {
+    it('should not include dateAdded in normalized output', () => {
       const bookmarks = [
-        { url: 'https://example.com', title: 'Test' },
+        { url: 'https://example.com', title: 'Test', dateAdded: 1700000000000 },
       ];
 
       const normalized = normalizeBookmarksForChecksum(bookmarks);
 
-      expect(normalized[0].dateAdded).toBe(0);
+      // dateAdded should be excluded from checksum calculation
+      expect(normalized[0]).not.toHaveProperty('dateAdded');
     });
 
     it('should return empty array for non-array input', () => {
@@ -298,7 +311,12 @@ describe('Checksum Normalization', () => {
       expect(checksum1).not.toBe(checksum2);
     });
 
-    it('should generate different checksum when dateAdded changes', () => {
+    it('should generate SAME checksum when only dateAdded differs (dateAdded excluded from checksum)', () => {
+      // This is intentional! dateAdded is excluded from checksum because:
+      // 1. Browser assigns new dateAdded when creating synced bookmarks
+      // 2. We can't set dateAdded via browser.bookmarks.create API
+      // 3. So synced bookmarks always have different dateAdded than cloud
+      // 4. This would cause checksums to never match, triggering unnecessary syncs
       const bookmarks1 = [
         { url: 'https://example.com', title: 'Test', dateAdded: 1000 },
       ];
@@ -310,7 +328,8 @@ describe('Checksum Normalization', () => {
       const checksum1 = generateChecksum(bookmarks1);
       const checksum2 = generateChecksum(bookmarks2);
 
-      expect(checksum1).not.toBe(checksum2);
+      // Checksums should be the SAME because dateAdded is excluded
+      expect(checksum1).toBe(checksum2);
     });
 
     it('should return valid SHA-256 hex string', () => {
@@ -333,15 +352,16 @@ describe('Checksum Normalization', () => {
   });
 
   describe('Extension and Server Checksum Compatibility', () => {
-    it('should produce identical checksums for browser-style and server-style bookmarks', () => {
-      // Browser extension style (with id, index)
+    it('should produce identical checksums for browser-style and server-style bookmarks (dateAdded excluded)', () => {
+      // Browser extension style (with id, index, dateAdded)
+      // Note: dateAdded is excluded from checksum, so different values don't matter
       const browserBookmarks = [
         {
           id: '123',
           url: 'https://example.com',
           title: 'Example Site',
           folderPath: 'Bookmarks Bar/Work',
-          dateAdded: 1700000000000,
+          dateAdded: 1700000000000, // This is excluded from checksum
           index: 0,
         },
         {
@@ -349,27 +369,28 @@ describe('Checksum Normalization', () => {
           url: 'https://test.com',
           title: 'Test Site',
           folderPath: 'Bookmarks Bar',
-          dateAdded: 1700000001000,
+          dateAdded: 1700000001000, // This is excluded from checksum
           index: 0, // Different folder, so index 0 is valid
         },
       ];
 
       // Server style (normalized, with folder_path variant and index)
+      // Note: dateAdded values are different but checksums should still match
       const serverBookmarks = [
         {
           url: 'https://example.com',
           title: 'Example Site',
           folder_path: 'Bookmarks Bar/Work',
-          dateAdded: 1700000000000,
-          index: 0, // index must match for checksum compatibility
+          dateAdded: 9999999999999, // Different dateAdded - should not affect checksum
+          index: 0,
           source: 'chrome',
         },
         {
           url: 'https://test.com',
           title: 'Test Site',
           folder_path: 'Bookmarks Bar',
-          dateAdded: 1700000001000,
-          index: 0, // index must match for checksum compatibility
+          dateAdded: 8888888888888, // Different dateAdded - should not affect checksum
+          index: 0,
           source: 'chrome',
         },
       ];
@@ -377,6 +398,7 @@ describe('Checksum Normalization', () => {
       const browserChecksum = generateChecksum(browserBookmarks);
       const serverChecksum = generateChecksum(serverBookmarks);
 
+      // Checksums should match even though dateAdded values are different
       expect(browserChecksum).toBe(serverChecksum);
     });
 

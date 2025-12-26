@@ -143,6 +143,14 @@ async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
  * their position within their parent folder matters for preserving
  * the complete bookmark structure across browsers.
  *
+ * NOTE: We intentionally EXCLUDE dateAdded from the checksum because:
+ * 1. When bookmarks are synced from cloud to local browser, the browser
+ *    assigns the CURRENT time as dateAdded (we can't set it via API)
+ * 2. This causes the local dateAdded to differ from cloud dateAdded
+ * 3. Which causes checksums to never match, triggering unnecessary syncs
+ * 4. dateAdded is not user-editable, so changes to it don't represent
+ *    meaningful user changes that need to be synced
+ *
  * @param {Array} items - Array of bookmarks and folders to normalize
  * @returns {Array} - Normalized items with only comparable fields
  */
@@ -160,12 +168,12 @@ function normalizeItemsForChecksum(items) {
       };
     } else {
       // Bookmark entry (default for backwards compatibility)
+      // NOTE: dateAdded is intentionally excluded - see function comment
       return {
         type: 'bookmark',
         url: item.url,
         title: item.title ?? '',
         folderPath: item.folderPath || item.folder_path || '',
-        dateAdded: item.dateAdded || 0,
         index: item.index ?? 0,
       };
     }
