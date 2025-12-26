@@ -338,13 +338,19 @@ function applyTombstones(bookmarks, tombstones) {
 }
 
 /**
- * Merge incoming bookmarks with existing cloud bookmarks
- * Uses URL as unique identifier
- * Newer bookmarks (by dateAdded) win conflicts
+ * Merge incoming bookmarks and folders with existing cloud data
+ *
+ * For bookmarks: Uses URL as unique identifier, newer bookmarks (by dateAdded) win conflicts
+ * For folders: Uses folderPath + title as unique identifier, incoming always wins (to preserve order changes)
+ *
+ * IMPORTANT: This function handles BOTH bookmarks and folders.
+ * Folders are identified by type='folder' and don't have URLs.
+ * Folders use folderPath + title as their unique key.
  */
 function mergeBookmarks(existingBookmarks, incomingBookmarks) {
-  // Create a map of existing bookmarks by URL
+  // Create separate maps for bookmarks (by URL) and folders (by path+title)
   const bookmarkMap = new Map();
+  const folderMap = new Map();
   
   // Extract bookmarks from nested format if needed
   const existingArray = extractBookmarksFromNested(existingBookmarks);
@@ -352,49 +358,85 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
   // Ensure incomingBookmarks is an array
   const incomingArray = Array.isArray(incomingBookmarks) ? incomingBookmarks : [];
   
-  console.log(`[Bookmarks API] Extracted ${existingArray.length} bookmarks from existing data`);
+  console.log(`[Bookmarks API] Extracted ${existingArray.length} items from existing data`);
   
-  // Add existing bookmarks to map
-  for (const bookmark of existingArray) {
-    if (bookmark && bookmark.url) {
-      bookmarkMap.set(bookmark.url, bookmark);
+  // Helper to generate folder key
+  const getFolderKey = (item) => `${item.folderPath || ''}::${item.title || ''}`;
+  
+  // Add existing items to maps
+  for (const item of existingArray) {
+    if (!item) continue;
+    
+    if (item.type === 'folder') {
+      // It's a folder - use folderPath + title as key
+      const key = getFolderKey(item);
+      folderMap.set(key, item);
+    } else if (item.url) {
+      // It's a bookmark - use URL as key
+      bookmarkMap.set(item.url, item);
     }
   }
   
   let added = 0;
   let updated = 0;
   
-  // Merge incoming bookmarks
+  // Merge incoming items
   for (const incoming of incomingArray) {
-    if (!incoming || !incoming.url) {
-      continue; // Skip invalid bookmarks
-    }
-    const existing = bookmarkMap.get(incoming.url);
+    if (!incoming) continue;
     
-    if (!existing) {
-      // New bookmark - add it
-      bookmarkMap.set(incoming.url, incoming);
-      added++;
-    } else {
-      // Existing bookmark - check if incoming is newer
-      const existingDate = existing.dateAdded || 0;
-      const incomingDate = incoming.dateAdded || 0;
+    if (incoming.type === 'folder') {
+      // It's a folder
+      const key = getFolderKey(incoming);
+      const existing = folderMap.get(key);
       
-      if (incomingDate > existingDate) {
-        // Incoming is newer - update
-        bookmarkMap.set(incoming.url, {
+      if (!existing) {
+        // New folder - add it
+        folderMap.set(key, incoming);
+        added++;
+      } else {
+        // Existing folder - always update to preserve order changes
+        // Folders don't have dateAdded for comparison, so incoming always wins
+        folderMap.set(key, {
           ...incoming,
-          // Preserve the original id if it exists
           id: existing.id || incoming.id,
         });
         updated++;
       }
-      // If existing is newer or same, keep existing (do nothing)
+    } else if (incoming.url) {
+      // It's a bookmark
+      const existing = bookmarkMap.get(incoming.url);
+      
+      if (!existing) {
+        // New bookmark - add it
+        bookmarkMap.set(incoming.url, incoming);
+        added++;
+      } else {
+        // Existing bookmark - check if incoming is newer
+        const existingDate = existing.dateAdded || 0;
+        const incomingDate = incoming.dateAdded || 0;
+        
+        if (incomingDate > existingDate) {
+          // Incoming is newer - update
+          bookmarkMap.set(incoming.url, {
+            ...incoming,
+            id: existing.id || incoming.id,
+          });
+          updated++;
+        }
+        // If existing is newer or same, keep existing (do nothing)
+      }
     }
+    // Skip items that are neither folders nor valid bookmarks
   }
   
+  // Combine bookmarks and folders
+  const merged = [
+    ...Array.from(bookmarkMap.values()),
+    ...Array.from(folderMap.values()),
+  ];
+  
   return {
-    merged: Array.from(bookmarkMap.values()),
+    merged,
     added,
     updated,
   };
