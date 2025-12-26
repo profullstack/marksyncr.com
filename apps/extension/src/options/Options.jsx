@@ -156,6 +156,7 @@ export function Options() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showClearCacheModal, setShowClearCacheModal] = useState(false);
   const [importMessage, setImportMessage] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -380,6 +381,35 @@ export function Options() {
     }
   };
 
+  // Clear sync cache only (preserves login and settings)
+  const handleClearCache = async () => {
+    try {
+      // Clear only sync-related cache keys, not login credentials or settings
+      if (chrome?.storage?.local) {
+        await new Promise((resolve) => {
+          chrome.storage.local.remove([
+            'marksyncr-last-cloud-checksum',
+            'marksyncr-tombstones',
+            'lastSync',
+            'lastSyncTime',
+            'syncInProgress'
+          ], resolve);
+        });
+      }
+      
+      setShowClearCacheModal(false);
+      setSaveStatus('cache-cleared');
+      setImportMessage({ type: 'success', text: 'Sync cache cleared. Next sync will perform a full comparison.' });
+      setTimeout(() => {
+        setSaveStatus(null);
+        setImportMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error('Clear cache failed:', err);
+      setImportMessage({ type: 'error', text: `Clear cache failed: ${err.message}` });
+    }
+  };
+
   if (!isInitialized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -536,6 +566,12 @@ export function Options() {
                 Import Bookmarks
               </button>
               <button
+                onClick={() => setShowClearCacheModal(true)}
+                className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+              >
+                Clear Sync Cache
+              </button>
+              <button
                 onClick={() => setShowResetModal(true)}
                 className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
               >
@@ -665,6 +701,40 @@ export function Options() {
                     className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
                   >
                     Reset Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Clear Cache Modal */}
+          {showClearCacheModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-lg font-semibold text-amber-600 mb-4">Clear Sync Cache</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  This will clear the local sync cache, including:
+                </p>
+                <ul className="text-sm text-slate-600 mb-4 list-disc list-inside">
+                  <li>Cached checksums</li>
+                  <li>Tombstones (deleted item tracking)</li>
+                  <li>Last sync timestamps</li>
+                </ul>
+                <p className="text-sm text-slate-600 mb-4">
+                  Your login, settings, and browser bookmarks will not be affected. The next sync will perform a full comparison with the cloud.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowClearCacheModal(false)}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleClearCache}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700"
+                  >
+                    Clear Cache
                   </button>
                 </div>
               </div>
