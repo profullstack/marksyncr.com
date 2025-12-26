@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Icons
 const EmailIcon = ({ className = '' }) => (
@@ -92,15 +92,91 @@ const LogoutIcon = ({ className = '' }) => (
 );
 
 /**
+ * Get browser API (Chrome or Firefox)
+ */
+const getBrowserAPI = () => {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    return chrome;
+  }
+  if (typeof browser !== 'undefined' && browser.storage) {
+    return browser;
+  }
+  return null;
+};
+
+/**
  * Login form component
  */
 function LoginForm({ onLogin, onSwitchToSignup, isLoading, error }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Load remembered email on mount
+  useEffect(() => {
+    const loadRememberedEmail = async () => {
+      const browserAPI = getBrowserAPI();
+      if (browserAPI?.storage?.local) {
+        try {
+          const result = await browserAPI.storage.local.get(['rememberedEmail', 'rememberEmail']);
+          if (result.rememberEmail && result.rememberedEmail) {
+            setEmail(result.rememberedEmail);
+            setRememberEmail(true);
+          }
+        } catch (err) {
+          console.warn('Failed to load remembered email:', err);
+        }
+      }
+    };
+    loadRememberedEmail();
+  }, []);
+
+  // Save or clear remembered email when checkbox changes
+  const handleRememberEmailChange = async (checked) => {
+    setRememberEmail(checked);
+    const browserAPI = getBrowserAPI();
+    if (browserAPI?.storage?.local) {
+      try {
+        if (checked && email) {
+          await browserAPI.storage.local.set({ rememberEmail: true, rememberedEmail: email });
+        } else {
+          await browserAPI.storage.local.remove(['rememberEmail', 'rememberedEmail']);
+        }
+      } catch (err) {
+        console.warn('Failed to save remember email preference:', err);
+      }
+    }
+  };
+
+  // Update stored email when email changes (if remember is checked)
+  const handleEmailChange = async (newEmail) => {
+    setEmail(newEmail);
+    if (rememberEmail) {
+      const browserAPI = getBrowserAPI();
+      if (browserAPI?.storage?.local) {
+        try {
+          await browserAPI.storage.local.set({ rememberedEmail: newEmail });
+        } catch (err) {
+          console.warn('Failed to update remembered email:', err);
+        }
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    // Save email if remember is checked before login
+    if (rememberEmail && email) {
+      const browserAPI = getBrowserAPI();
+      if (browserAPI?.storage?.local) {
+        try {
+          await browserAPI.storage.local.set({ rememberEmail: true, rememberedEmail: email });
+        } catch (err) {
+          console.warn('Failed to save remembered email:', err);
+        }
+      }
+    }
     onLogin(email, password);
   };
 
@@ -123,7 +199,7 @@ function LoginForm({ onLogin, onSwitchToSignup, isLoading, error }) {
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => handleEmailChange(e.target.value)}
             placeholder="you@example.com"
             required
             className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -159,6 +235,20 @@ function LoginForm({ onLogin, onSwitchToSignup, isLoading, error }) {
             )}
           </button>
         </div>
+      </div>
+
+      {/* Remember Email Checkbox */}
+      <div className="flex items-center">
+        <input
+          id="remember-email"
+          type="checkbox"
+          checked={rememberEmail}
+          onChange={(e) => handleRememberEmailChange(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+        />
+        <label htmlFor="remember-email" className="ml-2 text-sm text-slate-600">
+          Remember my email
+        </label>
       </div>
 
       <button
