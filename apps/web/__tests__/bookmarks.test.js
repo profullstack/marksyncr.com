@@ -1633,3 +1633,399 @@ describe('Tombstone Tracking for Deletion Sync', () => {
     });
   });
 });
+
+describe('Checksum-Based Skip Write Optimization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  /**
+   * Helper to create a mock that tracks whether upsert was called
+   * and supports checksum comparison
+   */
+  function createChecksumMockSupabase(options = {}) {
+    const {
+      userExists = true,
+      existingBookmarks = [],
+      existingTombstones = [],
+      existingVersion = 1,
+      existingChecksum = null,
+      upsertSuccess = true,
+    } = options;
+
+    // Track if upsert was called
+    let upsertCalled = false;
+    let upsertedData = null;
+
+    // Mock for ensureUserExists - user check
+    const usersSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: userExists ? { id: 'user-123' } : null,
+          error: userExists ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for user insert (when user doesn't exist)
+    const usersInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for subscriptions insert
+    const subscriptionsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for getting existing bookmarks from cloud_bookmarks
+    const bookmarksSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: (existingBookmarks.length > 0 || existingChecksum) ? {
+            bookmark_data: existingBookmarks,
+            tombstones: existingTombstones,
+            version: existingVersion,
+            checksum: existingChecksum,
+          } : null,
+          error: (existingBookmarks.length > 0 || existingChecksum) ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for upsert - track if called
+    const upsertMock = vi.fn().mockImplementation((data) => {
+      upsertCalled = true;
+      upsertedData = data;
+      return {
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: upsertSuccess ? {
+              version: existingVersion + 1,
+              checksum: data.checksum || 'new-checksum',
+              bookmark_data: data.bookmark_data,
+              tombstones: data.tombstones,
+            } : null,
+            error: upsertSuccess ? null : { message: 'Upsert failed' },
+          }),
+        }),
+      };
+    });
+
+    return {
+      from: vi.fn().mockImplementation((table) => {
+        if (table === 'users') {
+          return { select: usersSelectMock, insert: usersInsertMock };
+        }
+        if (table === 'subscriptions') {
+          return { insert: subscriptionsInsertMock };
+        }
+        return {
+          select: bookmarksSelectMock,
+          upsert: upsertMock,
+        };
+      }),
+      wasUpsertCalled: () => upsertCalled,
+      getUpsertedData: () => upsertedData,
+    };
+  }
+
+  describe('POST /api/bookmarks - Skip Write When Checksum Unchanged', () => {
+    it('should skip database write when checksum matches existing data', async () => {
+      // Same bookmarks that would produce the same checksum
+      const bookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+      ];
+
+      // Pre-calculate the checksum that would be generated
+      // The server normalizes and sorts by URL, so we need to match that
+      const crypto = await import('crypto');
+      const normalized = bookmarks.map(b => ({
+        url: b.url,
+        title: b.title ?? '',
+        folderPath: b.folderPath || '',
+        dateAdded: b.dateAdded || 0,
+      })).sort((a, b) => a.url.localeCompare(b.url));
+      const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks: bookmarks,
+        existingVersion: 5,
+        existingChecksum: expectedChecksum,
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should indicate no changes were made
+      expect(data.skipped).toBe(true);
+      // Version should remain the same
+      expect(data.version).toBe(5);
+      // Upsert should NOT have been called
+      expect(mockSupabase.wasUpsertCalled()).toBe(false);
+    });
+
+    it('should write to database when checksum differs', async () => {
+      const existingBookmarks = [
+        { id: '1', url: 'https://old.com', title: 'Old', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+      ];
+      const newBookmarks = [
+        { id: '2', url: 'https://new.com', title: 'New', folderPath: 'Bookmarks', dateAdded: 1700000001000 },
+      ];
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks,
+        existingVersion: 5,
+        existingChecksum: 'old-checksum-that-wont-match',
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: newBookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should NOT be skipped
+      expect(data.skipped).toBeUndefined();
+      // Version should be incremented
+      expect(data.version).toBe(6);
+      // Upsert SHOULD have been called
+      expect(mockSupabase.wasUpsertCalled()).toBe(true);
+    });
+
+    it('should write to database when no existing data (first sync)', async () => {
+      const bookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example' },
+      ];
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks: [],
+        existingVersion: 0,
+        existingChecksum: null,
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should NOT be skipped for first sync
+      expect(data.skipped).toBeUndefined();
+      // Upsert SHOULD have been called
+      expect(mockSupabase.wasUpsertCalled()).toBe(true);
+    });
+
+    it('should write to database when tombstones change even if bookmarks are same', async () => {
+      const bookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+      ];
+      const newTombstones = [
+        { url: 'https://deleted.com', deletedAt: Date.now() },
+      ];
+
+      // Calculate checksum for bookmarks
+      const crypto = await import('crypto');
+      const normalized = bookmarks.map(b => ({
+        url: b.url,
+        title: b.title ?? '',
+        folderPath: b.folderPath || '',
+        dateAdded: b.dateAdded || 0,
+      })).sort((a, b) => a.url.localeCompare(b.url));
+      const bookmarkChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks: bookmarks,
+        existingTombstones: [], // No existing tombstones
+        existingVersion: 5,
+        existingChecksum: bookmarkChecksum,
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks, tombstones: newTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should NOT be skipped because tombstones changed
+      expect(data.skipped).toBeUndefined();
+      // Upsert SHOULD have been called
+      expect(mockSupabase.wasUpsertCalled()).toBe(true);
+    });
+
+    it('should return existing checksum when skipping write', async () => {
+      const bookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+      ];
+
+      const crypto = await import('crypto');
+      const normalized = bookmarks.map(b => ({
+        url: b.url,
+        title: b.title ?? '',
+        folderPath: b.folderPath || '',
+        dateAdded: b.dateAdded || 0,
+      })).sort((a, b) => a.url.localeCompare(b.url));
+      const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks: bookmarks,
+        existingVersion: 5,
+        existingChecksum: expectedChecksum,
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.skipped).toBe(true);
+      expect(data.checksum).toBe(expectedChecksum);
+    });
+
+    it('should handle repeated syncs with same data without incrementing version', async () => {
+      const bookmarks = [
+        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+      ];
+
+      const crypto = await import('crypto');
+      const normalized = bookmarks.map(b => ({
+        url: b.url,
+        title: b.title ?? '',
+        folderPath: b.folderPath || '',
+        dateAdded: b.dateAdded || 0,
+      })).sort((a, b) => a.url.localeCompare(b.url));
+      const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+
+      // Simulate multiple syncs with same data
+      for (let i = 0; i < 3; i++) {
+        mockSupabase = createChecksumMockSupabase({
+          existingBookmarks: bookmarks,
+          existingVersion: 5, // Version should stay at 5
+          existingChecksum: expectedChecksum,
+        });
+        getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+        const request = createMockRequest({
+          method: 'POST',
+          headers: { authorization: 'Bearer valid-token' },
+          body: { bookmarks, source: 'chrome' },
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.skipped).toBe(true);
+        expect(data.version).toBe(5); // Version should NOT increment
+        expect(mockSupabase.wasUpsertCalled()).toBe(false);
+      }
+    });
+  });
+
+  describe('Checksum Comparison Edge Cases', () => {
+    it('should detect change when bookmark order differs but content is same', async () => {
+      // Bookmarks in different order should produce SAME checksum (sorted by URL)
+      const bookmarksOrder1 = [
+        { id: '1', url: 'https://a.com', title: 'A', folderPath: '', dateAdded: 1000 },
+        { id: '2', url: 'https://b.com', title: 'B', folderPath: '', dateAdded: 2000 },
+      ];
+      const bookmarksOrder2 = [
+        { id: '2', url: 'https://b.com', title: 'B', folderPath: '', dateAdded: 2000 },
+        { id: '1', url: 'https://a.com', title: 'A', folderPath: '', dateAdded: 1000 },
+      ];
+
+      const crypto = await import('crypto');
+      const normalized1 = bookmarksOrder1.map(b => ({
+        url: b.url,
+        title: b.title ?? '',
+        folderPath: b.folderPath || '',
+        dateAdded: b.dateAdded || 0,
+      })).sort((a, b) => a.url.localeCompare(b.url));
+      const checksum1 = crypto.createHash('sha256').update(JSON.stringify(normalized1)).digest('hex');
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks: bookmarksOrder1,
+        existingVersion: 5,
+        existingChecksum: checksum1,
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksOrder2, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should be skipped because content is the same (just different order)
+      expect(data.skipped).toBe(true);
+    });
+
+    it('should detect change when extra fields differ but core fields are same', async () => {
+      // Extra fields like 'id', 'index', 'source' should be ignored in checksum
+      const bookmarksWithExtras = [
+        { id: 'browser-123', url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5, source: 'chrome' },
+      ];
+      const bookmarksMinimal = [
+        { url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000 },
+      ];
+
+      const crypto = await import('crypto');
+      const normalized = bookmarksMinimal.map(b => ({
+        url: b.url,
+        title: b.title ?? '',
+        folderPath: b.folderPath || '',
+        dateAdded: b.dateAdded || 0,
+      })).sort((a, b) => a.url.localeCompare(b.url));
+      const checksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+
+      mockSupabase = createChecksumMockSupabase({
+        existingBookmarks: bookmarksWithExtras,
+        existingVersion: 5,
+        existingChecksum: checksum,
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksMinimal, source: 'firefox' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should be skipped because core fields are the same
+      expect(data.skipped).toBe(true);
+    });
+  });
+});

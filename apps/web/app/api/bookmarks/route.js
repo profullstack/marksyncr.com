@@ -604,6 +604,40 @@ export async function POST(request) {
 
     // Generate checksum for the final bookmark data
     const checksum = generateChecksum(finalBookmarks);
+    const existingChecksum = existingData?.checksum || null;
+
+    // Check if there are any actual changes by comparing checksums
+    // Also check if tombstones have changed
+    const existingTombstonesJson = JSON.stringify(existingTombstones.sort((a, b) => a.url.localeCompare(b.url)));
+    const mergedTombstonesJson = JSON.stringify(mergedTombstones.sort((a, b) => a.url.localeCompare(b.url)));
+    const tombstonesChanged = existingTombstonesJson !== mergedTombstonesJson;
+    
+    const checksumMatches = existingChecksum && checksum === existingChecksum;
+    const noChanges = checksumMatches && !tombstonesChanged;
+
+    console.log(`[Bookmarks API] Existing checksum: ${existingChecksum}`);
+    console.log(`[Bookmarks API] New checksum: ${checksum}`);
+    console.log(`[Bookmarks API] Checksums match: ${checksumMatches}`);
+    console.log(`[Bookmarks API] Tombstones changed: ${tombstonesChanged}`);
+    console.log(`[Bookmarks API] No changes (skip write): ${noChanges}`);
+
+    // If no changes, skip the database write and return early
+    if (noChanges) {
+      console.log(`[Bookmarks API] Skipping database write - no changes detected`);
+      return NextResponse.json({
+        synced: normalizedBookmarks.length,
+        merged: finalBookmarks.length,
+        added: 0,
+        updated: 0,
+        deleted: 0,
+        tombstones: mergedTombstones.length,
+        total: finalBookmarks.length,
+        version: existingVersion,
+        checksum: existingChecksum,
+        skipped: true,
+        message: 'No changes detected - sync skipped',
+      }, { headers });
+    }
 
     const newVersion = existingVersion + 1;
 
