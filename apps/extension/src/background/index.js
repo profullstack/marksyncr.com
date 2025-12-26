@@ -14,6 +14,7 @@ import browser from 'webextension-polyfill';
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
 const DEFAULT_SYNC_INTERVAL = 5; // minutes - sync every 5 minutes by default
 const TOMBSTONES_STORAGE_KEY = 'marksyncr-tombstones';
+const LAST_CLOUD_CHECKSUM_KEY = 'marksyncr-last-cloud-checksum';
 
 // Flag to disable tombstone creation during Force Pull operations
 let isForcePullInProgress = false;
@@ -130,6 +131,38 @@ async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
     await storeTombstones(filtered);
     console.log(`[MarkSyncr] Cleaned up ${tombstones.length - filtered.length} old tombstones`);
   }
+}
+
+/**
+ * Generate checksum for bookmark data (matches server-side algorithm)
+ * Uses SHA-256 hash of JSON stringified data
+ * @param {Array} bookmarks - Array of bookmarks to hash
+ * @returns {Promise<string>} - Hex string of SHA-256 hash
+ */
+async function generateChecksum(bookmarks) {
+  const data = JSON.stringify(bookmarks);
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Get the last known cloud checksum
+ * @returns {Promise<string|null>}
+ */
+async function getLastCloudChecksum() {
+  const data = await browser.storage.local.get(LAST_CLOUD_CHECKSUM_KEY);
+  return data[LAST_CLOUD_CHECKSUM_KEY] || null;
+}
+
+/**
+ * Store the last known cloud checksum
+ * @param {string} checksum
+ */
+async function storeLastCloudChecksum(checksum) {
+  await browser.storage.local.set({ [LAST_CLOUD_CHECKSUM_KEY]: checksum });
 }
 
 /**
@@ -845,12 +878,51 @@ async function performSync(sourceId) {
       const mergedData = convertBrowserBookmarks(finalTree);
       const stats = countBookmarks(finalTree);
       
+      // Step 8.5: Check if there are any actual changes by comparing checksums
+      // Generate checksum of merged bookmarks (same algorithm as server)
+      const localChecksum = await generateChecksum(mergedFlat);
+      const cloudChecksum = cloudData.checksum;
+      
+      console.log(`[MarkSyncr] Local checksum: ${localChecksum}`);
+      console.log(`[MarkSyncr] Cloud checksum: ${cloudChecksum}`);
+      
+      // Check if there were any changes during this sync
+      const hasChanges = newFromCloud.length > 0 ||
+                         deletedLocally > 0 ||
+                         localChecksum !== cloudChecksum;
+      
+      if (!hasChanges) {
+        console.log('[MarkSyncr] No changes detected - checksums match and no new bookmarks');
+        
+        // Update last sync time even when skipping
+        await browser.storage.local.set({
+          lastSync: new Date().toISOString(),
+        });
+        
+        // Store the cloud checksum for future reference
+        await storeLastCloudChecksum(cloudChecksum);
+        
+        return {
+          success: true,
+          stats,
+          addedFromCloud: 0,
+          deletedLocally: 0,
+          skipped: true,
+          message: 'No new updates',
+        };
+      }
+      
       // Step 9: Push merged bookmarks and tombstones back to cloud
       console.log(`[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`);
       const syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), mergedTombstones);
       console.log('[MarkSyncr] Cloud sync result:', syncResult);
+      
+      // Store the new checksum
+      if (syncResult.checksum) {
+        await storeLastCloudChecksum(syncResult.checksum);
+      }
 
-      // Step 10: Save version history
+      // Step 10: Save version history (only when there are actual changes)
       console.log('[MarkSyncr] Saving version history...');
       const versionResult = await saveVersionToCloud(
         mergedData,
