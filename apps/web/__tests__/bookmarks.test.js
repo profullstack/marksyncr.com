@@ -1734,15 +1734,20 @@ describe('Checksum-Based Skip Write Optimization', () => {
       ];
 
       // Pre-calculate the checksum that would be generated
-      // The server normalizes and sorts by folderPath + index, so we need to match that
+      // The server normalizes and sorts by type, folderPath, then index
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
+        type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
+        // Sort by type first (folders before bookmarks)
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
         const folderCompare = a.folderPath.localeCompare(b.folderPath);
         if (folderCompare !== 0) return folderCompare;
         return (a.index ?? 0) - (b.index ?? 0);
@@ -1843,15 +1848,20 @@ describe('Checksum-Based Skip Write Optimization', () => {
         { url: 'https://deleted.com', deletedAt: Date.now() },
       ];
 
-      // Calculate checksum for bookmarks (including index)
+      // Calculate checksum for bookmarks (including type and index)
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
+        type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
+        // Sort by type first (folders before bookmarks)
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
         const folderCompare = a.folderPath.localeCompare(b.folderPath);
         if (folderCompare !== 0) return folderCompare;
         return (a.index ?? 0) - (b.index ?? 0);
@@ -1889,12 +1899,17 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
+        type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
+        // Sort by type first (folders before bookmarks)
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
         const folderCompare = a.folderPath.localeCompare(b.folderPath);
         if (folderCompare !== 0) return folderCompare;
         return (a.index ?? 0) - (b.index ?? 0);
@@ -1929,12 +1944,17 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
       const crypto = await import('crypto');
       const normalized = bookmarks.map(b => ({
+        type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
+        // Sort by type first (folders before bookmarks)
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
         const folderCompare = a.folderPath.localeCompare(b.folderPath);
         if (folderCompare !== 0) return folderCompare;
         return (a.index ?? 0) - (b.index ?? 0);
@@ -1982,12 +2002,17 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
       const crypto = await import('crypto');
       const normalized1 = bookmarksOrder1.map(b => ({
+        type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
+        // Sort by type first (folders before bookmarks)
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
         const folderCompare = a.folderPath.localeCompare(b.folderPath);
         if (folderCompare !== 0) return folderCompare;
         return (a.index ?? 0) - (b.index ?? 0);
@@ -2027,12 +2052,17 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
       const crypto = await import('crypto');
       const normalized = bookmarksMinimal.map(b => ({
+        type: 'bookmark',
         url: b.url,
         title: b.title ?? '',
         folderPath: b.folderPath || '',
         dateAdded: b.dateAdded || 0,
         index: b.index ?? 0,
       })).sort((a, b) => {
+        // Sort by type first (folders before bookmarks)
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
         const folderCompare = a.folderPath.localeCompare(b.folderPath);
         if (folderCompare !== 0) return folderCompare;
         return (a.index ?? 0) - (b.index ?? 0);

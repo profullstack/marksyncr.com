@@ -38,33 +38,60 @@ export async function OPTIONS(request) {
 }
 
 /**
- * Normalize bookmarks for checksum comparison
+ * Normalize bookmarks AND folders for checksum comparison
  * Extracts only the fields that matter for content comparison,
  * matching the extension-side normalization
  *
- * IMPORTANT: We include index to detect order changes within folders.
- * We sort by folderPath + index to ensure consistent ordering that
- * reflects the actual bookmark order in the browser.
+ * IMPORTANT: We include both bookmarks and folders with their index
+ * to detect order changes. Folders need index tracking too because
+ * their position within their parent folder matters for preserving
+ * the complete bookmark structure across browsers.
  *
- * @param {Array} bookmarks - Array of bookmarks to normalize
- * @returns {Array} - Normalized bookmarks with only comparable fields
+ * @param {Array} items - Array of bookmarks and folders to normalize
+ * @returns {Array} - Normalized items with only comparable fields
  */
-function normalizeBookmarksForChecksum(bookmarks) {
-  if (!Array.isArray(bookmarks)) return [];
-  return bookmarks.map(b => ({
-    url: b.url,
-    title: b.title ?? '',
-    folderPath: b.folderPath || b.folder_path || '',
-    dateAdded: b.dateAdded || 0,
-    // Include index to detect order changes within folders
-    index: b.index ?? 0,
-  })).sort((a, b) => {
-    // Sort by folderPath first, then by index within the folder
-    // This preserves the actual bookmark order
+function normalizeItemsForChecksum(items) {
+  if (!Array.isArray(items)) return [];
+  
+  return items.map(item => {
+    if (item.type === 'folder') {
+      // Folder entry
+      return {
+        type: 'folder',
+        title: item.title ?? '',
+        folderPath: item.folderPath || item.folder_path || '',
+        index: item.index ?? 0,
+      };
+    } else {
+      // Bookmark entry (default for backwards compatibility)
+      return {
+        type: 'bookmark',
+        url: item.url,
+        title: item.title ?? '',
+        folderPath: item.folderPath || item.folder_path || '',
+        dateAdded: item.dateAdded || 0,
+        index: item.index ?? 0,
+      };
+    }
+  }).sort((a, b) => {
+    // Sort by type first (folders before bookmarks for consistent ordering)
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1;
+    }
+    // Then by folderPath
     const folderCompare = a.folderPath.localeCompare(b.folderPath);
     if (folderCompare !== 0) return folderCompare;
+    // Then by index within the folder
     return (a.index ?? 0) - (b.index ?? 0);
   });
+}
+
+/**
+ * @deprecated Use normalizeItemsForChecksum instead
+ * Kept for backwards compatibility during transition
+ */
+function normalizeBookmarksForChecksum(bookmarks) {
+  return normalizeItemsForChecksum(bookmarks);
 }
 
 /**

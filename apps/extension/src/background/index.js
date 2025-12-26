@@ -134,32 +134,60 @@ async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
 }
 
 /**
- * Normalize bookmarks for checksum comparison
+ * Normalize bookmarks AND folders for checksum comparison
  * Extracts only the fields that matter for content comparison,
  * matching the server-side normalization
  *
- * IMPORTANT: We include index to detect order changes within folders.
- * We sort by folderPath + index to ensure consistent ordering that
- * reflects the actual bookmark order in the browser.
+ * IMPORTANT: We include both bookmarks and folders with their index
+ * to detect order changes. Folders need index tracking too because
+ * their position within their parent folder matters for preserving
+ * the complete bookmark structure across browsers.
  *
- * @param {Array} bookmarks - Array of bookmarks to normalize
- * @returns {Array} - Normalized bookmarks with only comparable fields
+ * @param {Array} items - Array of bookmarks and folders to normalize
+ * @returns {Array} - Normalized items with only comparable fields
  */
-function normalizeBookmarksForChecksum(bookmarks) {
-  return bookmarks.map(b => ({
-    url: b.url,
-    title: b.title ?? '',
-    folderPath: b.folderPath || b.folder_path || '',
-    dateAdded: b.dateAdded || 0,
-    // Include index to detect order changes within folders
-    index: b.index ?? 0,
-  })).sort((a, b) => {
-    // Sort by folderPath first, then by index within the folder
-    // This preserves the actual bookmark order
+function normalizeItemsForChecksum(items) {
+  if (!Array.isArray(items)) return [];
+  
+  return items.map(item => {
+    if (item.type === 'folder') {
+      // Folder entry
+      return {
+        type: 'folder',
+        title: item.title ?? '',
+        folderPath: item.folderPath || item.folder_path || '',
+        index: item.index ?? 0,
+      };
+    } else {
+      // Bookmark entry (default for backwards compatibility)
+      return {
+        type: 'bookmark',
+        url: item.url,
+        title: item.title ?? '',
+        folderPath: item.folderPath || item.folder_path || '',
+        dateAdded: item.dateAdded || 0,
+        index: item.index ?? 0,
+      };
+    }
+  }).sort((a, b) => {
+    // Sort by type first (folders before bookmarks for consistent ordering)
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1;
+    }
+    // Then by folderPath
     const folderCompare = a.folderPath.localeCompare(b.folderPath);
     if (folderCompare !== 0) return folderCompare;
+    // Then by index within the folder
     return (a.index ?? 0) - (b.index ?? 0);
   });
+}
+
+/**
+ * @deprecated Use normalizeItemsForChecksum instead
+ * Kept for backwards compatibility during transition
+ */
+function normalizeBookmarksForChecksum(bookmarks) {
+  return normalizeItemsForChecksum(bookmarks);
 }
 
 /**
@@ -731,35 +759,56 @@ function scheduleSync(reason) {
 
 /**
  * Flatten bookmark tree to array for API sync
+ * Now includes BOTH bookmarks AND folders with their index for complete ordering
+ *
  * @param {Array} tree - Browser bookmark tree
- * @returns {Array} - Flat array of bookmarks with ordering information
+ * @returns {Array} - Flat array of bookmarks AND folders with ordering information
  */
 function flattenBookmarkTree(tree) {
-  const bookmarks = [];
+  const items = [];
 
-  function traverse(nodes, path = '') {
+  function traverse(nodes, parentPath = '') {
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
+      const nodeIndex = node.index ?? i;
+      
       if (node.url) {
-        bookmarks.push({
+        // It's a bookmark
+        items.push({
+          type: 'bookmark',
           id: node.id,
           url: node.url,
           // Preserve empty titles - don't replace with URL
           title: node.title ?? '',
-          folderPath: path,
+          folderPath: parentPath,
           dateAdded: node.dateAdded,
           // Track the index within the parent folder for ordering
-          index: node.index ?? i,
+          index: nodeIndex,
         });
       } else if (node.children) {
-        const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
-        traverse(node.children, newPath);
+        // It's a folder - add folder metadata
+        const folderPath = node.title ? (parentPath ? `${parentPath}/${node.title}` : node.title) : parentPath;
+        
+        // Only add folder entry if it has a title (skip root nodes without titles)
+        if (node.title) {
+          items.push({
+            type: 'folder',
+            id: node.id,
+            title: node.title,
+            folderPath: parentPath, // Parent path (where this folder lives)
+            dateAdded: node.dateAdded,
+            index: nodeIndex,
+          });
+        }
+        
+        // Recurse into children
+        traverse(node.children, folderPath);
       }
     }
   }
 
   traverse(tree);
-  return bookmarks;
+  return items;
 }
 
 /**
