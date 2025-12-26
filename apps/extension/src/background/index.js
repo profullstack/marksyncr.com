@@ -1154,16 +1154,26 @@ function mergeTombstonesLocal(localTombstones, cloudTombstones) {
 }
 
 /**
- * Add bookmarks from cloud to local browser, respecting ordering
- * @param {Array} cloudBookmarks - Bookmarks from cloud to add locally (with index property)
+ * Add bookmarks AND folders from cloud to local browser, respecting ordering
+ *
+ * IMPORTANT: This function handles BOTH bookmarks (items with URLs) and folders
+ * (items with type='folder'). Both need to be created at their correct index
+ * positions to preserve the interleaved order from the cloud.
+ *
+ * @param {Array} cloudItems - Bookmarks and folders from cloud to add locally (with index property)
  */
-async function addCloudBookmarksToLocal(cloudBookmarks) {
+async function addCloudBookmarksToLocal(cloudItems) {
   // Get current browser bookmarks to find root folders
   const currentTree = await browser.bookmarks.getTree();
   const rootFolders = {};
   const browserType = detectBrowser();
   
-  console.log(`[MarkSyncr] addCloudBookmarksToLocal: browser=${browserType}, bookmarks to add=${cloudBookmarks.length}`);
+  console.log(`[MarkSyncr] addCloudBookmarksToLocal: browser=${browserType}, items to add=${cloudItems.length}`);
+  
+  // Debug: Log the types of items we're adding
+  const bookmarkCount = cloudItems.filter(i => i.type !== 'folder' && i.url).length;
+  const folderCount = cloudItems.filter(i => i.type === 'folder').length;
+  console.log(`[MarkSyncr] Items breakdown: ${bookmarkCount} bookmarks, ${folderCount} folders`);
   
   if (currentTree[0]?.children) {
     console.log('[MarkSyncr] Root folder children:', currentTree[0].children.map(c => ({ id: c.id, title: c.title })));
@@ -1189,11 +1199,35 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
   
   console.log('[MarkSyncr] Detected root folders:', Object.keys(rootFolders));
   
-  // Create a folder cache for quick lookup
+  // Create a folder cache for quick lookup (folder path -> folder ID)
   const folderCache = new Map();
   
-  // Helper to get or create folder by path
-  async function getOrCreateFolder(folderPath, parentId) {
+  // Helper to determine root folder key and relative path from a folderPath
+  function parseRootAndPath(folderPath) {
+    let rootFolderKey = 'other';
+    let relativePath = folderPath || '';
+    
+    const lowerPath = relativePath.toLowerCase();
+    
+    if (lowerPath.startsWith('bookmarks bar') ||
+        lowerPath.startsWith('bookmarks toolbar') ||
+        lowerPath.startsWith('speed dial')) {
+      rootFolderKey = 'toolbar';
+      relativePath = relativePath.split('/').slice(1).join('/');
+    } else if (lowerPath.startsWith('bookmarks menu')) {
+      rootFolderKey = 'menu';
+      relativePath = relativePath.split('/').slice(1).join('/');
+    } else if (lowerPath.startsWith('other bookmarks') ||
+               lowerPath.startsWith('unsorted bookmarks')) {
+      rootFolderKey = 'other';
+      relativePath = relativePath.split('/').slice(1).join('/');
+    }
+    
+    return { rootFolderKey, relativePath };
+  }
+  
+  // Helper to get or create folder by path (without index - for intermediate folders)
+  async function getOrCreateFolderPath(folderPath, parentId) {
     if (!folderPath) return parentId;
     
     const cacheKey = `${parentId}:${folderPath}`;
@@ -1221,7 +1255,7 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
       if (existingFolder) {
         currentParentId = existingFolder.id;
       } else {
-        // Create new folder
+        // Create new folder (without index - this is for intermediate folders)
         const newFolder = await browser.bookmarks.create({
           parentId: currentParentId,
           title: part,
@@ -1236,98 +1270,117 @@ async function addCloudBookmarksToLocal(cloudBookmarks) {
     return currentParentId;
   }
   
-  // Group bookmarks by their target folder path for proper ordering
-  const bookmarksByFolder = new Map();
+  // Group items by their target folder path for proper ordering
+  // This groups both bookmarks AND folders that live in the same parent folder
+  const itemsByParentFolder = new Map();
   
-  for (const bookmark of cloudBookmarks) {
-    // Determine which root folder to use based on folderPath
-    let rootFolderKey = 'other';
-    let folderPath = bookmark.folderPath || '';
+  for (const item of cloudItems) {
+    const { rootFolderKey, relativePath } = parseRootAndPath(item.folderPath || '');
     
-    // Check if folderPath starts with a known root
-    // Handle various browser naming conventions:
-    // - Chrome: "Bookmarks Bar", "Other Bookmarks"
-    // - Firefox: "Bookmarks Toolbar", "Bookmarks Menu", "Other Bookmarks"
-    // - Opera: "Bookmarks bar", "Other bookmarks", "Speed Dial" (Opera-specific)
-    const lowerPath = folderPath.toLowerCase();
-    
-    if (lowerPath.startsWith('bookmarks bar') ||
-        lowerPath.startsWith('bookmarks toolbar') ||
-        lowerPath.startsWith('speed dial')) {
-      rootFolderKey = 'toolbar';
-      folderPath = folderPath.split('/').slice(1).join('/');
-    } else if (lowerPath.startsWith('bookmarks menu')) {
-      rootFolderKey = 'menu';
-      folderPath = folderPath.split('/').slice(1).join('/');
-    } else if (lowerPath.startsWith('other bookmarks') ||
-               lowerPath.startsWith('unsorted bookmarks')) {
-      rootFolderKey = 'other';
-      folderPath = folderPath.split('/').slice(1).join('/');
+    const fullPath = `${rootFolderKey}:${relativePath}`;
+    if (!itemsByParentFolder.has(fullPath)) {
+      itemsByParentFolder.set(fullPath, []);
     }
-    
-    const fullPath = `${rootFolderKey}:${folderPath}`;
-    if (!bookmarksByFolder.has(fullPath)) {
-      bookmarksByFolder.set(fullPath, []);
-    }
-    bookmarksByFolder.get(fullPath).push({
-      ...bookmark,
+    itemsByParentFolder.get(fullPath).push({
+      ...item,
       _rootFolderKey: rootFolderKey,
-      _folderPath: folderPath,
+      _folderPath: relativePath,
     });
   }
   
-  // Sort bookmarks within each folder by their index
-  for (const [path, bookmarks] of bookmarksByFolder) {
-    bookmarks.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
+  // Sort items within each folder by their index
+  // This ensures folders and bookmarks are interleaved correctly
+  for (const [path, items] of itemsByParentFolder) {
+    items.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
   }
   
-  // Add bookmarks in order
-  let addedCount = 0;
+  // Add items in order
+  let addedBookmarks = 0;
+  let addedFolders = 0;
   let skippedCount = 0;
   
-  for (const [path, bookmarks] of bookmarksByFolder) {
-    for (const bookmark of bookmarks) {
+  for (const [path, items] of itemsByParentFolder) {
+    for (const item of items) {
       try {
-        const rootFolder = rootFolders[bookmark._rootFolderKey] || rootFolders.other || rootFolders.toolbar;
+        const rootFolder = rootFolders[item._rootFolderKey] || rootFolders.other || rootFolders.toolbar;
         
         if (!rootFolder) {
-          console.warn(`[MarkSyncr] No root folder found for bookmark: ${bookmark.url}, folderPath: ${bookmark.folderPath}`);
+          console.warn(`[MarkSyncr] No root folder found for item: ${item.title}, folderPath: ${item.folderPath}`);
           skippedCount++;
           continue;
         }
         
-        // Get or create the target folder
-        const targetFolderId = await getOrCreateFolder(bookmark._folderPath, rootFolder.id);
+        // Get or create the target parent folder
+        const targetFolderId = await getOrCreateFolderPath(item._folderPath, rootFolder.id);
         
-        // Create the bookmark with index to preserve order
-        // Note: When adding new bookmarks, we use the index if available
-        // IMPORTANT: We do NOT set dateAdded here because browser.bookmarks.create
-        // does not support setting dateAdded. The browser will assign the current time.
-        // This is fine because:
-        // 1. New bookmarks from cloud should have dateAdded > any existing tombstones
-        // 2. The filtering in Step 6 already ensures we only add bookmarks that are
-        //    newer than their tombstones (if any)
-        const createOptions = {
-          parentId: targetFolderId,
-          title: bookmark.title ?? '',
-          url: bookmark.url,
-        };
-        
-        // Only set index if it's a valid number
-        if (typeof bookmark.index === 'number' && bookmark.index >= 0) {
-          createOptions.index = bookmark.index;
+        if (item.type === 'folder') {
+          // It's a folder entry - create the folder at the correct index
+          // First check if folder already exists
+          const children = await browser.bookmarks.getChildren(targetFolderId);
+          const existingFolder = children.find(c => !c.url && c.title === item.title);
+          
+          if (existingFolder) {
+            // Folder exists - check if it's at the correct index
+            if (typeof item.index === 'number' && existingFolder.index !== item.index) {
+              // Move to correct position
+              try {
+                await browser.bookmarks.move(existingFolder.id, {
+                  parentId: targetFolderId,
+                  index: item.index,
+                });
+                console.log(`[MarkSyncr] Moved existing folder "${item.title}" to index ${item.index}`);
+              } catch (moveErr) {
+                console.warn(`[MarkSyncr] Failed to move folder "${item.title}":`, moveErr);
+              }
+            }
+            // Cache the folder ID
+            const folderFullPath = item._folderPath ? `${item._folderPath}/${item.title}` : item.title;
+            folderCache.set(`${rootFolder.id}:${folderFullPath}`, existingFolder.id);
+          } else {
+            // Create new folder at the correct index
+            const createOptions = {
+              parentId: targetFolderId,
+              title: item.title || 'Untitled Folder',
+            };
+            
+            // Set index if available
+            if (typeof item.index === 'number' && item.index >= 0) {
+              createOptions.index = item.index;
+            }
+            
+            const newFolder = await browser.bookmarks.create(createOptions);
+            addedFolders++;
+            
+            // Cache the new folder ID
+            const folderFullPath = item._folderPath ? `${item._folderPath}/${item.title}` : item.title;
+            folderCache.set(`${rootFolder.id}:${folderFullPath}`, newFolder.id);
+            
+            console.log(`[MarkSyncr] Created folder "${item.title}" at index ${item.index}`);
+          }
+        } else if (item.url) {
+          // It's a bookmark - create at the correct index
+          const createOptions = {
+            parentId: targetFolderId,
+            title: item.title ?? '',
+            url: item.url,
+          };
+          
+          // Set index if available
+          if (typeof item.index === 'number' && item.index >= 0) {
+            createOptions.index = item.index;
+          }
+          
+          await browser.bookmarks.create(createOptions);
+          addedBookmarks++;
         }
-        
-        await browser.bookmarks.create(createOptions);
-        addedCount++;
       } catch (err) {
-        console.warn('[MarkSyncr] Failed to add bookmark from cloud:', bookmark.url, err);
+        console.warn('[MarkSyncr] Failed to add item from cloud:', item.title || item.url, err);
         skippedCount++;
       }
     }
   }
   
-  console.log(`[MarkSyncr] addCloudBookmarksToLocal complete: added=${addedCount}, skipped=${skippedCount}, total=${cloudBookmarks.length}`);
+  console.log(`[MarkSyncr] addCloudBookmarksToLocal complete: bookmarks=${addedBookmarks}, folders=${addedFolders}, skipped=${skippedCount}, total=${cloudItems.length}`);
 }
 
 /**
