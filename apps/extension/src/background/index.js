@@ -134,13 +134,31 @@ async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
 }
 
 /**
+ * Normalize bookmarks for checksum comparison
+ * Extracts only the fields that matter for content comparison,
+ * matching the server-side normalization
+ * @param {Array} bookmarks - Array of bookmarks to normalize
+ * @returns {Array} - Normalized bookmarks with only comparable fields
+ */
+function normalizeBookmarksForChecksum(bookmarks) {
+  return bookmarks.map(b => ({
+    url: b.url,
+    title: b.title ?? '',
+    folderPath: b.folderPath || b.folder_path || '',
+    dateAdded: b.dateAdded || 0,
+  })).sort((a, b) => a.url.localeCompare(b.url)); // Sort by URL for consistent ordering
+}
+
+/**
  * Generate checksum for bookmark data (matches server-side algorithm)
  * Uses SHA-256 hash of JSON stringified data
  * @param {Array} bookmarks - Array of bookmarks to hash
  * @returns {Promise<string>} - Hex string of SHA-256 hash
  */
 async function generateChecksum(bookmarks) {
-  const data = JSON.stringify(bookmarks);
+  // Normalize bookmarks to only include comparable fields
+  const normalized = normalizeBookmarksForChecksum(bookmarks);
+  const data = JSON.stringify(normalized);
   const encoder = new TextEncoder();
   const dataBuffer = encoder.encode(data);
   const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);

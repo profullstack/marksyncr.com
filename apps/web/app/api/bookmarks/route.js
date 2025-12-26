@@ -38,10 +38,29 @@ export async function OPTIONS(request) {
 }
 
 /**
+ * Normalize bookmarks for checksum comparison
+ * Extracts only the fields that matter for content comparison,
+ * matching the extension-side normalization
+ * @param {Array} bookmarks - Array of bookmarks to normalize
+ * @returns {Array} - Normalized bookmarks with only comparable fields
+ */
+function normalizeBookmarksForChecksum(bookmarks) {
+  if (!Array.isArray(bookmarks)) return [];
+  return bookmarks.map(b => ({
+    url: b.url,
+    title: b.title ?? '',
+    folderPath: b.folderPath || b.folder_path || '',
+    dateAdded: b.dateAdded || 0,
+  })).sort((a, b) => a.url.localeCompare(b.url)); // Sort by URL for consistent ordering
+}
+
+/**
  * Generate checksum for bookmark data
+ * Uses normalized data to ensure consistent checksums across extension and server
  */
 function generateChecksum(data) {
-  return crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  const normalized = normalizeBookmarksForChecksum(data);
+  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
 /**
