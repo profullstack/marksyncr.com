@@ -437,19 +437,26 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
     // Skip items that are neither folders nor valid bookmarks
   }
   
-  // Combine bookmarks and folders, preserving their original order
-  // Items are sorted by folderPath first, then by index within each folder
-  // This ensures folders and bookmarks are interleaved correctly
-  const merged = [
+  // Combine bookmarks and folders into a single array
+  // IMPORTANT: We must NOT put all bookmarks before all folders, as this
+  // would break the interleaved order when items have the same folderPath.
+  // Instead, we combine them and sort purely by folderPath and index.
+  const allItems = [
     ...Array.from(bookmarkMap.values()),
     ...Array.from(folderMap.values()),
-  ].sort((a, b) => {
+  ];
+  
+  // Sort by folderPath first, then by index within each folder
+  // This ensures folders and bookmarks are interleaved correctly based on their index
+  const merged = allItems.sort((a, b) => {
     // Sort by folderPath first
     const aPath = a.folderPath || '';
     const bPath = b.folderPath || '';
     const pathCompare = aPath.localeCompare(bPath);
     if (pathCompare !== 0) return pathCompare;
     // Then by index within the folder to preserve original order
+    // This is the key: items with the same folderPath are sorted by index,
+    // regardless of whether they are bookmarks or folders
     return (a.index ?? 0) - (b.index ?? 0);
   });
   

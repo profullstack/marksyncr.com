@@ -2092,3 +2092,226 @@ describe('Checksum-Based Skip Write Optimization', () => {
     });
   });
 });
+
+describe('Folder Ordering Preservation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  /**
+   * Helper to create a mock that captures the merged data
+   */
+  function createOrderingMockSupabase(options = {}) {
+    const {
+      userExists = true,
+      existingBookmarks = [],
+      existingVersion = 0,
+    } = options;
+
+    // Track what was upserted for assertions
+    let upsertedData = null;
+
+    // Mock for ensureUserExists - user check
+    const usersSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: userExists ? { id: 'user-123' } : null,
+          error: userExists ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for user insert (when user doesn't exist)
+    const usersInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for subscriptions insert
+    const subscriptionsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for getting existing bookmarks from cloud_bookmarks
+    const bookmarksSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: existingBookmarks.length > 0 ? {
+            bookmark_data: existingBookmarks,
+            version: existingVersion,
+            checksum: 'existing-checksum',
+          } : null,
+          error: existingBookmarks.length > 0 ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for upsert - capture what was upserted
+    const upsertMock = vi.fn().mockImplementation((data) => {
+      upsertedData = data;
+      return {
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              version: existingVersion + 1,
+              checksum: 'new-checksum',
+              bookmark_data: data.bookmark_data,
+            },
+            error: null,
+          }),
+        }),
+      };
+    });
+
+    return {
+      from: vi.fn().mockImplementation((table) => {
+        if (table === 'users') {
+          return { select: usersSelectMock, insert: usersInsertMock };
+        }
+        if (table === 'subscriptions') {
+          return { insert: subscriptionsInsertMock };
+        }
+        return {
+          select: bookmarksSelectMock,
+          upsert: upsertMock,
+        };
+      }),
+      getUpsertedData: () => upsertedData,
+    };
+  }
+
+  describe('POST /api/bookmarks - Folder and Bookmark Interleaving', () => {
+    it('should preserve interleaved order of folders and bookmarks within same folderPath', async () => {
+      // This test verifies that when folders and bookmarks are interleaved
+      // (e.g., folder at index 0, bookmark at index 1, folder at index 2),
+      // the order is preserved after merging.
+      //
+      // The bug was that mergeBookmarks() was putting all bookmarks first,
+      // then all folders, before sorting. This caused folders to appear
+      // after bookmarks even when they should be interleaved.
+      
+      const incomingItems = [
+        { type: 'folder', title: 'Folder A', folderPath: 'Bookmarks Bar', index: 0 },
+        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks Bar', index: 1 },
+        { type: 'folder', title: 'Folder B', folderPath: 'Bookmarks Bar', index: 2 },
+        { type: 'bookmark', url: 'https://test.com', title: 'Test', folderPath: 'Bookmarks Bar', index: 3 },
+      ];
+
+      mockSupabase = createOrderingMockSupabase({ existingBookmarks: [], existingVersion: 0 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingItems, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.merged).toBe(4);
+
+      // Verify the order in the upserted data
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData).not.toBeNull();
+      
+      const mergedItems = upsertedData.bookmark_data;
+      expect(mergedItems).toHaveLength(4);
+      
+      // Items should be sorted by folderPath, then by index
+      // Since all have same folderPath, they should be in index order
+      expect(mergedItems[0].index).toBe(0);
+      expect(mergedItems[0].type).toBe('folder');
+      expect(mergedItems[0].title).toBe('Folder A');
+      
+      expect(mergedItems[1].index).toBe(1);
+      expect(mergedItems[1].type).toBe('bookmark');
+      expect(mergedItems[1].url).toBe('https://example.com');
+      
+      expect(mergedItems[2].index).toBe(2);
+      expect(mergedItems[2].type).toBe('folder');
+      expect(mergedItems[2].title).toBe('Folder B');
+      
+      expect(mergedItems[3].index).toBe(3);
+      expect(mergedItems[3].type).toBe('bookmark');
+      expect(mergedItems[3].url).toBe('https://test.com');
+    });
+
+    it('should NOT put all folders after all bookmarks', async () => {
+      // This is the specific bug we're fixing:
+      // Before the fix, folders would always appear after bookmarks
+      // because the array was constructed as [...bookmarks, ...folders]
+      
+      const incomingItems = [
+        { type: 'bookmark', url: 'https://a.com', title: 'A', folderPath: 'Root', index: 0 },
+        { type: 'folder', title: 'My Folder', folderPath: 'Root', index: 1 },
+        { type: 'bookmark', url: 'https://b.com', title: 'B', folderPath: 'Root', index: 2 },
+      ];
+
+      mockSupabase = createOrderingMockSupabase({ existingBookmarks: [], existingVersion: 0 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingItems, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      const upsertedData = mockSupabase.getUpsertedData();
+      const mergedItems = upsertedData.bookmark_data;
+      
+      // The folder should be at index 1, NOT at the end
+      expect(mergedItems[1].type).toBe('folder');
+      expect(mergedItems[1].title).toBe('My Folder');
+      
+      // NOT this (the bug):
+      // mergedItems[0] = bookmark A
+      // mergedItems[1] = bookmark B
+      // mergedItems[2] = folder (WRONG - should be at index 1)
+    });
+
+    it('should handle folders and bookmarks in different folderPaths correctly', async () => {
+      const incomingItems = [
+        { type: 'folder', title: 'Work', folderPath: 'Bookmarks Bar', index: 0 },
+        { type: 'bookmark', url: 'https://work.com', title: 'Work Site', folderPath: 'Bookmarks Bar/Work', index: 0 },
+        { type: 'folder', title: 'Personal', folderPath: 'Bookmarks Bar', index: 1 },
+        { type: 'bookmark', url: 'https://personal.com', title: 'Personal Site', folderPath: 'Bookmarks Bar/Personal', index: 0 },
+      ];
+
+      mockSupabase = createOrderingMockSupabase({ existingBookmarks: [], existingVersion: 0 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingItems, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      const upsertedData = mockSupabase.getUpsertedData();
+      const mergedItems = upsertedData.bookmark_data;
+      
+      // Items should be sorted by folderPath first, then by index
+      // Expected order:
+      // 1. Bookmarks Bar items (Work folder at 0, Personal folder at 1)
+      // 2. Bookmarks Bar/Personal items (Personal Site at 0)
+      // 3. Bookmarks Bar/Work items (Work Site at 0)
+      
+      expect(mergedItems).toHaveLength(4);
+      
+      // First two should be from "Bookmarks Bar" (sorted by index)
+      expect(mergedItems[0].folderPath).toBe('Bookmarks Bar');
+      expect(mergedItems[0].index).toBe(0);
+      expect(mergedItems[1].folderPath).toBe('Bookmarks Bar');
+      expect(mergedItems[1].index).toBe(1);
+      
+      // Next should be from "Bookmarks Bar/Personal" (alphabetically before "Bookmarks Bar/Work")
+      expect(mergedItems[2].folderPath).toBe('Bookmarks Bar/Personal');
+      
+      // Last should be from "Bookmarks Bar/Work"
+      expect(mergedItems[3].folderPath).toBe('Bookmarks Bar/Work');
+    });
+  });
+});
