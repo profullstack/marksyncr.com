@@ -8,6 +8,12 @@
 const GITHUB_API_BASE = 'https://api.github.com';
 
 /**
+ * Default timeout for GitHub API requests (60 seconds)
+ * This prevents UND_ERR_HEADERS_TIMEOUT errors in Railway deployments
+ */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
  * Bookmark data structure for sync
  */
 export interface BookmarkSyncData {
@@ -90,6 +96,7 @@ export async function getBookmarkFile(
         Authorization: `Bearer ${accessToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     }
   );
 
@@ -199,6 +206,7 @@ export async function updateBookmarkFile(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     }
   );
 

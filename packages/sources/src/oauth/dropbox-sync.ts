@@ -10,6 +10,12 @@ const DROPBOX_CONTENT_BASE = 'https://content.dropboxapi.com/2';
 const DEFAULT_PATH = '/Apps/MarkSyncr/bookmarks.json';
 
 /**
+ * Default timeout for Dropbox API requests (60 seconds)
+ * This prevents UND_ERR_HEADERS_TIMEOUT errors in Railway deployments
+ */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
  * Bookmark data structure for sync
  */
 export interface BookmarkSyncData {
@@ -96,6 +102,7 @@ export async function getBookmarkFile(
       Authorization: `Bearer ${accessToken}`,
       'Dropbox-API-Arg': JSON.stringify({ path }),
     },
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -211,6 +218,7 @@ export async function updateBookmarkFile(
       'Content-Type': 'application/octet-stream',
     },
     body: contentString,
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
 
   if (!response.ok) {
