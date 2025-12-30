@@ -2566,3 +2566,304 @@ describe('Bookmark Count Limits', () => {
     });
   });
 });
+
+describe('Server-Side Tombstone Cleanup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  /**
+   * Helper to create a mock that handles tombstone cleanup testing
+   */
+  function createTombstoneCleanupMockSupabase(options = {}) {
+    const {
+      userExists = true,
+      existingBookmarks = [],
+      existingTombstones = [],
+      existingVersion = 0,
+      upsertSuccess = true,
+    } = options;
+
+    // Track what was upserted for assertions
+    let upsertedData = null;
+
+    // Mock for ensureUserExists - user check
+    const usersSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: userExists ? { id: 'user-123' } : null,
+          error: userExists ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for user insert (when user doesn't exist)
+    const usersInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for subscriptions insert
+    const subscriptionsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    // Mock for getting existing bookmarks from cloud_bookmarks
+    const bookmarksSelectMock = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? {
+            bookmark_data: existingBookmarks,
+            tombstones: existingTombstones,
+            version: existingVersion,
+            checksum: 'existing-checksum',
+          } : null,
+          error: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? null : { code: 'PGRST116' },
+        }),
+      }),
+    });
+
+    // Mock for upsert - capture what was upserted
+    const upsertMock = vi.fn().mockImplementation((data) => {
+      upsertedData = data;
+      return {
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: upsertSuccess ? {
+              version: existingVersion + 1,
+              checksum: 'new-checksum',
+              bookmark_data: data.bookmark_data,
+              tombstones: data.tombstones,
+            } : null,
+            error: upsertSuccess ? null : { message: 'Upsert failed' },
+          }),
+        }),
+      };
+    });
+
+    return {
+      from: vi.fn().mockImplementation((table) => {
+        if (table === 'users') {
+          return { select: usersSelectMock, insert: usersInsertMock };
+        }
+        if (table === 'subscriptions') {
+          return { insert: subscriptionsInsertMock };
+        }
+        return {
+          select: bookmarksSelectMock,
+          upsert: upsertMock,
+        };
+      }),
+      getUpsertedData: () => upsertedData,
+    };
+  }
+
+  describe('POST /api/bookmarks - Tombstone Cleanup', () => {
+    it('should remove tombstones older than 7 days from existing data', async () => {
+      const now = Date.now();
+      const eightDaysAgo = now - (8 * 24 * 60 * 60 * 1000);
+      const sixDaysAgo = now - (6 * 24 * 60 * 60 * 1000);
+      
+      const existingTombstones = [
+        { url: 'https://old-deleted.com', deletedAt: eightDaysAgo }, // Should be cleaned up
+        { url: 'https://recent-deleted.com', deletedAt: sixDaysAgo }, // Should be kept
+      ];
+
+      mockSupabase = createTombstoneCleanupMockSupabase({
+        existingTombstones,
+        existingVersion: 1
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: [], source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      
+      // Check that the old tombstone was cleaned up
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData).not.toBeNull();
+      expect(upsertedData.tombstones).toHaveLength(1);
+      expect(upsertedData.tombstones[0].url).toBe('https://recent-deleted.com');
+    });
+
+    it('should remove tombstones older than 7 days from incoming data', async () => {
+      const now = Date.now();
+      const eightDaysAgo = now - (8 * 24 * 60 * 60 * 1000);
+      const sixDaysAgo = now - (6 * 24 * 60 * 60 * 1000);
+      
+      const incomingTombstones = [
+        { url: 'https://old-incoming.com', deletedAt: eightDaysAgo }, // Should be cleaned up
+        { url: 'https://recent-incoming.com', deletedAt: sixDaysAgo }, // Should be kept
+      ];
+
+      mockSupabase = createTombstoneCleanupMockSupabase({ existingVersion: 0 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: incomingTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      
+      // Check that the old tombstone was cleaned up
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData).not.toBeNull();
+      expect(upsertedData.tombstones).toHaveLength(1);
+      expect(upsertedData.tombstones[0].url).toBe('https://recent-incoming.com');
+    });
+
+    it('should keep tombstones exactly 7 days old', async () => {
+      const now = Date.now();
+      const exactlySevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+      
+      const existingTombstones = [
+        { url: 'https://exactly-7-days.com', deletedAt: exactlySevenDaysAgo },
+      ];
+
+      mockSupabase = createTombstoneCleanupMockSupabase({
+        existingTombstones,
+        existingVersion: 1
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: [], source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      // Tombstone at exactly 7 days should be kept (cutoff is > 7 days)
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData.tombstones).toHaveLength(1);
+    });
+
+    it('should clean up old tombstones during merge', async () => {
+      const now = Date.now();
+      const tenDaysAgo = now - (10 * 24 * 60 * 60 * 1000);
+      const fiveDaysAgo = now - (5 * 24 * 60 * 60 * 1000);
+      const twoDaysAgo = now - (2 * 24 * 60 * 60 * 1000);
+      
+      const existingTombstones = [
+        { url: 'https://very-old.com', deletedAt: tenDaysAgo }, // Should be cleaned up (> 7 days)
+        { url: 'https://existing-recent.com', deletedAt: fiveDaysAgo }, // Should be kept (< 7 days)
+      ];
+      
+      const incomingTombstones = [
+        { url: 'https://incoming-recent.com', deletedAt: twoDaysAgo }, // Should be kept
+      ];
+
+      mockSupabase = createTombstoneCleanupMockSupabase({
+        existingTombstones,
+        existingVersion: 1
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: incomingTombstones, source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      // Should have 2 tombstones (the two recent ones)
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData.tombstones).toHaveLength(2);
+      
+      const urls = upsertedData.tombstones.map(t => t.url);
+      expect(urls).toContain('https://existing-recent.com');
+      expect(urls).toContain('https://incoming-recent.com');
+      expect(urls).not.toContain('https://very-old.com');
+    });
+
+    it('should handle tombstones without deletedAt timestamp', async () => {
+      // Tombstones without deletedAt should be kept (can't determine age)
+      const existingTombstones = [
+        { url: 'https://no-timestamp.com' }, // No deletedAt - should be kept
+        { url: 'https://with-timestamp.com', deletedAt: Date.now() - (5 * 24 * 60 * 60 * 1000) },
+      ];
+
+      mockSupabase = createTombstoneCleanupMockSupabase({
+        existingTombstones,
+        existingVersion: 1
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: [], source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      // Both should be kept
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData.tombstones).toHaveLength(2);
+    });
+  });
+
+  describe('Tombstone Cleanup - Root Cause Fix', () => {
+    it('should prevent stale tombstones from accumulating in cloud', async () => {
+      // This test verifies the ROOT CAUSE fix:
+      // Before: Tombstones accumulated forever in the cloud
+      // After: Tombstones older than 7 days are automatically cleaned up
+      
+      const now = Date.now();
+      
+      // Simulate a scenario where tombstones have been accumulating for weeks
+      const accumulatedTombstones = [
+        { url: 'https://deleted-30-days-ago.com', deletedAt: now - (30 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-14-days-ago.com', deletedAt: now - (14 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-10-days-ago.com', deletedAt: now - (10 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-8-days-ago.com', deletedAt: now - (8 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-6-days-ago.com', deletedAt: now - (6 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-3-days-ago.com', deletedAt: now - (3 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-today.com', deletedAt: now },
+      ];
+
+      mockSupabase = createTombstoneCleanupMockSupabase({
+        existingTombstones: accumulatedTombstones,
+        existingVersion: 1
+      });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: [], tombstones: [], source: 'chrome' },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      // Only tombstones from the last 7 days should remain
+      const upsertedData = mockSupabase.getUpsertedData();
+      expect(upsertedData.tombstones).toHaveLength(3); // 6 days, 3 days, today
+      
+      const urls = upsertedData.tombstones.map(t => t.url);
+      expect(urls).toContain('https://deleted-6-days-ago.com');
+      expect(urls).toContain('https://deleted-3-days-ago.com');
+      expect(urls).toContain('https://deleted-today.com');
+      
+      // Old tombstones should be gone
+      expect(urls).not.toContain('https://deleted-30-days-ago.com');
+      expect(urls).not.toContain('https://deleted-14-days-ago.com');
+      expect(urls).not.toContain('https://deleted-10-days-ago.com');
+      expect(urls).not.toContain('https://deleted-8-days-ago.com');
+    });
+  });
+});

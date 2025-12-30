@@ -330,32 +330,71 @@ function extractBookmarksFromNested(data) {
 }
 
 /**
- * Merge tombstones (deleted bookmark records)
+ * Maximum age for tombstones in milliseconds (7 days)
+ * Tombstones older than this are cleaned up to prevent stale deletion issues
+ *
+ * WHY THIS MATTERS:
+ * Without cleanup, tombstones accumulate forever. If a user clears their
+ * extension storage (or reinstalls), the next sync would receive ALL old
+ * tombstones and delete bookmarks that may have been re-added.
+ *
+ * With cleanup, tombstones only persist for 7 days - enough time for all
+ * browsers to sync and receive the deletion, but not so long that they
+ * cause problems when storage is cleared.
+ *
+ * NOTE: The PRIMARY protection against unintended deletions is the
+ * extension-side safeguard (filterTombstonesToApply) which only applies
+ * tombstones created after the last sync time. This server-side cleanup
+ * is a SECONDARY protection to prevent tombstone accumulation.
+ */
+const TOMBSTONE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/**
+ * Merge tombstones (deleted bookmark records) and clean up old ones
  * Uses URL as unique identifier
  * Newer deletions (by deletedAt) win
+ * Tombstones older than TOMBSTONE_MAX_AGE_MS are removed
  */
 function mergeTombstones(existingTombstones, incomingTombstones) {
   const tombstoneMap = new Map();
+  const now = Date.now();
+  const cutoffTime = now - TOMBSTONE_MAX_AGE_MS;
   
   // Ensure arrays
   const existingArray = Array.isArray(existingTombstones) ? existingTombstones : [];
   const incomingArray = Array.isArray(incomingTombstones) ? incomingTombstones : [];
   
-  // Add existing tombstones
+  // Add existing tombstones (skip old ones)
+  let cleanedUp = 0;
   for (const tombstone of existingArray) {
     if (tombstone && tombstone.url) {
+      // Skip tombstones older than the cutoff
+      if (tombstone.deletedAt && tombstone.deletedAt < cutoffTime) {
+        cleanedUp++;
+        continue;
+      }
       tombstoneMap.set(tombstone.url, tombstone);
     }
   }
   
-  // Merge incoming tombstones (newer wins)
+  // Merge incoming tombstones (newer wins, skip old ones)
   for (const incoming of incomingArray) {
     if (!incoming || !incoming.url) continue;
+    
+    // Skip tombstones older than the cutoff
+    if (incoming.deletedAt && incoming.deletedAt < cutoffTime) {
+      cleanedUp++;
+      continue;
+    }
     
     const existing = tombstoneMap.get(incoming.url);
     if (!existing || (incoming.deletedAt > existing.deletedAt)) {
       tombstoneMap.set(incoming.url, incoming);
     }
+  }
+  
+  if (cleanedUp > 0) {
+    console.log(`[Bookmarks API] Cleaned up ${cleanedUp} old tombstones (older than 7 days)`);
   }
   
   return Array.from(tombstoneMap.values());
