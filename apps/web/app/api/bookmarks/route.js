@@ -256,12 +256,22 @@ function extractBookmarksFromNested(data) {
   // If it has a 'roots' property, extract from nested format
   if (data.roots) {
     const items = [];
+    // Track seen folders to prevent duplicates (key = folderPath + title)
+    const seenFolders = new Set();
+    // Track seen bookmarks to prevent duplicates (key = url)
+    const seenBookmarks = new Set();
     
     function extractFromNode(node, path = '', nodeIndex = 0) {
       if (!node) return;
       
       // If it's a bookmark (has url)
       if (node.url) {
+        // Deduplicate bookmarks by URL
+        if (seenBookmarks.has(node.url)) {
+          return; // Skip duplicate bookmark
+        }
+        seenBookmarks.add(node.url);
+        
         items.push({
           type: 'bookmark',
           url: node.url,
@@ -280,13 +290,18 @@ function extractBookmarksFromNested(data) {
         // Add folder entry (only if it has a title and is not a root folder)
         // Root folders are identified by being direct children of roots object
         if (node.title && path) {
-          items.push({
-            type: 'folder',
-            title: node.title,
-            folderPath: path, // Parent path (where this folder lives)
-            dateAdded: node.dateAdded ? new Date(node.dateAdded).getTime() : Date.now(),
-            index: node.index ?? nodeIndex,
-          });
+          // Deduplicate folders by path + title
+          const folderKey = `${path}::${node.title}`;
+          if (!seenFolders.has(folderKey)) {
+            seenFolders.add(folderKey);
+            items.push({
+              type: 'folder',
+              title: node.title,
+              folderPath: path, // Parent path (where this folder lives)
+              dateAdded: node.dateAdded ? new Date(node.dateAdded).getTime() : Date.now(),
+              index: node.index ?? nodeIndex,
+            });
+          }
         }
         
         // Recurse into children with their index
