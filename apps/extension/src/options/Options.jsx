@@ -474,6 +474,7 @@ export function Options() {
           chrome.storage.local.remove([
             'marksyncr-last-cloud-checksum',
             'marksyncr-tombstones',
+            'marksyncr-last-sync-time',
             'lastSync',
             'lastSyncTime',
             'syncInProgress'

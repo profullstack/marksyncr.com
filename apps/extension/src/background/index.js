@@ -15,6 +15,7 @@ const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
 const DEFAULT_SYNC_INTERVAL = 5; // minutes - sync every 5 minutes by default
 const TOMBSTONES_STORAGE_KEY = 'marksyncr-tombstones';
 const LAST_CLOUD_CHECKSUM_KEY = 'marksyncr-last-cloud-checksum';
+const LAST_SYNC_TIME_KEY = 'marksyncr-last-sync-time';
 
 // Flag to disable tombstone creation during Force Pull operations
 let isForcePullInProgress = false;
@@ -229,6 +230,88 @@ async function getLastCloudChecksum() {
  */
 async function storeLastCloudChecksum(checksum) {
   await browser.storage.local.set({ [LAST_CLOUD_CHECKSUM_KEY]: checksum });
+}
+
+/**
+ * Get the last sync time (timestamp in milliseconds)
+ * @returns {Promise<number|null>}
+ */
+async function getLastSyncTime() {
+  const data = await browser.storage.local.get(LAST_SYNC_TIME_KEY);
+  return data[LAST_SYNC_TIME_KEY] || null;
+}
+
+/**
+ * Store the last sync time
+ * @param {number} timestamp - Timestamp in milliseconds
+ */
+async function storeLastSyncTime(timestamp) {
+  await browser.storage.local.set({ [LAST_SYNC_TIME_KEY]: timestamp });
+}
+
+/**
+ * Filter cloud tombstones to only include those that should be applied
+ *
+ * This is a SAFEGUARD to prevent unintended bookmark deletions when:
+ * 1. Local tombstones are cleared (e.g., user clears extension storage)
+ * 2. Cloud has tombstones from previous syncs
+ *
+ * A tombstone should be applied if:
+ * 1. It was created AFTER the last sync time (new deletion from another browser)
+ * 2. OR there's a matching local tombstone (we already know about this deletion)
+ *
+ * A tombstone should NOT be applied if:
+ * 1. It was created BEFORE the last sync time AND we have no local tombstone for it
+ *    (This means we cleared local storage and the tombstone is stale)
+ *
+ * @param {Array<{url: string, deletedAt: number}>} cloudTombstones - Tombstones from cloud
+ * @param {Array<{url: string, deletedAt: number}>} localTombstones - Local tombstones
+ * @param {number|null} lastSyncTime - Timestamp of last successful sync (null if never synced)
+ * @returns {Array<{url: string, deletedAt: number}>} - Filtered tombstones to apply
+ */
+function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime) {
+  if (!cloudTombstones || cloudTombstones.length === 0) {
+    return [];
+  }
+  
+  // If we've never synced before, don't apply any cloud tombstones
+  // This is a fresh install, so we shouldn't delete anything
+  if (!lastSyncTime) {
+    console.log('[MarkSyncr] First sync - not applying cloud tombstones (safeguard)');
+    return [];
+  }
+  
+  // Create a set of local tombstone URLs for quick lookup
+  const localTombstoneUrls = new Set(localTombstones.map(t => t.url));
+  
+  // Filter cloud tombstones
+  const filtered = cloudTombstones.filter(tombstone => {
+    // If we have a local tombstone for this URL, we already know about this deletion
+    if (localTombstoneUrls.has(tombstone.url)) {
+      return true;
+    }
+    
+    // If the tombstone was created AFTER our last sync, it's a new deletion
+    // from another browser that we should apply
+    if (tombstone.deletedAt > lastSyncTime) {
+      return true;
+    }
+    
+    // Otherwise, this is a stale tombstone from before our last sync
+    // We don't have a local tombstone for it, which means either:
+    // 1. We cleared local storage (lost our tombstones)
+    // 2. The bookmark was re-added after the tombstone was created
+    // In either case, we should NOT delete the local bookmark
+    console.log(`[MarkSyncr] Skipping stale tombstone (safeguard): ${tombstone.url} (deletedAt: ${new Date(tombstone.deletedAt).toISOString()}, lastSync: ${new Date(lastSyncTime).toISOString()})`);
+    return false;
+  });
+  
+  const skipped = cloudTombstones.length - filtered.length;
+  if (skipped > 0) {
+    console.log(`[MarkSyncr] Tombstone safeguard: ${skipped} stale tombstones skipped, ${filtered.length} will be applied`);
+  }
+  
+  return filtered;
 }
 
 /**
@@ -919,11 +1002,24 @@ async function performSync(sourceId) {
       console.log(`  - Cloud checksum: ${cloudData.checksum || 'none'}`);
       console.log(`  - Cloud version: ${cloudData.version || 'none'}`);
       
+      // Step 2.5: Get last sync time for tombstone safeguard
+      const lastSyncTime = await getLastSyncTime();
+      console.log(`[MarkSyncr] Last sync time: ${lastSyncTime ? new Date(lastSyncTime).toISOString() : 'never'}`);
+      
       // Step 3: Apply cloud tombstones to local bookmarks (delete locally if deleted elsewhere)
+      // IMPORTANT: Use the tombstone safeguard to prevent unintended deletions
+      // when local storage was cleared but cloud still has old tombstones
       let deletedLocally = 0;
       if (cloudTombstones.length > 0) {
-        deletedLocally = await applyTombstonesToLocal(cloudTombstones, localFlat);
-        console.log(`[MarkSyncr] Deleted ${deletedLocally} local bookmarks based on cloud tombstones`);
+        // Filter tombstones using the safeguard
+        const tombstonesToApply = filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime);
+        
+        if (tombstonesToApply.length > 0) {
+          deletedLocally = await applyTombstonesToLocal(tombstonesToApply, localFlat);
+          console.log(`[MarkSyncr] Deleted ${deletedLocally} local bookmarks based on ${tombstonesToApply.length} filtered cloud tombstones`);
+        } else {
+          console.log(`[MarkSyncr] No tombstones to apply after safeguard filtering`);
+        }
       }
       
       // Step 4: Merge tombstones (keep the newest deletion time for each URL)
@@ -1022,10 +1118,12 @@ async function performSync(sourceId) {
       if (!hasChanges) {
         console.log('[MarkSyncr] No changes detected - checksums match and no new bookmarks');
         
-        // Update last sync time even when skipping
+        // Update last sync time even when skipping (both ISO string and timestamp)
+        const syncTimestamp = Date.now();
         await browser.storage.local.set({
-          lastSync: new Date().toISOString(),
+          lastSync: new Date(syncTimestamp).toISOString(),
         });
+        await storeLastSyncTime(syncTimestamp);
         
         // Store the cloud checksum for future reference
         await storeLastCloudChecksum(cloudChecksum);
@@ -1078,10 +1176,12 @@ async function performSync(sourceId) {
       
       console.log('[MarkSyncr] Two-way sync with tombstones completed:', stats);
 
-      // Update last sync time
+      // Update last sync time (both ISO string for display and timestamp for tombstone safeguard)
+      const syncTimestamp = Date.now();
       await browser.storage.local.set({
-        lastSync: new Date().toISOString(),
+        lastSync: new Date(syncTimestamp).toISOString(),
       });
+      await storeLastSyncTime(syncTimestamp);
 
       return {
         success: true,
