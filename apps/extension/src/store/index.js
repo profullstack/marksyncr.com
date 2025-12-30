@@ -262,6 +262,22 @@ export const useStore = create(
         try {
           await apiSignOut();
           
+          // Mark supabase-cloud as disconnected since user is logging out
+          const sources = get().sources.map((source) => {
+            if (source.id === 'supabase-cloud') {
+              return { ...source, connected: false };
+            }
+            // Also disconnect OAuth sources since they require authentication
+            if (['github', 'dropbox', 'google-drive'].includes(source.id)) {
+              return { ...source, connected: false };
+            }
+            return source;
+          });
+          
+          // Persist updated sources to browser storage
+          const browserAPI = getBrowserAPI();
+          await browserAPI.storage.local.set({ sources });
+          
           set({
             user: null,
             isAuthenticated: false,
@@ -269,7 +285,10 @@ export const useStore = create(
             authError: null,
             subscription: null,
             tags: [],
+            sources,
           });
+
+          console.log('[MarkSyncr Store] Logged out, sources disconnected:', sources.map(s => ({ id: s.id, connected: s.connected })));
 
           return { success: true };
         } catch (err) {
@@ -1192,9 +1211,10 @@ export const useStore = create(
 /**
  * Count bookmarks and folders in a bookmark tree
  * @param {Array} tree - Bookmark tree from browser API
+ * @param {number} [syncedCount=0] - Number of bookmarks synced to cloud (0 if not logged in)
  * @returns {SyncStats}
  */
-function countBookmarks(tree) {
+function countBookmarks(tree, syncedCount = 0) {
   let total = 0;
   let folders = 0;
 
@@ -1211,7 +1231,8 @@ function countBookmarks(tree) {
 
   traverse(tree);
 
-  return { total, folders, synced: total };
+  // synced is 0 when not logged in, otherwise it's the actual synced count from the server
+  return { total, folders, synced: syncedCount };
 }
 
 /**

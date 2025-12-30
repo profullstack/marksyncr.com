@@ -6,6 +6,7 @@ import {
   formatToJson,
   detectImportFormat,
 } from '@marksyncr/core';
+import { deleteCloudData } from '../lib/api.js';
 
 // Service icons
 const GitHubIcon = ({ className = '' }) => (
@@ -249,6 +250,8 @@ export function Options() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showClearCacheModal, setShowClearCacheModal] = useState(false);
+  const [showDeleteCloudDataModal, setShowDeleteCloudDataModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [importMessage, setImportMessage] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -495,6 +498,43 @@ export function Options() {
     }
   };
 
+  // Delete all cloud data (bookmarks, versions, sync sources)
+  const handleDeleteCloudData = async () => {
+    if (!isAuthenticated) {
+      setImportMessage({ type: 'error', text: 'You must be logged in to delete cloud data.' });
+      setShowDeleteCloudDataModal(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteCloudData();
+      
+      // Also clear local sync cache since cloud data is gone
+      if (chrome?.storage?.local) {
+        await new Promise((resolve) => {
+          chrome.storage.local.remove([
+            'marksyncr-last-cloud-checksum',
+            'marksyncr-tombstones',
+            'marksyncr-last-sync-time',
+            'lastSync',
+            'lastSyncTime',
+            'syncInProgress'
+          ], resolve);
+        });
+      }
+      
+      setShowDeleteCloudDataModal(false);
+      setImportMessage({ type: 'success', text: 'All cloud data has been deleted. Your browser bookmarks are unchanged.' });
+      setTimeout(() => setImportMessage(null), 5000);
+    } catch (err) {
+      console.error('Delete cloud data failed:', err);
+      setImportMessage({ type: 'error', text: `Failed to delete cloud data: ${err.message}` });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!isInitialized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -653,6 +693,14 @@ export function Options() {
               >
                 Reset Sync Data
               </button>
+              {isAuthenticated && (
+                <button
+                  onClick={() => setShowDeleteCloudDataModal(true)}
+                  className="rounded-lg border border-red-500 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                >
+                  Delete Cloud Data
+                </button>
+              )}
             </div>
 
             {/* Hidden file input for import */}
@@ -811,6 +859,48 @@ export function Options() {
                     className="flex-1 px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700"
                   >
                     Clear Cache
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Cloud Data Modal */}
+          {showDeleteCloudDataModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                <h3 className="text-lg font-semibold text-red-600 mb-4">⚠️ Delete All Cloud Data</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  This will permanently delete ALL your cloud data, including:
+                </p>
+                <ul className="text-sm text-slate-600 mb-4 list-disc list-inside">
+                  <li>All synced bookmarks in the cloud</li>
+                  <li>Version history</li>
+                  <li>Connected sync sources (GitHub, Dropbox, etc.)</li>
+                  <li>Tombstones (deletion tracking)</li>
+                </ul>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-amber-800">
+                    <strong>Your browser bookmarks will NOT be affected.</strong> Only cloud data will be deleted.
+                  </p>
+                </div>
+                <p className="text-sm text-red-600 font-medium mb-4">
+                  This action cannot be undone. You will need to sync again to restore cloud data.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteCloudDataModal(false)}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteCloudData}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete All Cloud Data'}
                   </button>
                 </div>
               </div>

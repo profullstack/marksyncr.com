@@ -524,6 +524,30 @@ export async function deleteBookmark(urlOrId) {
 }
 
 /**
+ * Delete ALL cloud data for the current user
+ * This includes: bookmarks, tombstones, version history, and connected sync sources
+ * WARNING: This is a destructive operation that cannot be undone
+ * Browser bookmarks are NOT affected - only cloud data is deleted
+ */
+export async function deleteCloudData() {
+  try {
+    const response = await apiRequest('/api/bookmarks/all', {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to delete cloud data');
+    }
+    
+    return await response.json();
+  } catch (err) {
+    console.error('Failed to delete cloud data:', err);
+    throw err;
+  }
+}
+
+/**
  * Get browser bookmarks using the browser API
  */
 export async function getBrowserBookmarks() {
@@ -585,5 +609,6 @@ export default {
   fetchBookmarks,
   syncBookmarks,
   deleteBookmark,
+  deleteCloudData,
   getBrowserBookmarks,
 };

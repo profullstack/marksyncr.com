@@ -1091,7 +1091,8 @@ async function performSync(sourceId) {
       const finalTree = await browser.bookmarks.getTree();
       const mergedFlat = flattenBookmarkTree(finalTree);
       const mergedData = convertBrowserBookmarks(finalTree);
-      const stats = countBookmarks(finalTree);
+      // Pass the merged bookmark count as synced count since we're syncing to cloud
+      const stats = countBookmarks(finalTree, mergedFlat.filter(b => b.url).length);
       
       // Step 8.5: Check if there are any actual changes by comparing checksums
       // Generate checksum of merged bookmarks (same algorithm as server)
@@ -1633,9 +1634,10 @@ function detectBrowser() {
 /**
  * Count bookmarks in tree
  * @param {Array} tree
+ * @param {number} [syncedCount=0] - Number of bookmarks synced to cloud (0 if not logged in)
  * @returns {{total: number, folders: number, synced: number}}
  */
-function countBookmarks(tree) {
+function countBookmarks(tree, syncedCount = 0) {
   let total = 0;
   let folders = 0;
 
@@ -1651,7 +1653,8 @@ function countBookmarks(tree) {
   }
 
   traverse(tree);
-  return { total, folders, synced: total };
+  // synced is 0 when not logged in, otherwise it's the actual synced count from the server
+  return { total, folders, synced: syncedCount };
 }
 
 /**
@@ -1675,8 +1678,9 @@ async function forcePush() {
     // Get current bookmarks from browser
     const bookmarkTree = await browser.bookmarks.getTree();
     const bookmarkData = convertBrowserBookmarks(bookmarkTree);
-    const stats = countBookmarks(bookmarkTree);
     const flatBookmarks = flattenBookmarkTree(bookmarkTree);
+    // Pass the bookmark count as synced count since we're pushing all to cloud
+    const stats = countBookmarks(bookmarkTree, flatBookmarks.filter(b => b.url).length);
     
     // Force push to cloud (overwrite)
     console.log(`[MarkSyncr] Force pushing ${flatBookmarks.length} bookmarks to cloud...`);
@@ -1816,7 +1820,9 @@ async function forcePull() {
       
       // Count what was created
       const finalTree = await browser.bookmarks.getTree();
-      const finalStats = countBookmarks(finalTree);
+      const finalFlat = flattenBookmarkTree(finalTree);
+      // Pass the bookmark count as synced count since we pulled all from cloud
+      const finalStats = countBookmarks(finalTree, finalFlat.filter(b => b.url).length);
       importedCount = finalStats.total;
       foldersCreated = finalStats.folders;
       
@@ -1975,6 +1981,12 @@ async function connectSource(sourceId) {
 
 /**
  * Fetch connected sources from the server and update local state
+ *
+ * IMPORTANT: This function handles three types of sources:
+ * 1. browser-bookmarks - Always connected (local source)
+ * 2. supabase-cloud - Connected when user is authenticated (implicit)
+ * 3. OAuth sources (github, dropbox, google-drive) - Connected based on sync_sources table
+ *
  * @returns {Promise<{success: boolean, sources?: Array, error?: string}>}
  */
 async function refreshConnectedSources() {
@@ -2004,16 +2016,33 @@ async function refreshConnectedSources() {
     const data = await response.json();
     const serverSources = data.sources || [];
     
-    console.log('[MarkSyncr] Server sources:', serverSources);
+    console.log('[MarkSyncr] Server sources (OAuth providers):', serverSources);
     
     // Get current local sources
     const { sources: localSources = [] } = await browser.storage.local.get('sources');
     
     // Merge server sources with local sources
-    // Server sources take precedence for connection status
+    // Handle each source type appropriately:
+    // - browser-bookmarks: Always connected (local)
+    // - supabase-cloud: Connected when authenticated (we have a token, so connected)
+    // - OAuth sources: Connected based on server response
     const updatedSources = localSources.map((localSource) => {
+      // browser-bookmarks is always connected (it's a local source)
+      if (localSource.id === 'browser-bookmarks') {
+        return { ...localSource, connected: true };
+      }
+      
+      // supabase-cloud is connected when user is authenticated
+      // Since we have a valid token at this point, mark it as connected
+      if (localSource.id === 'supabase-cloud') {
+        console.log('[MarkSyncr] Marking supabase-cloud as connected (user is authenticated)');
+        return { ...localSource, connected: true };
+      }
+      
+      // For OAuth sources (github, dropbox, google-drive), check server response
       const serverSource = serverSources.find(s => s.id === localSource.id);
       if (serverSource) {
+        console.log(`[MarkSyncr] OAuth source ${localSource.id} is connected`);
         return {
           ...localSource,
           connected: true,
@@ -2024,17 +2053,14 @@ async function refreshConnectedSources() {
           connectedAt: serverSource.connectedAt,
         };
       }
-      // Keep local source but mark as disconnected if not on server
-      // (except for browser-bookmarks which is always local)
-      if (localSource.id === 'browser-bookmarks') {
-        return localSource;
-      }
+      
+      // OAuth source not found on server - mark as disconnected
       return { ...localSource, connected: false };
     });
     
     await browser.storage.local.set({ sources: updatedSources });
     
-    console.log('[MarkSyncr] Updated local sources:', updatedSources);
+    console.log('[MarkSyncr] Updated local sources:', updatedSources.map(s => ({ id: s.id, connected: s.connected })));
     
     return { success: true, sources: updatedSources };
   } catch (err) {
