@@ -2315,3 +2315,254 @@ describe('Folder Ordering Preservation', () => {
     });
   });
 });
+
+describe('Bookmark Count Limits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSupabase = createMockSupabase();
+  });
+
+  describe('POST /api/bookmarks - Request Size Limits', () => {
+    it('should reject requests with more than 10,000 bookmarks', async () => {
+      // Create an array with 10,001 bookmarks (exceeds limit)
+      const tooManyBookmarks = Array.from({ length: 10001 }, (_, i) => ({
+        url: `https://example${i}.com`,
+        title: `Bookmark ${i}`,
+      }));
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: tooManyBookmarks },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('Too many bookmarks');
+      expect(data.received).toBe(10001);
+      expect(data.limit).toBe(10000);
+    });
+
+    it('should accept requests with exactly 10,000 bookmarks', async () => {
+      // Create an array with exactly 10,000 bookmarks (at the limit)
+      const maxBookmarks = Array.from({ length: 10000 }, (_, i) => ({
+        url: `https://example${i}.com`,
+        title: `Bookmark ${i}`,
+      }));
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: maxBookmarks },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.synced).toBe(10000);
+    });
+
+    it('should accept requests with fewer than 10,000 bookmarks', async () => {
+      const fewBookmarks = Array.from({ length: 100 }, (_, i) => ({
+        url: `https://example${i}.com`,
+        title: `Bookmark ${i}`,
+      }));
+
+      mockSupabase = createPostMockSupabase({ existingVersion: null });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: fewBookmarks },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.synced).toBe(100);
+    });
+  });
+
+  describe('POST /api/bookmarks - Total Count Limits After Merge', () => {
+    /**
+     * Helper to create a mock that simulates existing bookmarks in the database
+     */
+    function createMergeLimitMockSupabase(options = {}) {
+      const {
+        userExists = true,
+        existingBookmarks = [],
+        existingVersion = 1,
+      } = options;
+
+      // Mock for ensureUserExists - user check
+      const usersSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: userExists ? { id: 'user-123' } : null,
+            error: userExists ? null : { code: 'PGRST116' },
+          }),
+        }),
+      });
+
+      // Mock for user insert (when user doesn't exist)
+      const usersInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+      // Mock for subscriptions insert
+      const subscriptionsInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+      // Mock for getting existing bookmarks from cloud_bookmarks
+      const bookmarksSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: existingBookmarks.length > 0 ? {
+              bookmark_data: existingBookmarks,
+              tombstones: [],
+              version: existingVersion,
+              checksum: 'existing-checksum',
+            } : null,
+            error: existingBookmarks.length > 0 ? null : { code: 'PGRST116' },
+          }),
+        }),
+      });
+
+      // Mock for upsert
+      const upsertMock = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              version: existingVersion + 1,
+              checksum: 'new-checksum',
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      return {
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'users') {
+            return { select: usersSelectMock, insert: usersInsertMock };
+          }
+          if (table === 'subscriptions') {
+            return { insert: subscriptionsInsertMock };
+          }
+          return {
+            select: bookmarksSelectMock,
+            upsert: upsertMock,
+          };
+        }),
+      };
+    }
+
+    it('should reject merge if total would exceed 10,000 bookmarks', async () => {
+      // Existing: 9,000 bookmarks
+      const existingBookmarks = Array.from({ length: 9000 }, (_, i) => ({
+        url: `https://existing${i}.com`,
+        title: `Existing ${i}`,
+      }));
+
+      // Incoming: 2,000 new bookmarks (total would be 11,000)
+      const newBookmarks = Array.from({ length: 2000 }, (_, i) => ({
+        url: `https://new${i}.com`,
+        title: `New ${i}`,
+      }));
+
+      mockSupabase = createMergeLimitMockSupabase({ existingBookmarks, existingVersion: 5 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: newBookmarks },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('exceed limit');
+      expect(data.current).toBe(9000);
+      expect(data.incoming).toBe(2000);
+      expect(data.wouldBe).toBe(11000);
+      expect(data.limit).toBe(10000);
+    });
+
+    it('should allow merge if total is exactly 10,000 bookmarks', async () => {
+      // Existing: 5,000 bookmarks
+      const existingBookmarks = Array.from({ length: 5000 }, (_, i) => ({
+        url: `https://existing${i}.com`,
+        title: `Existing ${i}`,
+      }));
+
+      // Incoming: 5,000 new bookmarks (total would be exactly 10,000)
+      const newBookmarks = Array.from({ length: 5000 }, (_, i) => ({
+        url: `https://new${i}.com`,
+        title: `New ${i}`,
+      }));
+
+      mockSupabase = createMergeLimitMockSupabase({ existingBookmarks, existingVersion: 5 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: newBookmarks },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.merged).toBe(10000);
+    });
+
+    it('should allow merge when duplicates keep total under limit', async () => {
+      // Existing: 9,000 bookmarks
+      const existingBookmarks = Array.from({ length: 9000 }, (_, i) => ({
+        url: `https://example${i}.com`,
+        title: `Bookmark ${i}`,
+      }));
+
+      // Incoming: 2,000 bookmarks, but 1,500 are duplicates of existing
+      // So only 500 new unique bookmarks would be added (total: 9,500)
+      const incomingBookmarks = [
+        // 1,500 duplicates (same URLs as existing)
+        ...Array.from({ length: 1500 }, (_, i) => ({
+          url: `https://example${i}.com`,
+          title: `Updated ${i}`,
+        })),
+        // 500 new unique bookmarks
+        ...Array.from({ length: 500 }, (_, i) => ({
+          url: `https://brand-new${i}.com`,
+          title: `Brand New ${i}`,
+        })),
+      ];
+
+      mockSupabase = createMergeLimitMockSupabase({ existingBookmarks, existingVersion: 5 });
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Total should be 9,500 (9,000 existing + 500 new unique)
+      expect(data.merged).toBe(9500);
+    });
+  });
+});

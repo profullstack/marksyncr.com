@@ -25,6 +25,15 @@ export async function OPTIONS() {
 
 export async function POST(request) {
   try {
+    // Validate environment variables first
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error('Login error: Missing Supabase environment variables');
+      return NextResponse.json(
+        { error: 'Server configuration error: Supabase not configured' },
+        { status: 500 }
+      );
+    }
+
     const { email, password } = await request.json();
 
     if (!email || !password) {
@@ -44,6 +53,14 @@ export async function POST(request) {
     });
 
     if (error) {
+      // Check if the error is a JSON parsing error (indicates Supabase connectivity issue)
+      if (error.message && error.message.includes('Unexpected token')) {
+        console.error('Login error: Supabase returned non-JSON response. Check NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+        return NextResponse.json(
+          { error: 'Unable to connect to authentication service. Please try again later.' },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         { error: error.message },
         { status: 401 }
@@ -60,6 +77,14 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Login error:', error);
+    // Check if the error is a JSON parsing error (indicates Supabase connectivity issue)
+    if (error.message && error.message.includes('Unexpected token')) {
+      console.error('Supabase URL configured:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      return NextResponse.json(
+        { error: 'Unable to connect to authentication service. Please try again later.' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

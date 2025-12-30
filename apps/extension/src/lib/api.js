@@ -151,6 +151,14 @@ export async function signInWithEmail(email, password) {
     body: JSON.stringify({ email, password }),
   });
   
+  // Check if response is JSON before parsing
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('Login API returned non-JSON response:', text.substring(0, 200));
+    throw new Error(`Server error: Expected JSON response but got ${contentType || 'unknown content type'}. The API may be unavailable.`);
+  }
+  
   const data = await response.json();
   
   if (!response.ok) {
@@ -181,6 +189,14 @@ export async function signUpWithEmail(email, password) {
     },
     body: JSON.stringify({ email, password }),
   });
+  
+  // Check if response is JSON before parsing
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('Signup API returned non-JSON response:', text.substring(0, 200));
+    throw new Error(`Server error: Expected JSON response but got ${contentType || 'unknown content type'}. The API may be unavailable.`);
+  }
   
   const data = await response.json();
   

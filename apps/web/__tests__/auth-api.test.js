@@ -66,6 +66,9 @@ describe('Auth API Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.NEXT_PUBLIC_APP_URL;
+    // Set required Supabase environment variables for tests
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
   });
 
   afterEach(() => {
@@ -480,6 +483,9 @@ describe('Auth API Routes', () => {
 describe('Auth API Edge Cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set required Supabase environment variables for tests
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
   });
 
   it('should handle empty string email', async () => {
@@ -593,6 +599,9 @@ describe('Auth API Edge Cases', () => {
 describe('Auth API Security', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set required Supabase environment variables for tests
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
   });
 
   it('should not expose internal error details', async () => {

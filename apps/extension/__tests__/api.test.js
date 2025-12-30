@@ -68,6 +68,9 @@ describe('API Client', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: {
+          get: (name) => name === 'content-type' ? 'application/json' : null,
+        },
         json: async () => mockResponse,
       });
 
@@ -97,6 +100,9 @@ describe('API Client', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: {
+          get: (name) => name === 'content-type' ? 'application/json' : null,
+        },
         json: async () => mockResponse,
       });
 
@@ -116,6 +122,9 @@ describe('API Client', () => {
     it('should throw error on failed login', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        headers: {
+          get: (name) => name === 'content-type' ? 'application/json' : null,
+        },
         json: async () => ({ error: 'Invalid credentials' }),
       });
 
@@ -127,11 +136,28 @@ describe('API Client', () => {
     it('should throw generic error when no error message provided', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        headers: {
+          get: (name) => name === 'content-type' ? 'application/json' : null,
+        },
         json: async () => ({}),
       });
 
       await expect(api.signInWithEmail('test@example.com', 'wrong')).rejects.toThrow(
         'Login failed'
+      );
+    });
+
+    it('should throw error when response is not JSON', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (name) => name === 'content-type' ? 'text/html' : null,
+        },
+        text: async () => '<!DOCTYPE html><html>Error</html>',
+      });
+
+      await expect(api.signInWithEmail('test@example.com', 'password123')).rejects.toThrow(
+        'Server error'
       );
     });
   });
@@ -145,6 +171,9 @@ describe('API Client', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: {
+          get: (name) => name === 'content-type' ? 'application/json' : null,
+        },
         json: async () => mockResponse,
       });
 
@@ -163,11 +192,28 @@ describe('API Client', () => {
     it('should throw error on failed signup', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        headers: {
+          get: (name) => name === 'content-type' ? 'application/json' : null,
+        },
         json: async () => ({ error: 'Email already exists' }),
       });
 
       await expect(api.signUpWithEmail('test@example.com', 'password123')).rejects.toThrow(
         'Email already exists'
+      );
+    });
+
+    it('should throw error when response is not JSON', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (name) => name === 'content-type' ? 'text/html' : null,
+        },
+        text: async () => '<!DOCTYPE html><html>Error</html>',
+      });
+
+      await expect(api.signUpWithEmail('test@example.com', 'password123')).rejects.toThrow(
+        'Server error'
       );
     });
   });

@@ -28,6 +28,18 @@ import { syncBookmarksToGitHub } from '@marksyncr/sources/oauth/github-sync';
 import { syncBookmarksToDropbox } from '@marksyncr/sources/oauth/dropbox-sync';
 
 /**
+ * Maximum number of bookmarks allowed per user
+ * This prevents data explosion from bugs or abuse
+ */
+const MAX_BOOKMARKS_PER_USER = 10000;
+
+/**
+ * Maximum number of bookmarks that can be synced in a single request
+ * This prevents timeout issues and memory problems
+ */
+const MAX_BOOKMARKS_PER_REQUEST = 10000;
+
+/**
  * Handle CORS preflight requests
  */
 export async function OPTIONS(request) {
@@ -646,6 +658,19 @@ export async function POST(request) {
       );
     }
 
+    // Validate incoming bookmark count to prevent abuse
+    if (bookmarks.length > MAX_BOOKMARKS_PER_REQUEST) {
+      console.error(`[Bookmarks API] Request rejected: ${bookmarks.length} bookmarks exceeds limit of ${MAX_BOOKMARKS_PER_REQUEST}`);
+      return NextResponse.json(
+        {
+          error: `Too many bookmarks in request. Maximum allowed: ${MAX_BOOKMARKS_PER_REQUEST}`,
+          received: bookmarks.length,
+          limit: MAX_BOOKMARKS_PER_REQUEST,
+        },
+        { status: 400, headers }
+      );
+    }
+
     // Ensure user exists in public.users table (required for foreign key)
     const userCreated = await ensureUserExists(supabase, user);
     if (!userCreated) {
@@ -732,6 +757,21 @@ export async function POST(request) {
     
     console.log(`[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`);
     console.log(`[Bookmarks API] Tombstones stored: ${mergedTombstones.length} (applied by extensions, not server)`);
+
+    // Validate total bookmark count after merge to prevent data explosion
+    if (finalBookmarks.length > MAX_BOOKMARKS_PER_USER) {
+      console.error(`[Bookmarks API] Merge rejected: ${finalBookmarks.length} total bookmarks exceeds limit of ${MAX_BOOKMARKS_PER_USER}`);
+      return NextResponse.json(
+        {
+          error: `Total bookmark count would exceed limit. Maximum allowed: ${MAX_BOOKMARKS_PER_USER}`,
+          current: Array.isArray(existingBookmarks) ? existingBookmarks.length : 0,
+          incoming: normalizedBookmarks.length,
+          wouldBe: finalBookmarks.length,
+          limit: MAX_BOOKMARKS_PER_USER,
+        },
+        { status: 400, headers }
+      );
+    }
 
     // Generate checksum for the final bookmark data
     const checksum = generateChecksum(finalBookmarks);
