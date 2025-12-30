@@ -2655,14 +2655,14 @@ describe('Server-Side Tombstone Cleanup', () => {
   }
 
   describe('POST /api/bookmarks - Tombstone Cleanup', () => {
-    it('should remove tombstones older than 7 days from existing data', async () => {
+    it('should remove tombstones older than 30 days from existing data', async () => {
       const now = Date.now();
-      const eightDaysAgo = now - (8 * 24 * 60 * 60 * 1000);
-      const sixDaysAgo = now - (6 * 24 * 60 * 60 * 1000);
+      const thirtyOneDaysAgo = now - (31 * 24 * 60 * 60 * 1000);
+      const twentyNineDaysAgo = now - (29 * 24 * 60 * 60 * 1000);
       
       const existingTombstones = [
-        { url: 'https://old-deleted.com', deletedAt: eightDaysAgo }, // Should be cleaned up
-        { url: 'https://recent-deleted.com', deletedAt: sixDaysAgo }, // Should be kept
+        { url: 'https://old-deleted.com', deletedAt: thirtyOneDaysAgo }, // Should be cleaned up
+        { url: 'https://recent-deleted.com', deletedAt: twentyNineDaysAgo }, // Should be kept
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
@@ -2689,14 +2689,14 @@ describe('Server-Side Tombstone Cleanup', () => {
       expect(upsertedData.tombstones[0].url).toBe('https://recent-deleted.com');
     });
 
-    it('should remove tombstones older than 7 days from incoming data', async () => {
+    it('should remove tombstones older than 30 days from incoming data', async () => {
       const now = Date.now();
-      const eightDaysAgo = now - (8 * 24 * 60 * 60 * 1000);
-      const sixDaysAgo = now - (6 * 24 * 60 * 60 * 1000);
+      const thirtyOneDaysAgo = now - (31 * 24 * 60 * 60 * 1000);
+      const twentyNineDaysAgo = now - (29 * 24 * 60 * 60 * 1000);
       
       const incomingTombstones = [
-        { url: 'https://old-incoming.com', deletedAt: eightDaysAgo }, // Should be cleaned up
-        { url: 'https://recent-incoming.com', deletedAt: sixDaysAgo }, // Should be kept
+        { url: 'https://old-incoming.com', deletedAt: thirtyOneDaysAgo }, // Should be cleaned up
+        { url: 'https://recent-incoming.com', deletedAt: twentyNineDaysAgo }, // Should be kept
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({ existingVersion: 0 });
@@ -2720,12 +2720,12 @@ describe('Server-Side Tombstone Cleanup', () => {
       expect(upsertedData.tombstones[0].url).toBe('https://recent-incoming.com');
     });
 
-    it('should keep tombstones exactly 7 days old', async () => {
+    it('should keep tombstones exactly 30 days old', async () => {
       const now = Date.now();
-      const exactlySevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+      const exactlyThirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
       
       const existingTombstones = [
-        { url: 'https://exactly-7-days.com', deletedAt: exactlySevenDaysAgo },
+        { url: 'https://exactly-30-days.com', deletedAt: exactlyThirtyDaysAgo },
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
@@ -2743,24 +2743,24 @@ describe('Server-Side Tombstone Cleanup', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
       
-      // Tombstone at exactly 7 days should be kept (cutoff is > 7 days)
+      // Tombstone at exactly 30 days should be kept (cutoff is > 30 days)
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData.tombstones).toHaveLength(1);
     });
 
     it('should clean up old tombstones during merge', async () => {
       const now = Date.now();
+      const fortyDaysAgo = now - (40 * 24 * 60 * 60 * 1000);
       const tenDaysAgo = now - (10 * 24 * 60 * 60 * 1000);
       const fiveDaysAgo = now - (5 * 24 * 60 * 60 * 1000);
-      const twoDaysAgo = now - (2 * 24 * 60 * 60 * 1000);
       
       const existingTombstones = [
-        { url: 'https://very-old.com', deletedAt: tenDaysAgo }, // Should be cleaned up (> 7 days)
-        { url: 'https://existing-recent.com', deletedAt: fiveDaysAgo }, // Should be kept (< 7 days)
+        { url: 'https://very-old.com', deletedAt: fortyDaysAgo }, // Should be cleaned up (> 30 days)
+        { url: 'https://existing-recent.com', deletedAt: tenDaysAgo }, // Should be kept (< 30 days)
       ];
       
       const incomingTombstones = [
-        { url: 'https://incoming-recent.com', deletedAt: twoDaysAgo }, // Should be kept
+        { url: 'https://incoming-recent.com', deletedAt: fiveDaysAgo }, // Should be kept
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
@@ -2820,18 +2820,18 @@ describe('Server-Side Tombstone Cleanup', () => {
     it('should prevent stale tombstones from accumulating in cloud', async () => {
       // This test verifies the ROOT CAUSE fix:
       // Before: Tombstones accumulated forever in the cloud
-      // After: Tombstones older than 7 days are automatically cleaned up
+      // After: Tombstones older than 30 days are automatically cleaned up
       
       const now = Date.now();
       
-      // Simulate a scenario where tombstones have been accumulating for weeks
+      // Simulate a scenario where tombstones have been accumulating for months
       const accumulatedTombstones = [
-        { url: 'https://deleted-30-days-ago.com', deletedAt: now - (30 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-14-days-ago.com', deletedAt: now - (14 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-10-days-ago.com', deletedAt: now - (10 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-8-days-ago.com', deletedAt: now - (8 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-6-days-ago.com', deletedAt: now - (6 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-3-days-ago.com', deletedAt: now - (3 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-90-days-ago.com', deletedAt: now - (90 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-60-days-ago.com', deletedAt: now - (60 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-45-days-ago.com', deletedAt: now - (45 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-31-days-ago.com', deletedAt: now - (31 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-29-days-ago.com', deletedAt: now - (29 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-7-days-ago.com', deletedAt: now - (7 * 24 * 60 * 60 * 1000) },
         { url: 'https://deleted-today.com', deletedAt: now },
       ];
 
@@ -2850,20 +2850,20 @@ describe('Server-Side Tombstone Cleanup', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
       
-      // Only tombstones from the last 7 days should remain
+      // Only tombstones from the last 30 days should remain
       const upsertedData = mockSupabase.getUpsertedData();
-      expect(upsertedData.tombstones).toHaveLength(3); // 6 days, 3 days, today
+      expect(upsertedData.tombstones).toHaveLength(3); // 29 days, 7 days, today
       
       const urls = upsertedData.tombstones.map(t => t.url);
-      expect(urls).toContain('https://deleted-6-days-ago.com');
-      expect(urls).toContain('https://deleted-3-days-ago.com');
+      expect(urls).toContain('https://deleted-29-days-ago.com');
+      expect(urls).toContain('https://deleted-7-days-ago.com');
       expect(urls).toContain('https://deleted-today.com');
       
       // Old tombstones should be gone
-      expect(urls).not.toContain('https://deleted-30-days-ago.com');
-      expect(urls).not.toContain('https://deleted-14-days-ago.com');
-      expect(urls).not.toContain('https://deleted-10-days-ago.com');
-      expect(urls).not.toContain('https://deleted-8-days-ago.com');
+      expect(urls).not.toContain('https://deleted-90-days-ago.com');
+      expect(urls).not.toContain('https://deleted-60-days-ago.com');
+      expect(urls).not.toContain('https://deleted-45-days-ago.com');
+      expect(urls).not.toContain('https://deleted-31-days-ago.com');
     });
   });
 });

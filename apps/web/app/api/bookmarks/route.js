@@ -330,7 +330,7 @@ function extractBookmarksFromNested(data) {
 }
 
 /**
- * Maximum age for tombstones in milliseconds (7 days)
+ * Maximum age for tombstones in milliseconds (30 days)
  * Tombstones older than this are cleaned up to prevent stale deletion issues
  *
  * WHY THIS MATTERS:
@@ -338,16 +338,21 @@ function extractBookmarksFromNested(data) {
  * extension storage (or reinstalls), the next sync would receive ALL old
  * tombstones and delete bookmarks that may have been re-added.
  *
- * With cleanup, tombstones only persist for 7 days - enough time for all
+ * With cleanup, tombstones only persist for 30 days - enough time for all
  * browsers to sync and receive the deletion, but not so long that they
  * cause problems when storage is cleared.
+ *
+ * WHY 30 DAYS (not shorter):
+ * - Users may not open all their browsers frequently
+ * - 30 days gives ample time for deletions to propagate
+ * - After 30 days, if a bookmark still exists locally, the user probably wants it
  *
  * NOTE: The PRIMARY protection against unintended deletions is the
  * extension-side safeguard (filterTombstonesToApply) which only applies
  * tombstones created after the last sync time. This server-side cleanup
  * is a SECONDARY protection to prevent tombstone accumulation.
  */
-const TOMBSTONE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /**
  * Merge tombstones (deleted bookmark records) and clean up old ones
@@ -394,7 +399,7 @@ function mergeTombstones(existingTombstones, incomingTombstones) {
   }
   
   if (cleanedUp > 0) {
-    console.log(`[Bookmarks API] Cleaned up ${cleanedUp} old tombstones (older than 7 days)`);
+    console.log(`[Bookmarks API] Cleaned up ${cleanedUp} old tombstones (older than 30 days)`);
   }
   
   return Array.from(tombstoneMap.values());
