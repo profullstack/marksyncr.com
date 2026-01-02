@@ -57,12 +57,13 @@ describe('API Client', () => {
   });
 
   describe('signInWithEmail', () => {
-    it('should call login API with email and password', async () => {
+    it('should call extension login API with email, password, and device info', async () => {
       const mockResponse = {
         user: { id: 'user-123', email: 'test@example.com' },
         session: {
+          extension_token: 'ext-token-123',
           access_token: 'access-token',
-          refresh_token: 'refresh-token',
+          expires_at: '2027-01-01T00:00:00Z',
         },
       };
 
@@ -76,22 +77,34 @@ describe('API Client', () => {
 
       const result = await api.signInWithEmail('test@example.com', 'password123');
 
+      // Should call the extension-specific login endpoint
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://marksyncr.com/api/auth/login',
+        'https://marksyncr.com/api/auth/extension/login',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
+          // Body should include email, password, and device info
+          body: expect.stringContaining('"email":"test@example.com"'),
         })
       );
+      // Verify the body also contains device info
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.email).toBe('test@example.com');
+      expect(body.password).toBe('password123');
+      expect(body.device_id).toBeDefined();
+      expect(body.device_name).toBeDefined();
+      expect(body.browser).toBeDefined();
+      
       expect(result).toEqual(mockResponse);
     });
 
     it('should store user data and session on successful login', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
       const mockSession = {
+        extension_token: 'ext-token-123',
         access_token: 'access-token',
-        refresh_token: 'refresh-token',
+        expires_at: '2027-01-01T00:00:00Z',
       };
       const mockResponse = {
         user: mockUser,
@@ -108,7 +121,7 @@ describe('API Client', () => {
 
       await api.signInWithEmail('test@example.com', 'password123');
 
-      // Should store session
+      // Should store session (including extension_token)
       expect(mockStorageSet).toHaveBeenCalledWith({
         session: mockSession,
       });

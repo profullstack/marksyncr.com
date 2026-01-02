@@ -315,45 +315,89 @@ function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime)
 }
 
 /**
- * Try to refresh the access token using the refresh token
+ * Try to refresh the access token using the long-lived extension token
+ *
+ * Extension sessions are designed to last 1 year, so users rarely need to re-login.
+ * When the access_token expires (1 hour), we use the extension_token to get a new one.
+ *
  * @returns {Promise<boolean>} - True if refresh was successful
  */
 async function tryRefreshToken() {
   const session = await getSession();
-  if (!session?.refresh_token) {
-    console.log('[MarkSyncr] No refresh token available');
-    return false;
+  
+  // First try extension token refresh (preferred for long-lived sessions)
+  if (session?.extension_token) {
+    try {
+      const baseUrl = getApiBaseUrl();
+      console.log('[MarkSyncr] Attempting to refresh token using extension_token...');
+      
+      const response = await fetch(`${baseUrl}/api/auth/extension/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ extension_token: session.extension_token }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.session?.access_token) {
+          console.log('[MarkSyncr] Token refreshed successfully via extension_token');
+          // Update the session with new access token, keeping extension_token
+          await storeSession({
+            ...session,
+            access_token: data.session.access_token,
+            access_token_expires_at: data.session.access_token_expires_at,
+          });
+          return true;
+        }
+      }
+      
+      // If extension token refresh failed with 401, the session is truly expired
+      if (response.status === 401) {
+        console.log('[MarkSyncr] Extension session expired (401), clearing session');
+        await clearSession();
+        return false;
+      }
+      
+      console.log('[MarkSyncr] Extension token refresh failed:', response.status);
+    } catch (err) {
+      console.error('[MarkSyncr] Extension token refresh error:', err);
+    }
   }
   
-  try {
-    const baseUrl = getApiBaseUrl();
-    console.log('[MarkSyncr] Attempting to refresh token...');
-    
-    const response = await fetch(`${baseUrl}/api/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: session.refresh_token }),
-    });
-    
-    if (!response.ok) {
-      console.log('[MarkSyncr] Token refresh failed:', response.status);
-      return false;
+  // Fallback to legacy refresh token if available (for backwards compatibility during migration)
+  if (session?.refresh_token) {
+    try {
+      const baseUrl = getApiBaseUrl();
+      console.log('[MarkSyncr] Attempting legacy refresh token...');
+      
+      const response = await fetch(`${baseUrl}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      
+      if (!response.ok) {
+        console.log('[MarkSyncr] Legacy token refresh failed:', response.status);
+        return false;
+      }
+      
+      const data = await response.json();
+      if (data.session) {
+        console.log('[MarkSyncr] Token refreshed successfully via legacy refresh_token');
+        await storeSession(data.session);
+        return true;
+      }
+    } catch (err) {
+      console.error('[MarkSyncr] Legacy token refresh error:', err);
     }
-    
-    const data = await response.json();
-    if (data.session) {
-      console.log('[MarkSyncr] Token refreshed successfully');
-      await storeSession(data.session);
-      return true;
-    }
-    
-    return false;
-  } catch (err) {
-    console.error('[MarkSyncr] Token refresh error:', err);
-    return false;
   }
+  
+  console.log('[MarkSyncr] No valid refresh token available');
+  return false;
 }
 
 /**

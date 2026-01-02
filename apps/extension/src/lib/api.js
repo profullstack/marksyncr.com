@@ -2,9 +2,16 @@
  * API client for MarkSyncr extension
  * All communication with the backend goes through web API calls
  *
- * Authentication: Bearer token in Authorization header
- * The extension stores tokens in browser.storage.local after login
- * and sends them with each request.
+ * Authentication: Long-lived extension tokens
+ * The extension stores an extension_token in browser.storage.local after login.
+ * This token is valid for 1 year and is used to obtain short-lived access tokens.
+ *
+ * Session Flow:
+ * 1. User logs in via /api/auth/extension/login
+ * 2. Server returns extension_token (valid 1 year) + initial access_token
+ * 3. Extension stores extension_token and access_token
+ * 4. When access_token expires, extension calls /api/auth/extension/refresh
+ * 5. Server validates extension_token and returns new access_token
  */
 
 const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:3000';
@@ -34,7 +41,19 @@ async function getAccessToken() {
 }
 
 /**
+ * Get stored extension token (long-lived)
+ */
+async function getExtensionToken() {
+  const browserAPI = getBrowserAPI();
+  if (!browserAPI) return null;
+  
+  const { session } = await browserAPI.storage.local.get('session');
+  return session?.extension_token || null;
+}
+
+/**
  * Store session data locally
+ * For extension sessions, we store both the extension_token and access_token
  */
 async function storeSession(session) {
   const browserAPI = getBrowserAPI();
@@ -107,48 +126,134 @@ async function apiRequest(endpoint, options = {}) {
 }
 
 /**
- * Try to refresh the access token
+ * Try to refresh the access token using the long-lived extension token
+ * This is the key to maintaining persistent sessions in the extension.
+ *
+ * The extension_token is valid for 1 year, so users rarely need to re-login.
+ * When the access_token expires (1 hour), we use the extension_token to get a new one.
  */
 async function tryRefreshToken() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return false;
   
   const { session } = await browserAPI.storage.local.get('session');
-  if (!session?.refresh_token) return false;
   
-  try {
-    const response = await fetch(`${APP_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: session.refresh_token }),
-    });
-    
-    if (!response.ok) return false;
-    
-    const data = await response.json();
-    if (data.session) {
-      await storeSession(data.session);
-      return true;
+  // First try extension token refresh (preferred for long-lived sessions)
+  if (session?.extension_token) {
+    try {
+      const response = await fetch(`${APP_URL}/api/auth/extension/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ extension_token: session.extension_token }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.session?.access_token) {
+          // Update the session with new access token, keeping extension_token
+          await storeSession({
+            ...session,
+            access_token: data.session.access_token,
+            // Update expiration info if provided
+            access_token_expires_at: data.session.access_token_expires_at,
+          });
+          return true;
+        }
+      }
+      
+      // If extension token refresh failed with 401, the session is truly expired
+      // Clear data and require re-login
+      if (response.status === 401) {
+        console.log('[MarkSyncr] Extension session expired, clearing data');
+        await clearUserData();
+        return false;
+      }
+    } catch (err) {
+      console.warn('[MarkSyncr] Extension token refresh failed:', err);
     }
-    return false;
-  } catch {
-    return false;
   }
+  
+  // Fallback to legacy refresh token if available (for backwards compatibility during migration)
+  if (session?.refresh_token) {
+    try {
+      const response = await fetch(`${APP_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      
+      if (!response.ok) return false;
+      
+      const data = await response.json();
+      if (data.session) {
+        await storeSession(data.session);
+        return true;
+      }
+    } catch {
+      // Ignore legacy refresh errors
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Get device information for session tracking
+ */
+function getDeviceInfo() {
+  const ua = navigator.userAgent;
+  let browser = 'unknown';
+  
+  if (ua.includes('Firefox/')) browser = 'firefox';
+  else if (ua.includes('Edg/')) browser = 'edge';
+  else if (ua.includes('OPR/') || ua.includes('Opera/')) browser = 'opera';
+  else if (ua.includes('Chrome/')) browser = 'chrome';
+  else if (ua.includes('Safari/')) browser = 'safari';
+  
+  return {
+    browser,
+    device_name: `${browser.charAt(0).toUpperCase() + browser.slice(1)} Extension`,
+  };
 }
 
 /**
  * Sign in with email and password
- * Stores session tokens in browser.storage.local for authenticated requests
+ * Uses the extension-specific login endpoint for long-lived sessions (1 year)
+ * Stores extension_token and access_token in browser.storage.local
  */
 export async function signInWithEmail(email, password) {
-  const response = await fetch(`${APP_URL}/api/auth/login`, {
+  const deviceInfo = getDeviceInfo();
+  
+  // Get or generate device ID for this browser instance
+  const browserAPI = getBrowserAPI();
+  let deviceId = null;
+  if (browserAPI) {
+    const stored = await browserAPI.storage.local.get('deviceId');
+    if (stored.deviceId) {
+      deviceId = stored.deviceId;
+    } else {
+      deviceId = `${deviceInfo.browser}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      await browserAPI.storage.local.set({ deviceId });
+    }
+  }
+  
+  // Use extension-specific login endpoint for long-lived sessions
+  const response = await fetch(`${APP_URL}/api/auth/extension/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+      device_id: deviceId,
+      device_name: deviceInfo.device_name,
+      browser: deviceInfo.browser,
+    }),
   });
   
   // Check if response is JSON before parsing
@@ -166,8 +271,10 @@ export async function signInWithEmail(email, password) {
   }
   
   // Store session tokens for authenticated requests
+  // Extension sessions include both extension_token (long-lived) and access_token (short-lived)
   if (data.session) {
     await storeSession(data.session);
+    console.log('[MarkSyncr] Extension session stored, expires:', data.session.expires_at);
   }
   
   // Store user info locally for quick access
