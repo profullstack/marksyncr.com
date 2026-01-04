@@ -315,6 +315,191 @@ function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime)
 }
 
 /**
+ * Normalize folder path for cross-browser comparison
+ * Different browsers use different root folder names:
+ * - Chrome: "Bookmarks Bar", "Other Bookmarks"
+ * - Firefox: "Bookmarks Toolbar", "Bookmarks Menu", "Unsorted Bookmarks"
+ * - Opera: "Speed Dial"
+ * - Edge: "Favorites Bar"
+ *
+ * This function normalizes these to a common format for comparison.
+ *
+ * @param {string} path - Folder path to normalize
+ * @returns {string} - Normalized path
+ */
+function normalizeFolderPath(path) {
+  if (!path) return '';
+  return path
+    // Normalize toolbar variations
+    .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
+    .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
+    .replace(/^Speed Dial\/?/i, 'toolbar/')
+    .replace(/^Favourites Bar\/?/i, 'toolbar/')
+    .replace(/^Favorites Bar\/?/i, 'toolbar/')
+    // Normalize other bookmarks variations
+    .replace(/^Other Bookmarks\/?/i, 'other/')
+    .replace(/^Unsorted Bookmarks\/?/i, 'other/')
+    // Normalize menu variations (Firefox)
+    .replace(/^Bookmarks Menu\/?/i, 'menu/')
+    // Clean up trailing slashes
+    .replace(/\/+$/, '');
+}
+
+/**
+ * Check if a bookmark needs to be updated based on cloud data
+ * Compares title, folder path (normalized), and index
+ *
+ * @param {Object} cloudBm - Cloud bookmark
+ * @param {Object} localBm - Local bookmark
+ * @returns {boolean} - True if bookmark needs updating
+ */
+function bookmarkNeedsUpdate(cloudBm, localBm) {
+  // Title changed
+  if ((cloudBm.title ?? '') !== (localBm.title ?? '')) return true;
+  
+  // Folder changed (with normalization)
+  const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
+  const localFolder = normalizeFolderPath(localBm.folderPath);
+  if (cloudFolder !== localFolder) return true;
+  
+  // Index changed (position within folder)
+  if (cloudBm.index !== undefined && localBm.index !== undefined && cloudBm.index !== localBm.index) return true;
+  
+  return false;
+}
+
+/**
+ * Categorize cloud bookmarks into those that need to be added vs updated
+ *
+ * @param {Array} cloudBookmarks - Bookmarks from cloud
+ * @param {Array} localBookmarks - Local bookmarks
+ * @param {Array} tombstones - Merged tombstones
+ * @returns {{toAdd: Array, toUpdate: Array}} - Categorized bookmarks
+ */
+function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
+  const localByUrl = new Map(localBookmarks.filter(b => b.url).map(b => [b.url, b]));
+  
+  const toAdd = [];
+  const toUpdate = [];
+  
+  for (const cloudBm of cloudBookmarks) {
+    // Skip folders (handled separately)
+    if (!cloudBm.url) continue;
+    
+    // Check tombstones - only add if bookmark is newer than tombstone
+    const tombstone = tombstones.find(t => t.url === cloudBm.url);
+    if (tombstone) {
+      const bookmarkDate = cloudBm.dateAdded || 0;
+      const tombstoneDate = tombstone.deletedAt || 0;
+      if (bookmarkDate <= tombstoneDate) {
+        continue; // Skip - tombstone is newer
+      }
+    }
+    
+    const localBm = localByUrl.get(cloudBm.url);
+    if (!localBm) {
+      toAdd.push(cloudBm);
+    } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
+      toUpdate.push({ cloud: cloudBm, local: localBm });
+    }
+  }
+  
+  return { toAdd, toUpdate };
+}
+
+/**
+ * Find or create a folder for a bookmark based on its folderPath
+ * Uses the same root folder detection logic as addCloudBookmarksToLocal
+ *
+ * @param {string} folderPath - The folder path (e.g., "Bookmarks Toolbar/Work/Projects")
+ * @returns {Promise<string|null>} - The folder ID, or null if not found/created
+ */
+async function findOrCreateFolderForBookmark(folderPath) {
+  if (!folderPath) return null;
+  
+  // Get current browser bookmarks to find root folders
+  const currentTree = await browser.bookmarks.getTree();
+  const rootFolders = {};
+  
+  if (currentTree[0]?.children) {
+    for (const root of currentTree[0].children) {
+      const title = root.title?.toLowerCase() || '';
+      const id = root.id;
+      
+      if (title.includes('toolbar') || title.includes('bar') || id === '1') {
+        rootFolders.toolbar = root;
+      } else if (title.includes('menu') || id === 'menu________') {
+        rootFolders.menu = root;
+      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+        rootFolders.other = root;
+      }
+    }
+  }
+  
+  // Parse the folder path to determine root and relative path
+  let rootFolderKey = 'other';
+  let relativePath = folderPath;
+  const lowerPath = folderPath.toLowerCase();
+  
+  if (lowerPath.startsWith('bookmarks bar') ||
+      lowerPath.startsWith('bookmarks toolbar') ||
+      lowerPath.startsWith('speed dial')) {
+    rootFolderKey = 'toolbar';
+    relativePath = folderPath.split('/').slice(1).join('/');
+  } else if (lowerPath.startsWith('bookmarks menu')) {
+    rootFolderKey = 'menu';
+    relativePath = folderPath.split('/').slice(1).join('/');
+  } else if (lowerPath.startsWith('other bookmarks') ||
+             lowerPath.startsWith('unsorted bookmarks')) {
+    rootFolderKey = 'other';
+    relativePath = folderPath.split('/').slice(1).join('/');
+  }
+  
+  const rootFolder = rootFolders[rootFolderKey] || rootFolders.other || rootFolders.toolbar;
+  if (!rootFolder) return null;
+  
+  // If no relative path, return the root folder
+  if (!relativePath) return rootFolder.id;
+  
+  // Navigate/create the folder path
+  const parts = relativePath.split('/').filter(p => p);
+  let currentParentId = rootFolder.id;
+  
+  for (const part of parts) {
+    const children = await browser.bookmarks.getChildren(currentParentId);
+    const existingFolder = children.find(c => !c.url && c.title === part);
+    
+    if (existingFolder) {
+      currentParentId = existingFolder.id;
+    } else {
+      // Create the folder
+      const newFolder = await browser.bookmarks.create({
+        parentId: currentParentId,
+        title: part,
+      });
+      currentParentId = newFolder.id;
+    }
+  }
+  
+  return currentParentId;
+}
+
+/**
+ * Get the parent folder ID for a bookmark
+ *
+ * @param {string} bookmarkId - The bookmark ID
+ * @returns {Promise<string|null>} - The parent folder ID, or null if not found
+ */
+async function getParentIdForBookmark(bookmarkId) {
+  try {
+    const [bookmark] = await browser.bookmarks.get(bookmarkId);
+    return bookmark?.parentId || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Try to refresh the access token using the long-lived extension token
  *
  * Extension sessions are designed to last 1 year, so users rarely need to re-login.
@@ -1075,40 +1260,35 @@ async function performSync(sourceId) {
       const updatedTree = await browser.bookmarks.getTree();
       const updatedLocalFlat = flattenBookmarkTree(updatedTree);
       
-      // Step 6: Find bookmarks in cloud that are not in local (and not tombstoned)
-      // Important: Only filter out bookmarks where the tombstone is NEWER than the bookmark
-      // This allows re-added bookmarks (from other browsers) to sync correctly
-      const localUrls = new Set(updatedLocalFlat.filter(b => b.url).map(b => b.url));
-      const newFromCloud = cloudBookmarks.filter(cb => {
-        // Skip folders (they don't have URLs)
-        if (!cb.url) {
-          return false;
-        }
-        
-        // Skip if bookmark already exists locally
-        if (localUrls.has(cb.url)) {
-          return false;
-        }
-        
-        // Check if there's a tombstone for this URL
-        const tombstone = mergedTombstones.find(t => t.url === cb.url);
-        if (!tombstone) {
-          return true; // No tombstone, add the bookmark
-        }
-        
-        // Compare dates: add bookmark only if it's newer than the tombstone
-        // This handles the case where Browser A adds a bookmark after Browser B deleted it
-        const bookmarkDate = cb.dateAdded || 0;
-        const tombstoneDate = tombstone.deletedAt || 0;
-        
-        return bookmarkDate > tombstoneDate;
-      });
-      console.log(`[MarkSyncr] 🔍 New bookmarks from cloud (after tombstone date check): ${newFromCloud.length}`);
+      // Step 6: Categorize cloud bookmarks into those to add vs update
+      // This uses the new categorizeCloudBookmarks function that properly handles:
+      // - New bookmarks (URL not in local)
+      // - Updated bookmarks (URL exists but title/folder/index differs)
+      // - Tombstone filtering (only add if bookmark is newer than tombstone)
+      const { toAdd: newFromCloud, toUpdate: bookmarksToUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        updatedLocalFlat,
+        mergedTombstones
+      );
+      
+      console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
+      console.log(`[MarkSyncr] 🔍 Bookmarks to update from cloud: ${bookmarksToUpdate.length}`);
+      
       if (newFromCloud.length > 0) {
         console.log('[MarkSyncr] 🔍 Sample new bookmarks from cloud:', newFromCloud.slice(0, 3).map(b => ({
           url: b.url,
           title: b.title,
           folderPath: b.folderPath,
+        })));
+      }
+      
+      if (bookmarksToUpdate.length > 0) {
+        console.log('[MarkSyncr] 🔍 Sample bookmarks to update:', bookmarksToUpdate.slice(0, 3).map(u => ({
+          url: u.cloud.url,
+          cloudTitle: u.cloud.title,
+          localTitle: u.local.title,
+          cloudFolder: u.cloud.folderPath,
+          localFolder: u.local.folderPath,
         })));
       }
       
@@ -1129,6 +1309,53 @@ async function performSync(sourceId) {
       if (newFromCloud.length > 0) {
         await addCloudBookmarksToLocal(newFromCloud);
         console.log(`[MarkSyncr] Added ${newFromCloud.length} bookmarks from cloud to local`);
+      }
+      
+      // Step 7.5: Update existing bookmarks that have different metadata in cloud
+      // This handles the case where a bookmark exists locally but has different title/folder/index
+      let updatedLocally = 0;
+      if (bookmarksToUpdate.length > 0) {
+        for (const { cloud, local } of bookmarksToUpdate) {
+          try {
+            // Update title if different
+            if ((cloud.title ?? '') !== (local.title ?? '')) {
+              await browser.bookmarks.update(local.id, { title: cloud.title ?? '' });
+              console.log(`[MarkSyncr] Updated title for ${cloud.url}: "${local.title}" -> "${cloud.title}"`);
+            }
+            
+            // Check if folder changed (with normalization)
+            const cloudFolder = normalizeFolderPath(cloud.folderPath);
+            const localFolder = normalizeFolderPath(local.folderPath);
+            
+            if (cloudFolder !== localFolder) {
+              // Need to move the bookmark to a different folder
+              // First, find or create the target folder
+              const targetFolderId = await findOrCreateFolderForBookmark(cloud.folderPath);
+              if (targetFolderId) {
+                await browser.bookmarks.move(local.id, {
+                  parentId: targetFolderId,
+                  index: cloud.index ?? undefined
+                });
+                console.log(`[MarkSyncr] Moved bookmark ${cloud.url} to folder: ${cloud.folderPath}`);
+              }
+            } else if (cloud.index !== undefined && cloud.index !== local.index) {
+              // Same folder but different index - just reorder
+              const parentId = await getParentIdForBookmark(local.id);
+              if (parentId) {
+                await browser.bookmarks.move(local.id, {
+                  parentId,
+                  index: cloud.index
+                });
+                console.log(`[MarkSyncr] Reordered bookmark ${cloud.url} to index ${cloud.index}`);
+              }
+            }
+            
+            updatedLocally++;
+          } catch (err) {
+            console.warn(`[MarkSyncr] Failed to update bookmark ${cloud.url}:`, err);
+          }
+        }
+        console.log(`[MarkSyncr] Updated ${updatedLocally} existing bookmarks from cloud`);
       }
       
       // Step 8: Get final local bookmarks after all merges
@@ -1177,6 +1404,7 @@ async function performSync(sourceId) {
           success: true,
           stats,
           addedFromCloud: 0,
+          updatedLocally: 0,
           deletedLocally: 0,
           pushedToCloud: 0,
           skipped: true,
@@ -1232,6 +1460,7 @@ async function performSync(sourceId) {
         success: true,
         stats,
         addedFromCloud: newFromCloud.length,
+        updatedLocally,
         deletedLocally,
         pushedToCloud: localAdditions.length,
       };
