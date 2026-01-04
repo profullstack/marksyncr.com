@@ -213,10 +213,10 @@ export async function getOrCreateCustomer(userId, email, name) {
  * Verify Stripe webhook signature
  * @param {string} payload - Raw request body
  * @param {string} signature - Stripe signature header
- * @returns {object} Verified event
+ * @returns {Promise<object>} Verified event
  */
-export function verifyWebhookSignature(payload, signature) {
-  const stripe = getStripeClientSync();
+export async function verifyWebhookSignature(payload, signature) {
+  const stripe = await getStripeClient();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -371,24 +371,6 @@ export async function handleWebhookEvent(event, supabase) {
  */
 async function getStripeClient() {
   const Stripe = (await import('stripe')).default;
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-
-  if (!secretKey) {
-    throw new Error('STRIPE_SECRET_KEY not configured');
-  }
-
-  return new Stripe(secretKey, {
-    apiVersion: '2023-10-16',
-  });
-}
-
-/**
- * Get Stripe client (sync for webhooks)
- * @returns {import('stripe').Stripe}
- */
-function getStripeClientSync() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Stripe = require('stripe').default;
   const secretKey = process.env.STRIPE_SECRET_KEY;
 
   if (!secretKey) {

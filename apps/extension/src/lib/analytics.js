@@ -80,7 +80,7 @@ export const trackEvent = async (eventName, properties = {}) => {
     });
 
     // Also log locally for debugging
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env?.DEV) {
       console.log('[Analytics]', eventName, properties);
     }
   } catch (error) {

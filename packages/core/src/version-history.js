@@ -259,7 +259,7 @@ export class VersionHistoryManager {
     const removed = bookmarksA.filter((b) => !idsB.has(b.id));
 
     const mapA = new Map(bookmarksA.map((b) => [b.id, b]));
-    const mapB = new Map(bookmarksB.map((b) => [b.id, b]));
+    const _mapB = new Map(bookmarksB.map((b) => [b.id, b]));
 
     const modified = bookmarksB.filter((b) => {
       if (!idsA.has(b.id)) return false;

@@ -31,7 +31,7 @@ function generateRandomString(length = 32) {
  * Generate PKCE code verifier and challenge
  * @returns {Promise<{verifier: string, challenge: string}>}
  */
-async function generatePKCE() {
+export async function generatePKCE() {
   const verifier = generateRandomString(64);
 
   // Create SHA-256 hash of verifier
@@ -237,7 +237,7 @@ export class GitHubOAuthHandler {
    * @returns {Promise<string>} Authorization code
    */
   async launchWebAuthFlow() {
-    const { authUrl, state } = await this.startAuth();
+    const { authUrl } = await this.startAuth();
 
     // Use browser extension identity API
     const browser = globalThis.browser || globalThis.chrome;
@@ -271,6 +271,7 @@ export class GitHubOAuthHandler {
 }
 
 export default {
+  generatePKCE,
   buildAuthorizationUrl,
   exchangeCodeForToken,
   validateToken,

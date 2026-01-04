@@ -47,7 +47,7 @@ export const resolveConflict = (conflict, strategy = 'newest') => {
       break;
 
     case 'newest':
-    default:
+    default: {
       // Use the most recent change based on timestamp
       const localTime = new Date(localChange.timestamp).getTime();
       const remoteTime = new Date(remoteChange.timestamp).getTime();
@@ -60,6 +60,7 @@ export const resolveConflict = (conflict, strategy = 'newest') => {
         resolved.resolvedValue = remoteChange.after ?? remoteChange.before;
       }
       break;
+    }
   }
 
   return resolved;

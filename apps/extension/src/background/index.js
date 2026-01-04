@@ -28,7 +28,7 @@ let isSyncInProgress = false;
  */
 function getApiBaseUrl() {
   // In production builds, this will be replaced by Vite with the actual URL
-  // eslint-disable-next-line no-undef
+   
   return typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_URL
     ? import.meta.env.VITE_APP_URL
     : 'https://marksyncr.com';

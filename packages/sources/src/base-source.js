@@ -41,10 +41,10 @@ export class BaseSource {
   /**
    * Writes bookmark data to the source
    * @abstract
-   * @param {BookmarkFile} data - Bookmark data to write
+   * @param {BookmarkFile} _data - Bookmark data to write
    * @returns {Promise<void>}
    */
-  async write(data) {
+  async write(_data) {
     throw new Error('write() must be implemented by subclass');
   }
 

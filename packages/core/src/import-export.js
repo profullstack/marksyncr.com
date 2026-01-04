@@ -98,8 +98,8 @@ export function parseNetscapeHtml(html) {
     const bookmarkRegex = /<DT><A\s+HREF="([^"]*)"[^>]*(?:ADD_DATE="(\d*)")?[^>]*>([^<]*)<\/A>/gi;
 
     let match;
-    let lastIndex = 0;
-    let processedContent = content;
+    let _lastIndex = 0;
+    let _processedContent = content;
 
     // First, extract all folders
     const folders = [];
