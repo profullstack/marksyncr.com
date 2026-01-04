@@ -10,7 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_popup": "src/popup/index.html",
+    "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/favicon-16.png",
       "32": "icons/favicon-32.png",
@@ -22,7 +22,7 @@
     "service_worker": "background/index.js",
     "type": "module"
   },
-  "options_page": "src/options/index.html",
+  "options_page": "options/index.html",
   "permissions": [
     "bookmarks",
     "storage",

@@ -232,7 +232,7 @@ const ExternalLinkIcon = ({ className = '' }) => (
 );
 
 // Connected services display component
-function ConnectedServices({ sources, isAuthenticated }) {
+function ConnectedServices({ sources, isAuthenticated, isLoading }) {
   const getServiceIcon = (sourceType) => {
     switch (sourceType) {
       case 'github':
@@ -279,13 +279,18 @@ function ConnectedServices({ sources, isAuthenticated }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-slate-700">Sync Destinations</label>
-        <button
-          onClick={openDashboard}
-          className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
-        >
-          Manage
-          <ExternalLinkIcon className="h-3 w-3" />
-        </button>
+        <div className="flex items-center gap-2">
+          {isLoading && (
+            <SyncIcon className="h-3 w-3 text-slate-400" spinning />
+          )}
+          <button
+            onClick={openDashboard}
+            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
+          >
+            Manage
+            <ExternalLinkIcon className="h-3 w-3" />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -296,7 +301,12 @@ function ConnectedServices({ sources, isAuthenticated }) {
             <span className="text-sm font-medium text-primary-700">MarkSyncr Cloud</span>
           </div>
           <div className="flex items-center space-x-2">
-            {isAuthenticated ? (
+            {isLoading ? (
+              <>
+                <SyncIcon className="h-3 w-3 text-slate-400" spinning />
+                <span className="text-xs text-slate-500">Loading...</span>
+              </>
+            ) : isAuthenticated ? (
               <>
                 <span className="h-2 w-2 rounded-full bg-green-500" />
                 <span className="text-xs text-green-600">Active</span>
@@ -469,6 +479,8 @@ export function Popup() {
     login,
     signup,
     logout,
+    // Sources loading state
+    isSourcesLoading,
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
@@ -819,7 +831,7 @@ ${content}
             <SyncStats stats={stats} />
 
             {/* Connected services display */}
-            <ConnectedServices sources={sources} isAuthenticated={isAuthenticated} />
+            <ConnectedServices sources={sources} isAuthenticated={isAuthenticated} isLoading={isSourcesLoading} />
 
             {/* Sync button */}
             <button

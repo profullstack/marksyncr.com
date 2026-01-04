@@ -10,7 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_popup": "src/popup/index.html",
+    "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/favicon-16.png",
       "32": "icons/favicon-32.png",
@@ -25,7 +25,7 @@
     "type": "module"
   },
   "options_ui": {
-    "page": "src/options/index.html",
+    "page": "options/index.html",
     "open_in_tab": true
   },
   "permissions": [

@@ -148,6 +148,8 @@ export const useStore = create(
       isAuthLoading: false,
       authError: null,
       signupSuccess: false,
+      // Sources loading state - tracks when sources are being refreshed from server
+      isSourcesLoading: false,
       // Pro features state
       subscription: null,
       tags: [],
@@ -184,9 +186,12 @@ export const useStore = create(
 
       /**
        * Sign in with email and password
+       *
+       * IMPORTANT: This function refreshes sources from the server after login
+       * to ensure the UI shows the correct connected services immediately.
        */
       login: async (email, password) => {
-        set({ isAuthLoading: true, authError: null });
+        set({ isAuthLoading: true, authError: null, isSourcesLoading: true });
 
         try {
           const { user, session } = await signInWithEmail(email, password);
@@ -211,9 +216,11 @@ export const useStore = create(
             await get().fetchTags();
           }
 
-          // Refresh connected sources from server
+          // Refresh connected sources from server - this is critical for showing
+          // the correct connected services in the UI immediately after login
           console.log('[MarkSyncr Store] Refreshing sources after login...');
-          await get().refreshSources();
+          const refreshResult = await get().refreshSources();
+          console.log('[MarkSyncr Store] Sources refresh result after login:', refreshResult);
 
           return { success: true };
         } catch (err) {
@@ -221,6 +228,7 @@ export const useStore = create(
           set({
             isAuthLoading: false,
             authError: err.message || 'Login failed',
+            isSourcesLoading: false,
           });
           return { success: false, error: err.message };
         }
@@ -303,12 +311,19 @@ export const useStore = create(
 
       /**
        * Check and restore authentication session
+       *
+       * IMPORTANT: This function is called on popup open to restore the session.
+       * It refreshes sources from the server to ensure the UI shows the correct
+       * connected services immediately.
        */
       checkAuth: async () => {
         try {
           const session = await getSession();
           
           if (session) {
+            // Set sources loading state early so UI knows we're fetching
+            set({ isSourcesLoading: true });
+            
             const user = await getUser();
             const subscription = await fetchSubscription();
             const cloudSettings = await fetchCloudSettings();
@@ -325,9 +340,11 @@ export const useStore = create(
               await get().fetchTags();
             }
 
-            // Refresh connected sources from server
+            // Refresh connected sources from server - this is critical for showing
+            // the correct connected services in the UI immediately
             console.log('[MarkSyncr Store] Refreshing sources after auth check...');
-            await get().refreshSources();
+            const refreshResult = await get().refreshSources();
+            console.log('[MarkSyncr Store] Sources refresh result after auth check:', refreshResult);
 
             return true;
           }
@@ -335,6 +352,7 @@ export const useStore = create(
           return false;
         } catch (err) {
           console.error('Auth check failed:', err);
+          set({ isSourcesLoading: false });
           return false;
         }
       },
@@ -658,9 +676,16 @@ export const useStore = create(
       /**
        * Refresh connected sources from the server
        * Call this after connecting sources via the web dashboard
+       *
+       * IMPORTANT: This function updates BOTH the Zustand store state AND
+       * browser.storage.local to ensure sources are persisted and available
+       * immediately on next popup open.
        */
       refreshSources: async () => {
         const browserAPI = getBrowserAPI();
+
+        // Set loading state so UI can show loading indicator
+        set({ isSourcesLoading: true });
 
         try {
           console.log('[MarkSyncr Store] Refreshing sources from server...');
@@ -670,15 +695,23 @@ export const useStore = create(
           });
 
           if (result?.success && result.sources) {
-            set({ sources: result.sources });
-            console.log('[MarkSyncr Store] Sources refreshed:', result.sources);
+            // Update Zustand store state
+            set({ sources: result.sources, isSourcesLoading: false });
+            
+            // Also persist to browser.storage.local so sources are available
+            // immediately on next popup open (before refreshSources completes)
+            await browserAPI.storage.local.set({ sources: result.sources });
+            
+            console.log('[MarkSyncr Store] Sources refreshed and persisted:', result.sources.map(s => ({ id: s.id, connected: s.connected })));
             return { success: true, sources: result.sources };
           } else {
             console.warn('[MarkSyncr Store] Failed to refresh sources:', result?.error);
+            set({ isSourcesLoading: false });
             return { success: false, error: result?.error || 'Failed to refresh sources' };
           }
         } catch (err) {
           console.error('[MarkSyncr Store] Failed to refresh sources:', err);
+          set({ isSourcesLoading: false });
           return { success: false, error: err.message };
         }
       },
