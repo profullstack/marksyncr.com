@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(npm run build:chrome:*)",
-      "Bash(pnpm run version:bump:*)"
-    ]
-  }
-}

@@ -884,10 +884,15 @@ async function initialize() {
         const nextFire = new Date(alarm.scheduledTime);
         const now = new Date();
         const minutesUntilFire = Math.round((nextFire - now) / 60000);
-        
-        // Check if alarm interval matches expected interval
+
+        // Check if alarm interval matches expected interval OR if alarm is stale
         if (alarm.periodInMinutes !== expectedInterval) {
           console.warn(`[MarkSyncr] Firefox: Alarm interval mismatch (${alarm.periodInMinutes} vs ${expectedInterval}), recreating...`);
+          await browser.alarms.clear(SYNC_ALARM_NAME);
+          await setupAutoSync();
+        } else if (nextFire <= now) {
+          // Alarm is stale (scheduled time in past) - recreate it
+          console.warn(`[MarkSyncr] Firefox: Alarm is stale (scheduled for ${nextFire.toISOString()}), recreating...`);
           await browser.alarms.clear(SYNC_ALARM_NAME);
           await setupAutoSync();
         } else {
@@ -922,12 +927,19 @@ async function setupAutoSync() {
       if (existingAlarm) {
         console.log(`[MarkSyncr] Existing alarm found:`, existingAlarm);
         const nextFireTime = new Date(existingAlarm.scheduledTime);
+        const now = new Date();
         console.log(`[MarkSyncr] Next fire time: ${nextFireTime.toISOString()}`);
-        
+        console.log(`[MarkSyncr] Current time: ${now.toISOString()}`);
+
         // Check if the alarm interval matches the settings
         // If not, recreate the alarm
         if (existingAlarm.periodInMinutes !== interval) {
           console.log(`[MarkSyncr] Alarm interval mismatch (${existingAlarm.periodInMinutes} vs ${interval}), recreating...`);
+          await browser.alarms.clear(SYNC_ALARM_NAME);
+        } else if (nextFireTime <= now) {
+          // Alarm's scheduledTime is in the past - this is stale and won't fire correctly
+          // This can happen after browser sleep, system hibernate, or clock changes
+          console.log(`[MarkSyncr] Alarm is stale (scheduled for past: ${nextFireTime.toISOString()}), recreating...`);
           await browser.alarms.clear(SYNC_ALARM_NAME);
         } else {
           console.log(`[MarkSyncr] Alarm already configured correctly, skipping recreation`);
