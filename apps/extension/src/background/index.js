@@ -23,6 +23,10 @@ let isForcePullInProgress = false;
 // Flag to prevent sync loops - when true, bookmark changes won't trigger new syncs
 let isSyncInProgress = false;
 
+// Track pending changes that occurred during sync - these need to be synced after current sync completes
+let pendingSyncNeeded = false;
+let pendingSyncReasons = [];
+
 /**
  * Get API base URL - uses VITE_APP_URL from build config or falls back to production URL
  */
@@ -986,33 +990,45 @@ function setupBookmarkListeners() {
   // Listen for bookmark creation - remove tombstone if bookmark is re-added
   browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
     console.log('[MarkSyncr] Bookmark created:', bookmark.title);
-    
+
     // Skip processing during sync operations to prevent sync loops
+    // BUT mark that we need a follow-up sync after current sync completes
     if (isSyncInProgress || isForcePullInProgress) {
-      console.log('[MarkSyncr] Skipping bookmark created handler (sync in progress)');
+      console.log('[MarkSyncr] Queuing pending sync (bookmark created during sync)');
+      pendingSyncNeeded = true;
+      pendingSyncReasons.push('bookmark-created-during-sync');
       return;
     }
-    
+
     // If a bookmark is re-added, remove its tombstone
     if (bookmark.url) {
       await removeTombstone(bookmark.url);
     }
-    
+
     scheduleSync('bookmark-created');
   });
 
   // Listen for bookmark removal - add tombstone for deletion sync
   browser.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
     console.log('[MarkSyncr] Bookmark removed:', id, removeInfo);
-    
+
     // Skip tombstone creation during sync operations to prevent sync loops
     // Force Pull clears all bookmarks before recreating from cloud,
     // so we don't want to create tombstones for those deletions
-    if (isSyncInProgress || isForcePullInProgress) {
-      console.log('[MarkSyncr] Skipping tombstone (sync in progress)');
-      return; // Don't schedule sync either during sync operations
+    // BUT if user explicitly deleted during normal sync, queue for follow-up
+    if (isForcePullInProgress) {
+      console.log('[MarkSyncr] Skipping tombstone (force pull in progress)');
+      return;
     }
-    
+    if (isSyncInProgress) {
+      // During normal sync, user deletions should still be recorded
+      // Queue a follow-up sync to capture these changes
+      console.log('[MarkSyncr] Queuing pending sync (bookmark removed during sync)');
+      pendingSyncNeeded = true;
+      pendingSyncReasons.push('bookmark-removed-during-sync');
+      return;
+    }
+
     // Get the URL of the removed bookmark from removeInfo.node
     // Note: removeInfo.node contains the removed bookmark data
     if (removeInfo.node?.url) {
@@ -1022,33 +1038,39 @@ function setupBookmarkListeners() {
       // It's a folder - add tombstones for all bookmarks in the folder
       await addTombstonesForFolder(removeInfo.node);
     }
-    
+
     scheduleSync('bookmark-removed');
   });
 
   // Listen for bookmark changes
   browser.bookmarks.onChanged.addListener((id, changeInfo) => {
     console.log('[MarkSyncr] Bookmark changed:', id);
-    
+
     // Skip during sync operations to prevent sync loops
+    // BUT mark that we need a follow-up sync after current sync completes
     if (isSyncInProgress || isForcePullInProgress) {
-      console.log('[MarkSyncr] Skipping bookmark changed handler (sync in progress)');
+      console.log('[MarkSyncr] Queuing pending sync (bookmark changed during sync)');
+      pendingSyncNeeded = true;
+      pendingSyncReasons.push('bookmark-changed-during-sync');
       return;
     }
-    
+
     scheduleSync('bookmark-changed');
   });
 
   // Listen for bookmark moves
   browser.bookmarks.onMoved.addListener((id, moveInfo) => {
     console.log('[MarkSyncr] Bookmark moved:', id);
-    
+
     // Skip during sync operations to prevent sync loops
+    // BUT mark that we need a follow-up sync after current sync completes
     if (isSyncInProgress || isForcePullInProgress) {
-      console.log('[MarkSyncr] Skipping bookmark moved handler (sync in progress)');
+      console.log('[MarkSyncr] Queuing pending sync (bookmark moved during sync)');
+      pendingSyncNeeded = true;
+      pendingSyncReasons.push('bookmark-moved-during-sync');
       return;
     }
-    
+
     scheduleSync('bookmark-moved');
   });
 }
@@ -1323,51 +1345,23 @@ async function performSync(sourceId) {
         console.log(`[MarkSyncr] Added ${newFromCloud.length} bookmarks from cloud to local`);
       }
       
-      // Step 7.5: Update existing bookmarks that have different metadata in cloud
-      // This handles the case where a bookmark exists locally but has different title/folder/index
+      // Step 7.5: Handle bookmarks that differ between cloud and local
+      // IMPORTANT: We do NOT update local bookmarks from cloud here because:
+      // 1. Without per-bookmark modification timestamps, we can't know which is "newer"
+      // 2. Updating local from cloud would overwrite user's recent changes
+      // 3. Instead, local changes are pushed to cloud in Step 9
+      // 4. Other browsers will receive updates on their next sync
+      //
+      // This makes local changes authoritative for existing bookmarks.
+      // Users who want to pull all changes from cloud can use "Force Pull".
       let updatedLocally = 0;
       if (bookmarksToUpdate.length > 0) {
-        for (const { cloud, local } of bookmarksToUpdate) {
-          try {
-            // Update title if different
-            if ((cloud.title ?? '') !== (local.title ?? '')) {
-              await browser.bookmarks.update(local.id, { title: cloud.title ?? '' });
-              console.log(`[MarkSyncr] Updated title for ${cloud.url}: "${local.title}" -> "${cloud.title}"`);
-            }
-            
-            // Check if folder changed (with normalization)
-            const cloudFolder = normalizeFolderPath(cloud.folderPath);
-            const localFolder = normalizeFolderPath(local.folderPath);
-            
-            if (cloudFolder !== localFolder) {
-              // Need to move the bookmark to a different folder
-              // First, find or create the target folder
-              const targetFolderId = await findOrCreateFolderForBookmark(cloud.folderPath);
-              if (targetFolderId) {
-                await browser.bookmarks.move(local.id, {
-                  parentId: targetFolderId,
-                  index: cloud.index ?? undefined
-                });
-                console.log(`[MarkSyncr] Moved bookmark ${cloud.url} to folder: ${cloud.folderPath}`);
-              }
-            } else if (cloud.index !== undefined && cloud.index !== local.index) {
-              // Same folder but different index - just reorder
-              const parentId = await getParentIdForBookmark(local.id);
-              if (parentId) {
-                await browser.bookmarks.move(local.id, {
-                  parentId,
-                  index: cloud.index
-                });
-                console.log(`[MarkSyncr] Reordered bookmark ${cloud.url} to index ${cloud.index}`);
-              }
-            }
-            
-            updatedLocally++;
-          } catch (err) {
-            console.warn(`[MarkSyncr] Failed to update bookmark ${cloud.url}:`, err);
-          }
+        console.log(`[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks with differences between cloud and local`);
+        console.log('[MarkSyncr] Local changes will be preserved and pushed to cloud (local-first sync model)');
+        // Log the differences for debugging
+        for (const { cloud, local } of bookmarksToUpdate.slice(0, 5)) {
+          console.log(`[MarkSyncr] Difference for ${cloud.url}: cloud title="${cloud.title}", local title="${local.title}"`);
         }
-        console.log(`[MarkSyncr] Updated ${updatedLocally} existing bookmarks from cloud`);
       }
       
       // Step 8: Get final local bookmarks after all merges
@@ -1387,8 +1381,10 @@ async function performSync(sourceId) {
       
       // Determine if we have local changes to push to cloud
       // Local changes = bookmarks that exist locally but not in cloud (before this sync)
+      // OR bookmarks that differ from cloud (local-first model: local changes override cloud)
       // OR tombstones that need to be synced
       const hasLocalChangesToPush = localAdditions.length > 0 ||
+                                     bookmarksToUpdate.length > 0 ||
                                      localTombstones.length > cloudTombstones.length ||
                                      deletedLocally > 0;
       
@@ -1487,6 +1483,23 @@ async function performSync(sourceId) {
     // Always reset the sync flag, even if an error occurred
     isSyncInProgress = false;
     console.log('[MarkSyncr] Sync completed, setting isSyncInProgress=false');
+
+    // Check if any bookmark changes occurred during sync that need a follow-up sync
+    if (pendingSyncNeeded) {
+      const reasons = pendingSyncReasons.join(', ');
+      console.log(`[MarkSyncr] Pending sync needed due to changes during sync: ${reasons}`);
+
+      // Reset pending sync state
+      pendingSyncNeeded = false;
+      pendingSyncReasons = [];
+
+      // Schedule a follow-up sync with a short delay to capture the pending changes
+      // Use a shorter delay (2 seconds) since user already made changes
+      setTimeout(async () => {
+        console.log('[MarkSyncr] Triggering follow-up sync for pending changes');
+        await performSync();
+      }, 2000);
+    }
   }
 }
 
@@ -1658,46 +1671,98 @@ async function addCloudBookmarksToLocal(cloudItems) {
     return { rootFolderKey, relativePath };
   }
   
+  // Promise cache to prevent race conditions during concurrent folder creation
+  // Maps cache key -> Promise<folderId> for in-flight folder lookups/creations
+  const pendingFolderOps = new Map();
+
+  // Helper to get or create a single folder segment (with race condition protection)
+  async function getOrCreateSingleFolder(parentId, folderName, pathCacheKey) {
+    // Check if result is already cached
+    if (folderCache.has(pathCacheKey)) {
+      return folderCache.get(pathCacheKey);
+    }
+
+    // Check if there's an in-flight operation for this path
+    if (pendingFolderOps.has(pathCacheKey)) {
+      return pendingFolderOps.get(pathCacheKey);
+    }
+
+    // Create a promise for this folder operation and store it
+    const folderPromise = (async () => {
+      // Search for existing folder
+      const children = await browser.bookmarks.getChildren(parentId);
+      let existingFolder = children.find(c => !c.url && c.title === folderName);
+
+      if (existingFolder) {
+        return existingFolder.id;
+      }
+
+      // Create new folder (without index - this is for intermediate folders)
+      const newFolder = await browser.bookmarks.create({
+        parentId: parentId,
+        title: folderName,
+      });
+
+      // Double-check for duplicates that might have been created by race condition
+      // This handles the case where another operation created the folder just before us
+      const updatedChildren = await browser.bookmarks.getChildren(parentId);
+      const duplicates = updatedChildren.filter(c => !c.url && c.title === folderName);
+
+      if (duplicates.length > 1) {
+        // Keep the first one (oldest), remove the rest
+        console.log(`[MarkSyncr] Found ${duplicates.length} duplicate folders named "${folderName}", cleaning up...`);
+        for (let i = 1; i < duplicates.length; i++) {
+          try {
+            // Only remove if empty (no children)
+            const dupChildren = await browser.bookmarks.getChildren(duplicates[i].id);
+            if (dupChildren.length === 0) {
+              await browser.bookmarks.remove(duplicates[i].id);
+              console.log(`[MarkSyncr] Removed duplicate empty folder: ${duplicates[i].id}`);
+            }
+          } catch (err) {
+            console.warn(`[MarkSyncr] Failed to remove duplicate folder:`, err);
+          }
+        }
+        return duplicates[0].id;
+      }
+
+      return newFolder.id;
+    })();
+
+    // Store the promise so concurrent calls wait for the same operation
+    pendingFolderOps.set(pathCacheKey, folderPromise);
+
+    try {
+      const folderId = await folderPromise;
+      // Cache the result
+      folderCache.set(pathCacheKey, folderId);
+      return folderId;
+    } finally {
+      // Clean up the pending operation
+      pendingFolderOps.delete(pathCacheKey);
+    }
+  }
+
   // Helper to get or create folder by path (without index - for intermediate folders)
   async function getOrCreateFolderPath(folderPath, parentId) {
     if (!folderPath) return parentId;
-    
+
     const cacheKey = `${parentId}:${folderPath}`;
     if (folderCache.has(cacheKey)) {
       return folderCache.get(cacheKey);
     }
-    
+
     const parts = folderPath.split('/').filter(p => p);
     let currentParentId = parentId;
     let currentPath = '';
-    
+
     for (const part of parts) {
       currentPath = currentPath ? `${currentPath}/${part}` : part;
       const pathCacheKey = `${parentId}:${currentPath}`;
-      
-      if (folderCache.has(pathCacheKey)) {
-        currentParentId = folderCache.get(pathCacheKey);
-        continue;
-      }
-      
-      // Search for existing folder
-      const children = await browser.bookmarks.getChildren(currentParentId);
-      const existingFolder = children.find(c => !c.url && c.title === part);
-      
-      if (existingFolder) {
-        currentParentId = existingFolder.id;
-      } else {
-        // Create new folder (without index - this is for intermediate folders)
-        const newFolder = await browser.bookmarks.create({
-          parentId: currentParentId,
-          title: part,
-        });
-        currentParentId = newFolder.id;
-      }
-      
-      folderCache.set(pathCacheKey, currentParentId);
+
+      currentParentId = await getOrCreateSingleFolder(currentParentId, part, pathCacheKey);
     }
-    
+
     folderCache.set(cacheKey, currentParentId);
     return currentParentId;
   }
