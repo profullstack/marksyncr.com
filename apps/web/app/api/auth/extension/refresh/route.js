@@ -116,25 +116,95 @@ export async function POST(request) {
 
     if (refreshError) {
       console.error('Extension refresh error: Supabase refresh failed:', refreshError);
-      
-      // If the Supabase refresh token is invalid, the session is effectively dead
-      // Mark it as revoked so we don't keep trying
-      await adminClient
+
+      // Try to generate a new session using admin API
+      // This allows us to recover from expired Supabase refresh tokens
+      // while keeping the extension session alive
+      const { data: userData, error: userError } = await adminClient
+        .auth.admin.getUserById(session.user_id);
+
+      if (userError || !userData?.user) {
+        console.error('Extension refresh error: Failed to get user for session recovery:', userError);
+        // User doesn't exist anymore, revoke the session
+        await adminClient
+          .from('extension_sessions')
+          .update({
+            revoked_at: new Date().toISOString(),
+            revoked_reason: 'User not found',
+          })
+          .eq('id', session.id);
+
+        return NextResponse.json(
+          { error: 'Session refresh failed. Please log in again.' },
+          { status: 401 }
+        );
+      }
+
+      // Generate a new session for the user using admin magic link flow
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: 'magiclink',
+        email: userData.user.email,
+      });
+
+      if (linkError || !linkData?.properties?.hashed_token) {
+        console.error('Extension refresh error: Failed to generate recovery link:', linkError);
+        // Don't revoke - let user try again later
+        return NextResponse.json(
+          { error: 'Session refresh temporarily unavailable. Please try again.' },
+          { status: 503 }
+        );
+      }
+
+      // Verify the OTP to get a new session
+      const { data: otpData, error: otpError } = await adminClient.auth.verifyOtp({
+        token_hash: linkData.properties.hashed_token,
+        type: 'magiclink',
+      });
+
+      if (otpError || !otpData?.session) {
+        console.error('Extension refresh error: Failed to verify recovery OTP:', otpError);
+        return NextResponse.json(
+          { error: 'Session refresh temporarily unavailable. Please try again.' },
+          { status: 503 }
+        );
+      }
+
+      // Update the session with the new refresh token
+      const { error: recoveryUpdateError } = await adminClient
         .from('extension_sessions')
         .update({
-          revoked_at: new Date().toISOString(),
-          revoked_reason: 'Supabase refresh token expired',
+          supabase_refresh_token: otpData.session.refresh_token,
+          last_used_at: new Date().toISOString(),
         })
         .eq('id', session.id);
 
-      return NextResponse.json(
-        { error: 'Session refresh failed. Please log in again.' },
-        { status: 401 }
-      );
+      if (recoveryUpdateError) {
+        console.error('Extension refresh error: Failed to save recovered session:', recoveryUpdateError);
+        return NextResponse.json(
+          { error: 'Session refresh temporarily unavailable. Please try again.' },
+          { status: 503 }
+        );
+      }
+
+      // Return the recovered session
+      return NextResponse.json({
+        session: {
+          access_token: otpData.session.access_token,
+          expires_at: session.expires_at,
+          access_token_expires_at: otpData.session.expires_at,
+        },
+        user: {
+          id: userData.user.id,
+          email: userData.user.email,
+          created_at: userData.user.created_at,
+          email_confirmed_at: userData.user.email_confirmed_at,
+        },
+      });
     }
 
     // Step 7: Update the session with the new refresh token and last_used_at
     // Supabase may rotate the refresh token on each use
+    // CRITICAL: This update MUST succeed, otherwise the rotated token is lost
     const { error: updateError } = await adminClient
       .from('extension_sessions')
       .update({
@@ -144,8 +214,11 @@ export async function POST(request) {
       .eq('id', session.id);
 
     if (updateError) {
-      // Log but don't fail - the access token is still valid
-      console.warn('Extension refresh warning: Failed to update session:', updateError);
+      // If we can't save the new refresh token, the session will break on next refresh
+      // due to token rotation. Log this as an error, not a warning.
+      console.error('Extension refresh error: Failed to update refresh token - session may break:', updateError);
+      // Return the access token anyway since it's valid for this request
+      // but log prominently so we can investigate
     }
 
     // Step 8: Get user info
