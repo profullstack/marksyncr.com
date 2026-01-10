@@ -233,21 +233,8 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <svg
-              className="h-10 w-10 text-primary-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-            <span className="text-2xl font-bold text-slate-900">MarkSyncr</span>
+          <Link href="/" className="inline-flex items-center">
+            <img src="/logo.svg" alt="MarkSyncr" className="h-10 w-auto" />
           </Link>
         </div>
 

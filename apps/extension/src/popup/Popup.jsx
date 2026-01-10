@@ -135,15 +135,8 @@ const AlertIcon = ({ className = '' }) => (
   </svg>
 );
 
-const BookmarkIcon = ({ className = '' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-    />
-  </svg>
+const LogoImage = ({ className = '' }) => (
+  <img src="/logo.svg" alt="MarkSyncr" className={className} />
 );
 
 // Status indicator component
@@ -739,9 +732,8 @@ ${content}
     <div className="flex min-h-[480px] flex-col bg-white">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center space-x-2">
-          <BookmarkIcon className="h-6 w-6 text-primary-600" />
-          <h1 className="text-lg font-semibold text-slate-900">MarkSyncr</h1>
+        <div className="flex items-center">
+          <LogoImage className="h-6 w-auto" />
         </div>
         <button
           onClick={openOptions}

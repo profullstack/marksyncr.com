@@ -550,21 +550,9 @@ export function Options() {
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <svg
-                className="h-8 w-8 text-primary-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                />
-              </svg>
+              <img src="/logo.svg" alt="MarkSyncr" className="h-8 w-auto" />
               <div>
-                <h1 className="text-xl font-bold text-slate-900">MarkSyncr Settings</h1>
+                <h1 className="text-xl font-bold text-slate-900">Settings</h1>
                 <p className="text-sm text-slate-500">Configure your bookmark sync preferences</p>
               </div>
             </div>

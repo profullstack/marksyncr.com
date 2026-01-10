@@ -7,21 +7,8 @@ export default function Footer() {
     <footer className="border-t border-slate-200 bg-white py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between md:flex-row">
-          <Link href="/" className="flex items-center space-x-2">
-            <svg
-              className="h-6 w-6 text-primary-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-            <span className="font-semibold text-slate-900">MarkSyncr</span>
+          <Link href="/" className="flex items-center">
+            <img src="/logo.svg" alt="MarkSyncr" className="h-6 w-auto" />
           </Link>
           <div className="mt-4 flex space-x-6 md:mt-0">
             <Link
