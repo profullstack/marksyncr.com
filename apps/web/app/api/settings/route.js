@@ -39,15 +39,12 @@ const DEFAULT_SETTINGS = {
 
 export async function GET(request) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     // Get settings from database
@@ -59,45 +56,36 @@ export async function GET(request) {
 
     if (settingsError && settingsError.code !== 'PGRST116') {
       console.error('Settings fetch error:', settingsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch settings' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500, headers });
     }
 
     // Return settings or defaults
-    return NextResponse.json({
-      settings: settings?.settings || DEFAULT_SETTINGS,
-    }, { headers });
+    return NextResponse.json(
+      {
+        settings: settings?.settings || DEFAULT_SETTINGS,
+      },
+      { headers }
+    );
   } catch (error) {
     console.error('Settings GET error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }
 
 export async function PUT(request) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     const { settings } = await request.json();
 
     if (!settings || typeof settings !== 'object') {
-      return NextResponse.json(
-        { error: 'Settings object is required' },
-        { status: 400, headers }
-      );
+      return NextResponse.json({ error: 'Settings object is required' }, { status: 400, headers });
     }
 
     // Merge with defaults to ensure all fields exist
@@ -113,33 +101,33 @@ export async function PUT(request) {
     // Upsert settings
     const { data, error: upsertError } = await supabase
       .from('user_settings')
-      .upsert({
-        user_id: user.id,
-        settings: mergedSettings,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      })
+      .upsert(
+        {
+          user_id: user.id,
+          settings: mergedSettings,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'user_id',
+        }
+      )
       .select()
       .single();
 
     if (upsertError) {
       console.error('Settings upsert error:', upsertError);
-      return NextResponse.json(
-        { error: 'Failed to save settings' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to save settings' }, { status: 500, headers });
     }
 
-    return NextResponse.json({
-      settings: data.settings,
-      message: 'Settings saved successfully',
-    }, { headers });
+    return NextResponse.json(
+      {
+        settings: data.settings,
+        message: 'Settings saved successfully',
+      },
+      { headers }
+    );
   } catch (error) {
     console.error('Settings PUT error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }

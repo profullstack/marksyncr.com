@@ -11,37 +11,52 @@ import { deleteCloudData } from '../lib/api.js';
 // Service icons
 const GitHubIcon = ({ className = '' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
   </svg>
 );
 
 const DropboxIcon = ({ className = '' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75-6 3.75-6-3.75zm18-3.75l6 3.75-6 3.75-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z"/>
+    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75-6 3.75-6-3.75zm18-3.75l6 3.75-6 3.75-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z" />
   </svg>
 );
 
 const GoogleDriveIcon = ({ className = '' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M7.71 3.5L1.15 15l3.43 5.5h6.56l3.43-5.5L7.71 3.5zm1.44 1.5l5.14 8.5H4.29L9.15 5zm6.56 0L22.85 15l-3.43 5.5H12.86l3.43-5.5-1.58-2.5 1.58-2.5L22.85 15l-3.43-5.5L13.71 5z"/>
+    <path d="M7.71 3.5L1.15 15l3.43 5.5h6.56l3.43-5.5L7.71 3.5zm1.44 1.5l5.14 8.5H4.29L9.15 5zm6.56 0L22.85 15l-3.43 5.5H12.86l3.43-5.5-1.58-2.5 1.58-2.5L22.85 15l-3.43-5.5L13.71 5z" />
   </svg>
 );
 
 const CloudIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+    />
   </svg>
 );
 
 const MarkSyncrIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+    />
   </svg>
 );
 
 const ExternalLinkIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+    />
   </svg>
 );
 
@@ -50,9 +65,7 @@ function Section({ title, description, children }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6">
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      {description && (
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
-      )}
+      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
       <div className="mt-4">{children}</div>
     </div>
   );
@@ -64,9 +77,7 @@ function Toggle({ label, description, checked, onChange }) {
     <div className="flex items-center justify-between py-3">
       <div>
         <div className="text-sm font-medium text-slate-900">{label}</div>
-        {description && (
-          <div className="text-sm text-slate-500">{description}</div>
-        )}
+        {description && <div className="text-sm text-slate-500">{description}</div>}
       </div>
       <button
         type="button"
@@ -92,9 +103,7 @@ function Select({ label, description, value, onChange, options }) {
   return (
     <div className="py-3">
       <label className="block text-sm font-medium text-slate-900">{label}</label>
-      {description && (
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
-      )}
+      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -146,8 +155,8 @@ function ConnectedServices({ sources, isAuthenticated }) {
 
   // Filter to only external services (not browser-bookmarks)
   const externalServices = ['github', 'dropbox', 'google-drive', 'google_drive'];
-  const connectedSources = sources.filter(s =>
-    s.connected && externalServices.includes(getSourceType(s))
+  const connectedSources = sources.filter(
+    (s) => s.connected && externalServices.includes(getSourceType(s))
   );
 
   const openDashboard = () => {
@@ -234,14 +243,7 @@ function ConnectedServices({ sources, isAuthenticated }) {
 
 // Main Options component
 export function Options() {
-  const {
-    settings,
-    sources,
-    bookmarks,
-    updateSettings,
-    initialize,
-    isAuthenticated,
-  } = useStore();
+  const { settings, sources, bookmarks, updateSettings, initialize, isAuthenticated } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
@@ -323,18 +325,21 @@ export function Options() {
     try {
       const content = await file.text();
       const format = detectImportFormat(content);
-      
+
       if (!format) {
         throw new Error('Unable to detect file format. Please use HTML or JSON format.');
       }
 
       const parsed = parseImportFile(content, format);
-      
+
       // Import to browser bookmarks
       // Detect if we're in Firefox (uses browser.bookmarks with Promises) or Chrome (uses chrome.bookmarks with callbacks)
-      const isFirefox = typeof browser !== 'undefined' && browser.bookmarks && typeof browser.bookmarks.create === 'function';
+      const isFirefox =
+        typeof browser !== 'undefined' &&
+        browser.bookmarks &&
+        typeof browser.bookmarks.create === 'function';
       const bookmarksApi = isFirefox ? browser.bookmarks : chrome?.bookmarks;
-      
+
       if (bookmarksApi?.create) {
         // Helper function to create a bookmark that works in both Chrome and Firefox
         const createBookmark = async (options) => {
@@ -351,7 +356,10 @@ export function Options() {
             return new Promise((resolve) => {
               chrome.bookmarks.create(options, (result) => {
                 if (chrome.runtime.lastError) {
-                  console.warn('Chrome bookmark creation failed:', chrome.runtime.lastError.message);
+                  console.warn(
+                    'Chrome bookmark creation failed:',
+                    chrome.runtime.lastError.message
+                  );
                   resolve(null);
                 } else {
                   resolve(result);
@@ -371,10 +379,14 @@ export function Options() {
               // Find the toolbar folder (usually the second child of root)
               const root = tree[0];
               if (root && root.children) {
-                const toolbar = root.children.find(c => c.id === 'toolbar_____' || c.title === 'Bookmarks Toolbar');
+                const toolbar = root.children.find(
+                  (c) => c.id === 'toolbar_____' || c.title === 'Bookmarks Toolbar'
+                );
                 if (toolbar) return toolbar.id;
                 // Fallback to menu folder
-                const menu = root.children.find(c => c.id === 'menu________' || c.title === 'Bookmarks Menu');
+                const menu = root.children.find(
+                  (c) => c.id === 'menu________' || c.title === 'Bookmarks Menu'
+                );
                 if (menu) return menu.id;
               }
               return 'unfiled_____'; // Fallback to Other Bookmarks
@@ -388,7 +400,7 @@ export function Options() {
         };
 
         const parentFolderId = await getBookmarksBarId();
-        
+
         // Create an import folder
         const importFolder = await createBookmark({
           title: `Imported ${new Date().toLocaleDateString()}`,
@@ -402,11 +414,11 @@ export function Options() {
         // Recursively create bookmarks
         const createBookmarks = async (items, parentId) => {
           if (!items || !Array.isArray(items)) return;
-          
+
           for (const item of items) {
             // Skip null/undefined items
             if (!item) continue;
-            
+
             if (item.type === 'folder' || item.children) {
               // Use nullish coalescing to preserve empty strings
               // Folders need a visible name, so use 'Untitled Folder' only if null/undefined
@@ -433,7 +445,10 @@ export function Options() {
       }
 
       setShowImportModal(false);
-      setImportMessage({ type: 'success', text: `Successfully imported ${parsed.totalCount} bookmarks` });
+      setImportMessage({
+        type: 'success',
+        text: `Successfully imported ${parsed.totalCount} bookmarks`,
+      });
       setTimeout(() => setImportMessage(null), 3000);
     } catch (err) {
       console.error('Import failed:', err);
@@ -455,7 +470,7 @@ export function Options() {
           chrome.storage.local.clear(resolve);
         });
       }
-      
+
       setShowResetModal(false);
       setSaveStatus('reset');
       setTimeout(() => {
@@ -474,20 +489,26 @@ export function Options() {
       // Clear only sync-related cache keys, not login credentials or settings
       if (chrome?.storage?.local) {
         await new Promise((resolve) => {
-          chrome.storage.local.remove([
-            'marksyncr-last-cloud-checksum',
-            'marksyncr-tombstones',
-            'marksyncr-last-sync-time',
-            'lastSync',
-            'lastSyncTime',
-            'syncInProgress'
-          ], resolve);
+          chrome.storage.local.remove(
+            [
+              'marksyncr-last-cloud-checksum',
+              'marksyncr-tombstones',
+              'marksyncr-last-sync-time',
+              'lastSync',
+              'lastSyncTime',
+              'syncInProgress',
+            ],
+            resolve
+          );
         });
       }
-      
+
       setShowClearCacheModal(false);
       setSaveStatus('cache-cleared');
-      setImportMessage({ type: 'success', text: 'Sync cache cleared. Next sync will perform a full comparison.' });
+      setImportMessage({
+        type: 'success',
+        text: 'Sync cache cleared. Next sync will perform a full comparison.',
+      });
       setTimeout(() => {
         setSaveStatus(null);
         setImportMessage(null);
@@ -509,23 +530,29 @@ export function Options() {
     setIsDeleting(true);
     try {
       await deleteCloudData();
-      
+
       // Also clear local sync cache since cloud data is gone
       if (chrome?.storage?.local) {
         await new Promise((resolve) => {
-          chrome.storage.local.remove([
-            'marksyncr-last-cloud-checksum',
-            'marksyncr-tombstones',
-            'marksyncr-last-sync-time',
-            'lastSync',
-            'lastSyncTime',
-            'syncInProgress'
-          ], resolve);
+          chrome.storage.local.remove(
+            [
+              'marksyncr-last-cloud-checksum',
+              'marksyncr-tombstones',
+              'marksyncr-last-sync-time',
+              'lastSync',
+              'lastSyncTime',
+              'syncInProgress',
+            ],
+            resolve
+          );
         });
       }
-      
+
       setShowDeleteCloudDataModal(false);
-      setImportMessage({ type: 'success', text: 'All cloud data has been deleted. Your browser bookmarks are unchanged.' });
+      setImportMessage({
+        type: 'success',
+        text: 'All cloud data has been deleted. Your browser bookmarks are unchanged.',
+      });
       setTimeout(() => setImportMessage(null), 5000);
     } catch (err) {
       console.error('Delete cloud data failed:', err);
@@ -559,7 +586,12 @@ export function Options() {
             {saveStatus && (
               <div className="flex items-center space-x-2 text-sm text-green-600">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 <span>Settings saved</span>
               </div>
@@ -572,18 +604,12 @@ export function Options() {
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="space-y-6">
           {/* Sync Destinations */}
-          <Section
-            title="Sync Destinations"
-            description="Manage where your bookmarks sync to"
-          >
+          <Section title="Sync Destinations" description="Manage where your bookmarks sync to">
             <ConnectedServices sources={sources} isAuthenticated={isAuthenticated} />
           </Section>
 
           {/* Sync Settings */}
-          <Section
-            title="Sync Settings"
-            description="Configure how and when your bookmarks sync"
-          >
+          <Section title="Sync Settings" description="Configure how and when your bookmarks sync">
             <div className="divide-y divide-slate-200">
               <Toggle
                 label="Auto Sync"
@@ -628,10 +654,7 @@ export function Options() {
           </Section>
 
           {/* Notifications */}
-          <Section
-            title="Notifications"
-            description="Control sync notifications"
-          >
+          <Section title="Notifications" description="Control sync notifications">
             <Toggle
               label="Show Notifications"
               description="Display notifications for sync events and errors"
@@ -647,11 +670,13 @@ export function Options() {
           >
             {/* Status Messages */}
             {importMessage && (
-              <div className={`mb-4 p-3 rounded-lg ${
-                importMessage.type === 'error'
-                  ? 'bg-red-50 border border-red-200 text-red-700'
-                  : 'bg-green-50 border border-green-200 text-green-700'
-              }`}>
+              <div
+                className={`mb-4 p-3 rounded-lg ${
+                  importMessage.type === 'error'
+                    ? 'bg-red-50 border border-red-200 text-red-700'
+                    : 'bg-green-50 border border-green-200 text-green-700'
+                }`}
+              >
                 {importMessage.text}
               </div>
             )}
@@ -721,7 +746,9 @@ export function Options() {
                     />
                     <div>
                       <div className="font-medium text-slate-900">JSON</div>
-                      <div className="text-xs text-slate-500">MarkSyncr format, includes all metadata</div>
+                      <div className="text-xs text-slate-500">
+                        MarkSyncr format, includes all metadata
+                      </div>
                     </div>
                   </label>
                   <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
@@ -735,7 +762,9 @@ export function Options() {
                     />
                     <div>
                       <div className="font-medium text-slate-900">HTML</div>
-                      <div className="text-xs text-slate-500">Browser standard format, compatible with all browsers</div>
+                      <div className="text-xs text-slate-500">
+                        Browser standard format, compatible with all browsers
+                      </div>
                     </div>
                   </label>
                 </div>
@@ -796,7 +825,8 @@ export function Options() {
               <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
                 <h3 className="text-lg font-semibold text-red-600 mb-4">Reset Sync Data</h3>
                 <p className="text-sm text-slate-600 mb-4">
-                  This will clear all sync data and settings. Your browser bookmarks will not be affected.
+                  This will clear all sync data and settings. Your browser bookmarks will not be
+                  affected.
                 </p>
                 <p className="text-sm text-red-600 font-medium mb-4">
                   This action cannot be undone.
@@ -833,7 +863,8 @@ export function Options() {
                   <li>Last sync timestamps</li>
                 </ul>
                 <p className="text-sm text-slate-600 mb-4">
-                  Your login, settings, and browser bookmarks will not be affected. The next sync will perform a full comparison with the cloud.
+                  Your login, settings, and browser bookmarks will not be affected. The next sync
+                  will perform a full comparison with the cloud.
                 </p>
                 <div className="flex gap-3">
                   <button
@@ -857,7 +888,9 @@ export function Options() {
           {showDeleteCloudDataModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-                <h3 className="text-lg font-semibold text-red-600 mb-4">⚠️ Delete All Cloud Data</h3>
+                <h3 className="text-lg font-semibold text-red-600 mb-4">
+                  ⚠️ Delete All Cloud Data
+                </h3>
                 <p className="text-sm text-slate-600 mb-4">
                   This will permanently delete ALL your cloud data, including:
                 </p>
@@ -869,7 +902,8 @@ export function Options() {
                 </ul>
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                   <p className="text-sm text-amber-800">
-                    <strong>Your browser bookmarks will NOT be affected.</strong> Only cloud data will be deleted.
+                    <strong>Your browser bookmarks will NOT be affected.</strong> Only cloud data
+                    will be deleted.
                   </p>
                 </div>
                 <p className="text-sm text-red-600 font-medium mb-4">
@@ -902,7 +936,8 @@ export function Options() {
                 <strong>MarkSyncr</strong> v0.1.0
               </p>
               <p>
-                Sync your bookmarks across browsers using GitHub, Dropbox, Google Drive, or MarkSyncr Cloud.
+                Sync your bookmarks across browsers using GitHub, Dropbox, Google Drive, or
+                MarkSyncr Cloud.
               </p>
               <div className="flex space-x-4 pt-2">
                 <a

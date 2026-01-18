@@ -46,15 +46,10 @@ vi.mock('../lib/supabase/server', () => ({
 }));
 
 // Import after mocks
-const { DELETE: githubDELETE } = await import(
-  '../app/api/connect/github/disconnect/route.js'
-);
-const { DELETE: dropboxDELETE } = await import(
-  '../app/api/connect/dropbox/disconnect/route.js'
-);
-const { DELETE: googleDriveDELETE } = await import(
-  '../app/api/connect/google-drive/disconnect/route.js'
-);
+const { DELETE: githubDELETE } = await import('../app/api/connect/github/disconnect/route.js');
+const { DELETE: dropboxDELETE } = await import('../app/api/connect/dropbox/disconnect/route.js');
+const { DELETE: googleDriveDELETE } =
+  await import('../app/api/connect/google-drive/disconnect/route.js');
 
 describe('Disconnect API Routes', () => {
   beforeEach(() => {

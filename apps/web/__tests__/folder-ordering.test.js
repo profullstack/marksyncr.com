@@ -1,10 +1,10 @@
 /**
  * Tests for folder ordering preservation in bookmark sync
- * 
+ *
  * The issue: Folders need to have their order preserved across sync operations.
  * Previously, only bookmarks had index tracking, but folders also need index
  * to maintain their position within their parent folder.
- * 
+ *
  * Solution: Include folder metadata (with index) in the sync data, so that:
  * 1. Folder reordering is detected by checksum changes
  * 2. Folders can be recreated in the correct order during restore
@@ -16,43 +16,45 @@ import crypto from 'crypto';
 /**
  * Normalize bookmarks AND folders for checksum comparison
  * This includes folder entries to detect folder reordering
- * 
+ *
  * @param {Array} items - Array of bookmarks and folders to normalize
  * @returns {Array} - Normalized items with only comparable fields
  */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
-  
-  return items.map(item => {
-    if (item.type === 'folder') {
-      // Folder entry
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      // Bookmark entry
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || '',
-        dateAdded: item.dateAdded || 0,
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    // Sort by folderPath first, then by index within the folder
-    // IMPORTANT: Do NOT sort by type - this would break the interleaved order
-    // of folders and bookmarks. When a user moves a folder from position 3 to
-    // the last position, the index should be preserved, not reset based on type.
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder to preserve original order
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        // Folder entry
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        // Bookmark entry
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || '',
+          dateAdded: item.dateAdded || 0,
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      // Sort by folderPath first, then by index within the folder
+      // IMPORTANT: Do NOT sort by type - this would break the interleaved order
+      // of folders and bookmarks. When a user moves a folder from position 3 to
+      // the last position, the index should be preserved, not reset based on type.
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      // Then by index within the folder to preserve original order
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -75,7 +77,7 @@ function flattenBookmarkTreeWithFolders(tree) {
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       const nodeIndex = node.index ?? i;
-      
+
       if (node.url) {
         // It's a bookmark
         items.push({
@@ -89,8 +91,12 @@ function flattenBookmarkTreeWithFolders(tree) {
         });
       } else if (node.children) {
         // It's a folder - add folder metadata
-        const folderPath = node.title ? (parentPath ? `${parentPath}/${node.title}` : node.title) : parentPath;
-        
+        const folderPath = node.title
+          ? parentPath
+            ? `${parentPath}/${node.title}`
+            : node.title
+          : parentPath;
+
         // Only add folder entry if it has a title (skip root nodes)
         if (node.title) {
           items.push({
@@ -102,7 +108,7 @@ function flattenBookmarkTreeWithFolders(tree) {
             index: nodeIndex,
           });
         }
-        
+
         // Recurse into children
         traverse(node.children, folderPath);
       }
@@ -125,9 +131,7 @@ describe('Folder Ordering', () => {
               id: 'folder1',
               title: 'Work',
               index: 0,
-              children: [
-                { id: 'b1', url: 'https://work.com', title: 'Work Site', index: 0 },
-              ],
+              children: [{ id: 'b1', url: 'https://work.com', title: 'Work Site', index: 0 }],
             },
             {
               id: 'folder2',
@@ -142,12 +146,12 @@ describe('Folder Ordering', () => {
       ];
 
       const items = flattenBookmarkTreeWithFolders(tree);
-      
+
       // Should have 2 folders + 2 bookmarks = 4 items
       expect(items).toHaveLength(4);
-      
+
       // Check folder entries
-      const folders = items.filter(i => i.type === 'folder');
+      const folders = items.filter((i) => i.type === 'folder');
       expect(folders).toHaveLength(2);
       expect(folders[0]).toMatchObject({
         type: 'folder',
@@ -161,9 +165,9 @@ describe('Folder Ordering', () => {
         folderPath: '',
         index: 1,
       });
-      
+
       // Check bookmark entries
-      const bookmarks = items.filter(i => i.type === 'bookmark');
+      const bookmarks = items.filter((i) => i.type === 'bookmark');
       expect(bookmarks).toHaveLength(2);
       expect(bookmarks[0]).toMatchObject({
         type: 'bookmark',
@@ -203,22 +207,22 @@ describe('Folder Ordering', () => {
       ];
 
       const items = flattenBookmarkTreeWithFolders(tree);
-      const folders = items.filter(i => i.type === 'folder');
-      
+      const folders = items.filter((i) => i.type === 'folder');
+
       expect(folders).toHaveLength(3);
-      
+
       // Parent folder
-      expect(folders.find(f => f.title === 'Parent')).toMatchObject({
+      expect(folders.find((f) => f.title === 'Parent')).toMatchObject({
         folderPath: '',
         index: 0,
       });
-      
+
       // Child folders
-      expect(folders.find(f => f.title === 'Child A')).toMatchObject({
+      expect(folders.find((f) => f.title === 'Child A')).toMatchObject({
         folderPath: 'Parent',
         index: 0,
       });
-      expect(folders.find(f => f.title === 'Child B')).toMatchObject({
+      expect(folders.find((f) => f.title === 'Child B')).toMatchObject({
         folderPath: 'Parent',
         index: 1,
       });
@@ -228,25 +232,32 @@ describe('Folder Ordering', () => {
   describe('normalizeItemsForChecksum', () => {
     it('should normalize both bookmarks and folders preserving index order', () => {
       const items = [
-        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: 'Work', index: 0, dateAdded: 1000 },
+        {
+          type: 'bookmark',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Work',
+          index: 0,
+          dateAdded: 1000,
+        },
         { type: 'folder', title: 'Work', folderPath: '', index: 0 },
         { type: 'folder', title: 'Personal', folderPath: '', index: 1 },
       ];
 
       const normalized = normalizeItemsForChecksum(items);
-      
+
       expect(normalized).toHaveLength(3);
-      
+
       // Items should be sorted by folderPath first, then by index
       // Root level (folderPath='') items come first, sorted by index
       expect(normalized[0].folderPath).toBe('');
       expect(normalized[0].index).toBe(0);
       expect(normalized[0].title).toBe('Work');
-      
+
       expect(normalized[1].folderPath).toBe('');
       expect(normalized[1].index).toBe(1);
       expect(normalized[1].title).toBe('Personal');
-      
+
       // Then items in 'Work' folder
       expect(normalized[2].folderPath).toBe('Work');
       expect(normalized[2].index).toBe(0);
@@ -261,7 +272,7 @@ describe('Folder Ordering', () => {
       ];
 
       const normalized = normalizeItemsForChecksum(items);
-      
+
       // Should be sorted: A (path='', index=0), B (path='', index=1), C (path='A', index=0)
       expect(normalized[0].title).toBe('A');
       expect(normalized[1].title).toBe('B');
@@ -274,13 +285,27 @@ describe('Folder Ordering', () => {
       const items1 = [
         { type: 'folder', title: 'Work', folderPath: '', index: 0 },
         { type: 'folder', title: 'Personal', folderPath: '', index: 1 },
-        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: 'Work', index: 0, dateAdded: 1000 },
+        {
+          type: 'bookmark',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Work',
+          index: 0,
+          dateAdded: 1000,
+        },
       ];
 
       const items2 = [
         { type: 'folder', title: 'Work', folderPath: '', index: 1 }, // Changed index
         { type: 'folder', title: 'Personal', folderPath: '', index: 0 }, // Changed index
-        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: 'Work', index: 0, dateAdded: 1000 },
+        {
+          type: 'bookmark',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Work',
+          index: 0,
+          dateAdded: 1000,
+        },
       ];
 
       const checksum1 = generateChecksum(items1);
@@ -332,13 +357,27 @@ describe('Folder Ordering', () => {
       // Scenario: Folder at index 0, bookmark at index 1
       const items1 = [
         { type: 'folder', title: 'Folder', folderPath: '', index: 0 },
-        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: '', index: 1, dateAdded: 1000 },
+        {
+          type: 'bookmark',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: '',
+          index: 1,
+          dateAdded: 1000,
+        },
       ];
 
       // Scenario: Bookmark at index 0, folder at index 1
       const items2 = [
         { type: 'folder', title: 'Folder', folderPath: '', index: 1 },
-        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: '', index: 0, dateAdded: 1000 },
+        {
+          type: 'bookmark',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: '',
+          index: 0,
+          dateAdded: 1000,
+        },
       ];
 
       const checksum1 = generateChecksum(items1);
@@ -362,7 +401,7 @@ describe('Folder Ordering', () => {
       ];
 
       const normalized = normalizeItemsForChecksum(items);
-      
+
       // Should default to index 0
       expect(normalized[0].index).toBe(0);
       expect(normalized[1].index).toBe(0);
@@ -375,7 +414,7 @@ describe('Folder Ordering', () => {
       ];
 
       const normalized = normalizeItemsForChecksum(items);
-      
+
       // Should treat as bookmarks (no type field defaults to bookmark)
       expect(normalized).toHaveLength(2);
       expect(normalized[0].type).toBe('bookmark');

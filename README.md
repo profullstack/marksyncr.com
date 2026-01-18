@@ -92,12 +92,14 @@ pnpm build:firefox
 ### Loading the Extension
 
 **Chrome:**
+
 1. Go to `chrome://extensions/`
 2. Enable "Developer mode"
 3. Click "Load unpacked"
 4. Select `apps/extension/dist/chrome`
 
 **Firefox:**
+
 1. Go to `about:debugging#/runtime/this-firefox`
 2. Click "Load Temporary Add-on"
 3. Select `apps/extension/dist/firefox/manifest.json`
@@ -109,6 +111,7 @@ pnpm build:firefox
 Copy `.env.example` to `.env.local` in each app directory:
 
 **apps/web/.env.local:**
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
@@ -146,6 +149,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-publishable-key
 ### Bookmark Schema
 
 Bookmarks are stored in a custom JSON format that preserves:
+
 - Toolbar, menu, and other bookmark locations
 - Folder hierarchy with nested children
 - Metadata (created, modified timestamps)
@@ -154,6 +158,7 @@ Bookmarks are stored in a custom JSON format that preserves:
 ### Sync Engine
 
 The sync engine implements two-way sync with:
+
 - Change detection via checksums
 - Conflict resolution strategies (newer-wins, local-wins, remote-wins, merge)
 - Field-level merging for non-conflicting changes
@@ -162,6 +167,7 @@ The sync engine implements two-way sync with:
 ### Storage Sources
 
 Each storage source implements a common interface:
+
 - `read()` - Fetch bookmark data
 - `write(data)` - Save bookmark data
 - `isAvailable()` - Check connectivity
@@ -169,16 +175,16 @@ Each storage source implements a common interface:
 
 ## Pricing
 
-| Feature | Free | Pro ($5/mo) | Team ($12/mo) |
-|---------|------|-------------|---------------|
-| Bookmarks | Unlimited | Unlimited | Unlimited |
-| GitHub/Dropbox/Drive | ✓ | ✓ | ✓ |
-| Local File | ✓ | ✓ | ✓ |
-| MarkSyncr Cloud | - | ✓ | ✓ |
-| Safari Support | - | ✓ | ✓ |
-| Version History | - | 30 days | 1 year |
-| Shared Folders | - | - | ✓ |
-| Team Management | - | - | ✓ |
+| Feature              | Free      | Pro ($5/mo) | Team ($12/mo) |
+| -------------------- | --------- | ----------- | ------------- |
+| Bookmarks            | Unlimited | Unlimited   | Unlimited     |
+| GitHub/Dropbox/Drive | ✓         | ✓           | ✓             |
+| Local File           | ✓         | ✓           | ✓             |
+| MarkSyncr Cloud      | -         | ✓           | ✓             |
+| Safari Support       | -         | ✓           | ✓             |
+| Version History      | -         | 30 days     | 1 year        |
+| Shared Folders       | -         | -           | ✓             |
+| Team Management      | -         | -           | ✓             |
 
 ## Deployment
 
@@ -201,6 +207,7 @@ railway up
 ```
 
 **Environment Variables to configure in Railway:**
+
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`

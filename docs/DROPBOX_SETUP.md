@@ -5,6 +5,7 @@ This guide covers how to set up your MarkSyncr app on Dropbox.com and implement 
 ## Overview
 
 The Dropbox integration follows a similar pattern to GitHub:
+
 1. User authorizes the app via OAuth 2.0 with PKCE
 2. App receives access token and refresh token
 3. Bookmarks are stored as a JSON file in Dropbox
@@ -13,11 +14,13 @@ The Dropbox integration follows a similar pattern to GitHub:
 ## ⚠️ Important: OAuth Scopes
 
 The OAuth flow now requests these scopes automatically:
+
 - `files.content.read` - Read file contents (to check existing bookmarks)
 - `files.content.write` - Write file contents (to save bookmarks)
 - `account_info.read` - Read account info (for user display)
 
 **If you previously connected Dropbox and see scope errors**, you need to:
+
 1. Disconnect Dropbox from the dashboard
 2. Reconnect Dropbox (this will request the new scopes)
 
@@ -44,13 +47,16 @@ Navigate to: **https://www.dropbox.com/developers/apps**
 In the app settings page:
 
 #### Permissions Tab
+
 Enable these scopes:
+
 - `files.metadata.read` - Read file metadata
 - `files.content.read` - Read file contents
 - `files.content.write` - Write file contents
 - `account_info.read` - Read user account info (for validation)
 
 #### Settings Tab
+
 1. **App key** (Client ID) - Copy this value
 2. **App secret** (Client Secret) - Copy this value (keep secure!)
 3. **OAuth 2 Redirect URIs** - Add your callback URLs:
@@ -101,7 +107,7 @@ const authUrl = buildAuthorizationUrl(
   process.env.DROPBOX_REDIRECT_URI,
   {
     state: generateRandomState(), // CSRF protection
-    codeChallenge: pkceChallenge,  // PKCE for security
+    codeChallenge: pkceChallenge, // PKCE for security
   }
 );
 
@@ -146,7 +152,9 @@ export async function GET(request: Request): Promise<Response> {
 
   // Store tokens in Supabase (server-side only!)
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return Response.redirect('/login');
@@ -156,8 +164,8 @@ export async function GET(request: Request): Promise<Response> {
   await supabase.from('sync_sources').upsert({
     user_id: user.id,
     source_type: 'dropbox',
-    access_token: tokens.access_token,      // Encrypt in production!
-    refresh_token: tokens.refresh_token,    // Encrypt in production!
+    access_token: tokens.access_token, // Encrypt in production!
+    refresh_token: tokens.refresh_token, // Encrypt in production!
     token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
     account_id: tokens.account_id,
     config: {
@@ -181,7 +189,7 @@ Create `packages/sources/src/oauth/dropbox-sync.ts`:
 ```typescript
 /**
  * Dropbox Sync Helper
- * 
+ *
  * Provides functions for syncing bookmarks to Dropbox with checksum-based updates.
  */
 
@@ -219,7 +227,7 @@ export interface BookmarkFile {
 export interface GetBookmarkFileResult {
   content: BookmarkFile;
   contentHash: string; // Dropbox's content_hash for the file
-  rev: string;         // Dropbox revision ID
+  rev: string; // Dropbox revision ID
 }
 
 export interface DropboxSyncResult {
@@ -284,7 +292,7 @@ export async function updateBookmarkFile(
 
   // Try to get existing file to check checksum
   const existing = await getBookmarkFile(accessToken, path);
-  
+
   const bookmarkCount = data.bookmarks.length;
 
   // Check if checksum matches - skip update if data hasn't changed
@@ -404,11 +412,7 @@ export async function ensureValidToken(
   }
 
   // Refresh the token
-  const newTokens = await refreshAccessToken(
-    tokenInfo.refreshToken,
-    clientId,
-    clientSecret
-  );
+  const newTokens = await refreshAccessToken(tokenInfo.refreshToken, clientId, clientSecret);
 
   return {
     accessToken: newTokens.access_token,
@@ -475,12 +479,12 @@ The sync flow with checksum comparison:
 
 Handle common Dropbox API errors:
 
-| Error Code | Meaning | Action |
-|------------|---------|--------|
-| 401 | Invalid/expired token | Refresh token or re-authenticate |
-| 409 | Conflict (path not found, etc.) | Check error_summary for details |
-| 429 | Rate limited | Implement exponential backoff |
-| 500+ | Server error | Retry with backoff |
+| Error Code | Meaning                         | Action                           |
+| ---------- | ------------------------------- | -------------------------------- |
+| 401        | Invalid/expired token           | Refresh token or re-authenticate |
+| 409        | Conflict (path not found, etc.) | Check error_summary for details  |
+| 429        | Rate limited                    | Implement exponential backoff    |
+| 500+       | Server error                    | Retry with backoff               |
 
 ```typescript
 export class DropboxApiError extends Error {
@@ -532,15 +536,15 @@ Before deploying, verify:
 
 ## Comparison: GitHub vs Dropbox
 
-| Feature | GitHub | Dropbox |
-|---------|--------|---------|
-| File storage | Repository | App folder |
-| Version control | Git commits | Revisions |
-| Checksum field | `metadata.checksum` | `metadata.checksum` |
-| Update mode | SHA-based | Revision-based |
-| Rate limits | 5000/hour | Varies by endpoint |
-| Token expiry | No expiry | 4 hours |
-| Refresh token | No | Yes |
+| Feature         | GitHub              | Dropbox             |
+| --------------- | ------------------- | ------------------- |
+| File storage    | Repository          | App folder          |
+| Version control | Git commits         | Revisions           |
+| Checksum field  | `metadata.checksum` | `metadata.checksum` |
+| Update mode     | SHA-based           | Revision-based      |
+| Rate limits     | 5000/hour           | Varies by endpoint  |
+| Token expiry    | No expiry           | 4 hours             |
+| Refresh token   | No                  | Yes                 |
 
 ---
 

@@ -449,7 +449,7 @@ export const generateInsights = (bookmarks, folderMap) => {
       type: 'engagement',
       message: `Only ${Math.round(visitedPercent)}% of your bookmarks have been visited. Many might be outdated.`,
       severity: 'info',
-      action: 'Review bookmarks you haven\'t visited',
+      action: "Review bookmarks you haven't visited",
     });
   }
 

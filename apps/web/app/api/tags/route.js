@@ -32,7 +32,9 @@ export async function GET() {
       .single();
 
     const hasPro =
-      subscription && ['pro', 'team'].includes(subscription.plan) && subscription.status === 'active';
+      subscription &&
+      ['pro', 'team'].includes(subscription.plan) &&
+      subscription.status === 'active';
 
     if (!hasPro) {
       return NextResponse.json(
@@ -86,7 +88,9 @@ export async function POST(request) {
       .single();
 
     const hasPro =
-      subscription && ['pro', 'team'].includes(subscription.plan) && subscription.status === 'active';
+      subscription &&
+      ['pro', 'team'].includes(subscription.plan) &&
+      subscription.status === 'active';
 
     if (!hasPro) {
       return NextResponse.json(
@@ -111,13 +115,19 @@ export async function POST(request) {
     }
 
     if (normalizedName.length > 50) {
-      return NextResponse.json({ error: 'Tag name must be 50 characters or less' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Tag name must be 50 characters or less' },
+        { status: 400 }
+      );
     }
 
     // Validate color format
     const colorRegex = /^#[0-9A-Fa-f]{6}$/;
     if (!colorRegex.test(color)) {
-      return NextResponse.json({ error: 'Invalid color format. Use hex format like #3B82F6' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid color format. Use hex format like #3B82F6' },
+        { status: 400 }
+      );
     }
 
     // Create the tag

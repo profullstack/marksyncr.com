@@ -38,9 +38,7 @@ describe('GitHub Sync', () => {
           lastModified: '2025-01-01T00:00:00.000Z',
           source: 'marksyncr',
         },
-        bookmarks: [
-          { url: 'https://example.com', title: 'Example' },
-        ],
+        bookmarks: [{ url: 'https://example.com', title: 'Example' }],
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -240,13 +238,7 @@ describe('GitHub Sync', () => {
       });
 
       await expect(
-        updateBookmarkFile(
-          mockAccessToken,
-          mockRepository,
-          mockBranch,
-          mockFilePath,
-          mockBookmarks
-        )
+        updateBookmarkFile(mockAccessToken, mockRepository, mockBranch, mockFilePath, mockBookmarks)
       ).rejects.toThrow('Failed to update bookmark file');
     });
 
@@ -379,9 +371,7 @@ describe('GitHub Sync', () => {
           source: 'marksyncr',
           checksum: 'different_checksum', // Different checksum
         },
-        bookmarks: [
-          { url: 'https://old.com', title: 'Old' },
-        ],
+        bookmarks: [{ url: 'https://old.com', title: 'Old' }],
       };
 
       // First call: get existing file with different checksum
@@ -427,9 +417,7 @@ describe('GitHub Sync', () => {
           source: 'marksyncr',
           // No checksum field
         },
-        bookmarks: [
-          { url: 'https://old.com', title: 'Old' },
-        ],
+        bookmarks: [{ url: 'https://old.com', title: 'Old' }],
       };
 
       // First call: get existing file without checksum
@@ -475,9 +463,7 @@ describe('GitHub Sync', () => {
           source: 'marksyncr',
           checksum: 'existing_checksum',
         },
-        bookmarks: [
-          { url: 'https://old.com', title: 'Old' },
-        ],
+        bookmarks: [{ url: 'https://old.com', title: 'Old' }],
       };
 
       // First call: get existing file
@@ -499,9 +485,7 @@ describe('GitHub Sync', () => {
       });
 
       const bookmarksWithoutChecksum: BookmarkSyncData = {
-        bookmarks: [
-          { url: 'https://example.com', title: 'Example' },
-        ],
+        bookmarks: [{ url: 'https://example.com', title: 'Example' }],
         tombstones: [],
         // No checksum
       };

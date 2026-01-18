@@ -57,10 +57,7 @@ describe('conflict-resolver', () => {
         timestamp: new Date('2024-01-02').toISOString(),
       });
 
-      const result = resolveConflict(
-        { localChange, remoteChange },
-        CONFLICT_RESOLUTION.LOCAL
-      );
+      const result = resolveConflict({ localChange, remoteChange }, CONFLICT_RESOLUTION.LOCAL);
 
       expect(result.resolution).toBe(CONFLICT_RESOLUTION.LOCAL);
       expect(result.resolvedValue.title).toBe('Local Title');
@@ -78,10 +75,7 @@ describe('conflict-resolver', () => {
         timestamp: new Date('2024-01-01').toISOString(),
       });
 
-      const result = resolveConflict(
-        { localChange, remoteChange },
-        CONFLICT_RESOLUTION.REMOTE
-      );
+      const result = resolveConflict({ localChange, remoteChange }, CONFLICT_RESOLUTION.REMOTE);
 
       expect(result.resolution).toBe(CONFLICT_RESOLUTION.REMOTE);
       expect(result.resolvedValue.title).toBe('Remote Title');
@@ -99,10 +93,7 @@ describe('conflict-resolver', () => {
         timestamp: new Date('2024-01-02').toISOString(),
       });
 
-      const result = resolveConflict(
-        { localChange, remoteChange },
-        CONFLICT_RESOLUTION.MERGED
-      );
+      const result = resolveConflict({ localChange, remoteChange }, CONFLICT_RESOLUTION.MERGED);
 
       expect(result.resolution).toBe(CONFLICT_RESOLUTION.MERGED);
       expect(result.resolvedValue).toBeDefined();

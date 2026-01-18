@@ -81,9 +81,7 @@ function TagBadge({ tag, onRemove, onClick, selected = false, editable = false }
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
-        selected
-          ? 'ring-2 ring-offset-1 ring-primary-500'
-          : ''
+        selected ? 'ring-2 ring-offset-1 ring-primary-500' : ''
       }`}
       style={{
         backgroundColor: `${tag.color}20`,
@@ -144,16 +142,11 @@ export function TagSelector({ tags, selectedTags = [], onTagsChange, disabled = 
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-slate-700">Tags</label>
-      
+
       {/* Selected tags */}
       <div className="flex flex-wrap gap-1">
         {selectedTags.map((tag) => (
-          <TagBadge
-            key={tag.id}
-            tag={tag}
-            onRemove={handleRemoveTag}
-            editable
-          />
+          <TagBadge key={tag.id} tag={tag} onRemove={handleRemoveTag} editable />
         ))}
       </div>
 
@@ -180,10 +173,7 @@ export function TagSelector({ tags, selectedTags = [], onTagsChange, disabled = 
                 onClick={() => handleAddTag(tag)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
               >
-                <span
-                  className="h-3 w-3 rounded-full"
-                  style={{ backgroundColor: tag.color }}
-                />
+                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
                 {tag.name}
               </button>
             ))}
@@ -192,12 +182,7 @@ export function TagSelector({ tags, selectedTags = [], onTagsChange, disabled = 
       </div>
 
       {/* Click outside to close */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-0"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 z-0" onClick={() => setIsOpen(false)} />}
     </div>
   );
 }
@@ -280,9 +265,7 @@ export function TagManager({ tags, onCreateTag, onUpdateTag, onDeleteTag, isPro 
           </div>
           <div>
             <h3 className="font-medium text-slate-900">Tags & Organization</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Organize your bookmarks with custom tags
-            </p>
+            <p className="mt-1 text-sm text-slate-500">Organize your bookmarks with custom tags</p>
           </div>
           <a
             href="https://marksyncr.com/pricing"
@@ -316,11 +299,7 @@ export function TagManager({ tags, onCreateTag, onUpdateTag, onDeleteTag, isPro 
       </div>
 
       {/* Error message */}
-      {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {/* Create/Edit form */}
       {(isCreating || editingTag) && (
@@ -351,9 +330,7 @@ export function TagManager({ tags, onCreateTag, onUpdateTag, onDeleteTag, isPro 
           {/* Preview */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-500">Preview:</span>
-            <TagBadge
-              tag={{ name: newTagName || 'Tag name', color: newTagColor }}
-            />
+            <TagBadge tag={{ name: newTagName || 'Tag name', color: newTagColor }} />
           </div>
 
           {/* Actions */}

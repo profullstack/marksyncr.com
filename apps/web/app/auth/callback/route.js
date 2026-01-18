@@ -22,10 +22,7 @@ export async function GET(request) {
   if (error) {
     console.error('OAuth error:', error, errorDescription);
     return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent(errorDescription || error)}`,
-        baseUrl
-      )
+      new URL(`/login?error=${encodeURIComponent(errorDescription || error)}`, baseUrl)
     );
   }
 
@@ -56,25 +53,18 @@ export async function GET(request) {
     );
 
     try {
-      const { error: exchangeError } =
-        await supabase.auth.exchangeCodeForSession(code);
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
       if (exchangeError) {
         console.error('Code exchange error:', exchangeError);
         return NextResponse.redirect(
-          new URL(
-            `/login?error=${encodeURIComponent(exchangeError.message)}`,
-            baseUrl
-          )
+          new URL(`/login?error=${encodeURIComponent(exchangeError.message)}`, baseUrl)
         );
       }
     } catch (err) {
       console.error('Auth callback error:', err);
       return NextResponse.redirect(
-        new URL(
-          `/login?error=${encodeURIComponent('Authentication failed')}`,
-          baseUrl
-        )
+        new URL(`/login?error=${encodeURIComponent('Authentication failed')}`, baseUrl)
       );
     }
   }

@@ -188,22 +188,19 @@ export async function initializeBookmarkFile(
   const content = getDefaultBookmarkFileContent();
   const encodedContent = btoa(JSON.stringify(content, null, 2));
 
-  const response = await fetch(
-    `${GITHUB_API_BASE}/repos/${repository}/contents/${filePath}`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: 'Initialize MarkSyncr bookmarks',
-        content: encodedContent,
-        branch,
-      }),
-    }
-  );
+  const response = await fetch(`${GITHUB_API_BASE}/repos/${repository}/contents/${filePath}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: 'Initialize MarkSyncr bookmarks',
+      content: encodedContent,
+      branch,
+    }),
+  });
 
   if (!response.ok) {
     const error = await response.json();

@@ -5,12 +5,7 @@
  */
 
 // Hash utilities
-export {
-  sha256,
-  generateBookmarkId,
-  generateChecksum,
-  generateDeviceId,
-} from './hash-utils.js';
+export { sha256, generateBookmarkId, generateChecksum, generateDeviceId } from './hash-utils.js';
 
 // Diff engine
 export {
@@ -55,10 +50,7 @@ export {
 } from './bookmark-parser.js';
 
 // Version history
-export {
-  VersionHistoryManager,
-  createChangeSummary,
-} from './version-history.js';
+export { VersionHistoryManager, createChangeSummary } from './version-history.js';
 
 // Feature gating (Pro features)
 export {

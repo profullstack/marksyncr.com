@@ -46,16 +46,14 @@ describe('SyncSourcesClient', () => {
       // MarkSyncr Cloud should show as connected
       expect(screen.getByText('MarkSyncr Cloud')).toBeInTheDocument();
       expect(screen.getByText('Default')).toBeInTheDocument();
-      
+
       // Should show Connected status for MarkSyncr Cloud
       const connectedLabels = screen.getAllByText('Connected');
       expect(connectedLabels.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should show Connected status for connected sources', () => {
-      const connectedSources = [
-        { provider: 'github', repository: 'user/marksyncr-bookmarks' },
-      ];
+      const connectedSources = [{ provider: 'github', repository: 'user/marksyncr-bookmarks' }];
 
       render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
 
@@ -65,9 +63,7 @@ describe('SyncSourcesClient', () => {
     });
 
     it('should show Disconnect button for connected sources', () => {
-      const connectedSources = [
-        { provider: 'github', repository: 'user/marksyncr-bookmarks' },
-      ];
+      const connectedSources = [{ provider: 'github', repository: 'user/marksyncr-bookmarks' }];
 
       render(<SyncSourcesClient subscription={null} connectedSources={connectedSources} />);
 
@@ -181,7 +177,7 @@ describe('SyncSourcesClient', () => {
       // MarkSyncr Cloud is always connected and shows "Default" instead
       const connectButtons = screen.getAllByText('Connect');
       expect(connectButtons.length).toBe(3);
-      
+
       // MarkSyncr Cloud should show "Default" label
       expect(screen.getByText('Default')).toBeInTheDocument();
     });
@@ -197,10 +193,7 @@ describe('SyncSourcesClient', () => {
 
     it('should allow connection for Pro users', () => {
       render(
-        <SyncSourcesClient
-          subscription={{ plan: 'pro', status: 'active' }}
-          connectedSources={[]}
-        />
+        <SyncSourcesClient subscription={{ plan: 'pro', status: 'active' }} connectedSources={[]} />
       );
 
       // Should not show Pro plan required

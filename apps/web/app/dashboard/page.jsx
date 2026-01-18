@@ -51,10 +51,7 @@ async function getUserDevices(userId) {
  */
 async function getConnectedSources(userId) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('sync_sources')
-    .select('*')
-    .eq('user_id', userId);
+  const { data, error } = await supabase.from('sync_sources').select('*').eq('user_id', userId);
 
   if (error) {
     console.error('Error getting sync sources:', error.message);
@@ -106,12 +103,7 @@ export default async function DashboardPage({ searchParams }) {
         {checkoutStatus === 'success' && (
           <div className="mb-6 rounded-lg bg-green-50 p-4 text-green-700">
             <div className="flex items-center">
-              <svg
-                className="mr-2 h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -119,9 +111,7 @@ export default async function DashboardPage({ searchParams }) {
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span>
-                Your subscription has been activated! Thank you for upgrading.
-              </span>
+              <span>Your subscription has been activated! Thank you for upgrading.</span>
             </div>
           </div>
         )}
@@ -129,12 +119,7 @@ export default async function DashboardPage({ searchParams }) {
         {connectedProvider && (
           <div className="mb-6 rounded-lg bg-green-50 p-4 text-green-700">
             <div className="flex items-center">
-              <svg
-                className="mr-2 h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -143,7 +128,8 @@ export default async function DashboardPage({ searchParams }) {
                 />
               </svg>
               <span>
-                Successfully connected to {connectedProvider.charAt(0).toUpperCase() + connectedProvider.slice(1)}!
+                Successfully connected to{' '}
+                {connectedProvider.charAt(0).toUpperCase() + connectedProvider.slice(1)}!
               </span>
             </div>
           </div>
@@ -152,12 +138,7 @@ export default async function DashboardPage({ searchParams }) {
         {errorMessage && (
           <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
             <div className="flex items-center">
-              <svg
-                className="mr-2 h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -165,9 +146,7 @@ export default async function DashboardPage({ searchParams }) {
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              <span>
-                Connection error: {decodeURIComponent(errorMessage)}
-              </span>
+              <span>Connection error: {decodeURIComponent(errorMessage)}</span>
             </div>
           </div>
         )}
@@ -237,14 +216,10 @@ function SubscriptionCard({ subscription }) {
       ) : (
         <div className="text-sm text-slate-600">
           <p>
-            Status:{' '}
-            <span className="font-medium capitalize">{subscription?.status}</span>
+            Status: <span className="font-medium capitalize">{subscription?.status}</span>
           </p>
           {subscription?.current_period_end && (
-            <p>
-              Renews:{' '}
-              {new Date(subscription.current_period_end).toLocaleDateString()}
-            </p>
+            <p>Renews: {new Date(subscription.current_period_end).toLocaleDateString()}</p>
           )}
           <a
             href="/api/portal"
@@ -265,31 +240,31 @@ function SubscriptionCard({ subscription }) {
  */
 function getBrowserIconPath(browser) {
   const browserLower = browser?.toLowerCase() || '';
-  
+
   if (browserLower === 'chrome') {
     return '/icons/browser-chrome.svg';
   }
-  
+
   if (browserLower === 'firefox') {
     return '/icons/browser-firefox.svg';
   }
-  
+
   if (browserLower === 'safari') {
     return '/icons/browser-safari.svg';
   }
-  
+
   if (browserLower === 'edge') {
     return '/icons/browser-edge.svg';
   }
-  
+
   if (browserLower === 'opera') {
     return '/icons/browser-opera.svg';
   }
-  
+
   if (browserLower === 'brave') {
     return '/icons/browser-brave.svg';
   }
-  
+
   // Default browser icon
   return '/icons/browser-default.svg';
 }
@@ -303,24 +278,14 @@ function getBrowserIconPath(browser) {
 function BrowserIcon({ browser }) {
   const iconPath = getBrowserIconPath(browser);
   const browserName = browser || 'Browser';
-  
-  return (
-    <Image
-      src={iconPath}
-      alt={browserName}
-      width={24}
-      height={24}
-      className="h-6 w-6"
-    />
-  );
+
+  return <Image src={iconPath} alt={browserName} width={24} height={24} className="h-6 w-6" />;
 }
 
 function DevicesCard({ devices }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">
-        Connected Devices
-      </h2>
+      <h2 className="mb-4 text-lg font-semibold text-slate-900">Connected Devices</h2>
       {devices.length === 0 ? (
         <div className="text-center text-slate-500">
           <Image
@@ -331,9 +296,7 @@ function DevicesCard({ devices }) {
             className="mx-auto mb-2 h-12 w-12 opacity-30"
           />
           <p className="text-sm">No devices connected yet</p>
-          <p className="mt-1 text-xs">
-            Install the browser extension to get started
-          </p>
+          <p className="mt-1 text-xs">Install the browser extension to get started</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -509,4 +472,3 @@ function QuickActionsCard() {
     </div>
   );
 }
-

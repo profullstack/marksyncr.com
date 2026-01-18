@@ -43,35 +43,37 @@ const METHODS = ['GET', 'POST', 'OPTIONS'];
  */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
-  
-  return items.map(item => {
-    if (item.type === 'folder') {
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      // Bookmark entry (default for backwards compatibility)
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    // Sort by folderPath first, then by index within the folder
-    // IMPORTANT: Do NOT sort by type - this would break the interleaved order
-    // of folders and bookmarks. When a user moves a folder from position 3 to
-    // the last position, the index should be preserved, not reset based on type.
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder to preserve original order
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        // Bookmark entry (default for backwards compatibility)
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      // Sort by folderPath first, then by index within the folder
+      // IMPORTANT: Do NOT sort by type - this would break the interleaved order
+      // of folders and bookmarks. When a user moves a folder from position 3 to
+      // the last position, the index should be preserved, not reset based on type.
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      // Then by index within the folder to preserve original order
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -80,17 +82,17 @@ function normalizeItemsForChecksum(items) {
  */
 function extractBookmarksFromNested(data) {
   if (!data) return [];
-  
+
   // If it's already an array, return it
   if (Array.isArray(data)) return data;
-  
+
   // If it has a 'roots' property, extract from nested format
   if (data.roots) {
     const bookmarks = [];
-    
+
     function extractFromNode(node, path = '', index = 0) {
       if (!node) return;
-      
+
       // If it's a bookmark (has url)
       if (node.url) {
         bookmarks.push({
@@ -102,11 +104,11 @@ function extractBookmarksFromNested(data) {
         });
         return;
       }
-      
+
       // If it's a folder with children
       if (node.children && Array.isArray(node.children)) {
         const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
-        
+
         // Add folder entry if it has a title and is not a root
         if (node.title && path) {
           bookmarks.push({
@@ -116,13 +118,13 @@ function extractBookmarksFromNested(data) {
             index: node.index ?? index,
           });
         }
-        
+
         for (let i = 0; i < node.children.length; i++) {
           extractFromNode(node.children[i], newPath, i);
         }
       }
     }
-    
+
     // Extract from each root
     for (const [rootKey, rootNode] of Object.entries(data.roots)) {
       if (rootNode && rootNode.children) {
@@ -132,10 +134,10 @@ function extractBookmarksFromNested(data) {
         }
       }
     }
-    
+
     return bookmarks;
   }
-  
+
   return [];
 }
 
@@ -165,7 +167,7 @@ export async function OPTIONS(request) {
  */
 export async function GET(request) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
@@ -185,7 +187,10 @@ export async function GET(request) {
 
     if (error) {
       console.error('Failed to get version history:', error);
-      return NextResponse.json({ error: 'Failed to get version history' }, { status: 500, headers });
+      return NextResponse.json(
+        { error: 'Failed to get version history' },
+        { status: 500, headers }
+      );
     }
 
     // Get retention limit for the user
@@ -193,21 +198,24 @@ export async function GET(request) {
       p_user_id: user.id,
     });
 
-    return NextResponse.json({
-      versions: (data || []).map((v) => ({
-        id: v.id,
-        version: v.version,
-        checksum: v.checksum,
-        sourceType: v.source_type,
-        sourceName: v.source_name,
-        deviceName: v.device_name,
-        changeSummary: v.change_summary,
-        createdAt: v.created_at,
-        bookmarkCount: v.bookmark_count,
-        folderCount: v.folder_count,
-      })),
-      retentionLimit: retentionLimit || 5,
-    }, { headers });
+    return NextResponse.json(
+      {
+        versions: (data || []).map((v) => ({
+          id: v.id,
+          version: v.version,
+          checksum: v.checksum,
+          sourceType: v.source_type,
+          sourceName: v.source_name,
+          deviceName: v.device_name,
+          changeSummary: v.change_summary,
+          createdAt: v.created_at,
+          bookmarkCount: v.bookmark_count,
+          folderCount: v.folder_count,
+        })),
+        retentionLimit: retentionLimit || 5,
+      },
+      { headers }
+    );
   } catch (error) {
     console.error('Version history error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
@@ -225,7 +233,7 @@ export async function GET(request) {
  */
 export async function POST(request) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
@@ -246,7 +254,7 @@ export async function POST(request) {
     // Compute checksum using normalized algorithm (matches extension and bookmarks API)
     // This ensures consistent checksums regardless of dateAdded, exportedAt, etc.
     const checksum = generateNormalizedChecksum(bookmarkData);
-    
+
     console.log(`[Versions API] Computed normalized checksum: ${checksum}`);
 
     // Check if the latest version has the same checksum (deduplication)
@@ -263,24 +271,31 @@ export async function POST(request) {
     }
 
     const latestVersion = latestVersions?.[0];
-    
+
     // If the latest version has the same checksum, skip creating a new version
     if (latestVersion && latestVersion.checksum === checksum) {
-      console.log(`[Versions API] Checksum matches latest version ${latestVersion.version}, skipping duplicate`);
-      
-      return NextResponse.json({
-        version: {
-          id: latestVersion.id,
-          version: latestVersion.version,
-          checksum: latestVersion.checksum,
-          createdAt: latestVersion.created_at,
+      console.log(
+        `[Versions API] Checksum matches latest version ${latestVersion.version}, skipping duplicate`
+      );
+
+      return NextResponse.json(
+        {
+          version: {
+            id: latestVersion.id,
+            version: latestVersion.version,
+            checksum: latestVersion.checksum,
+            createdAt: latestVersion.created_at,
+          },
+          skipped: true,
+          message: 'No changes detected - version already exists',
         },
-        skipped: true,
-        message: 'No changes detected - version already exists',
-      }, { headers });
+        { headers }
+      );
     }
 
-    console.log(`[Versions API] Checksum differs from latest (${latestVersion?.checksum || 'none'}), creating new version`);
+    console.log(
+      `[Versions API] Checksum differs from latest (${latestVersion?.checksum || 'none'}), creating new version`
+    );
 
     const { data, error } = await supabase.rpc('save_bookmark_version', {
       p_user_id: user.id,
@@ -298,14 +313,17 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to save version' }, { status: 500, headers });
     }
 
-    return NextResponse.json({
-      version: {
-        id: data?.id,
-        version: data?.version,
-        checksum: data?.checksum,
-        createdAt: data?.created_at,
+    return NextResponse.json(
+      {
+        version: {
+          id: data?.id,
+          version: data?.version,
+          checksum: data?.checksum,
+          createdAt: data?.created_at,
+        },
       },
-    }, { headers });
+      { headers }
+    );
   } catch (error) {
     console.error('Save version error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });

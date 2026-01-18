@@ -1,10 +1,10 @@
 /**
  * Tests for cross-browser sync issues
- * 
+ *
  * These tests reproduce the sync issues that occur when:
  * 1. Firefox force pushes bookmarks to cloud
  * 2. Chrome syncs - should get Firefox's bookmarks exactly
- * 
+ *
  * Current bugs:
  * - Duplicate/empty folders
  * - Stale bookmarks not being replaced
@@ -77,7 +77,7 @@ describe('Cross-Browser Sync Issues', () => {
      * 2. Chrome has bookmark A with title "Chrome Title" in folder "Personal"
      * 3. Firefox force pushes to cloud
      * 4. Chrome syncs
-     * 
+     *
      * Expected: Chrome's bookmark A should be updated to match Firefox's
      * Actual Bug: Chrome's bookmark A keeps its old title and folder
      */
@@ -103,15 +103,16 @@ describe('Cross-Browser Sync Issues', () => {
 
       // Current buggy logic: only checks if URL exists locally
       const localUrls = new Set([localBookmark.url]);
-      const newFromCloud = [cloudBookmark].filter(cb => !localUrls.has(cb.url));
+      const newFromCloud = [cloudBookmark].filter((cb) => !localUrls.has(cb.url));
 
       // Bug: newFromCloud is empty because URL exists locally
       expect(newFromCloud).toHaveLength(0);
 
       // Expected behavior: should detect that bookmark needs updating
       // because cloud version has different title/folder
-      const needsUpdate = cloudBookmark.title !== localBookmark.title ||
-                          cloudBookmark.folderPath !== localBookmark.folderPath;
+      const needsUpdate =
+        cloudBookmark.title !== localBookmark.title ||
+        cloudBookmark.folderPath !== localBookmark.folderPath;
       expect(needsUpdate).toBe(true);
     });
 
@@ -130,14 +131,14 @@ describe('Cross-Browser Sync Issues', () => {
 
       // Helper function that should be implemented
       function categorizeCloudBookmarks(cloudBookmarks, localBookmarks) {
-        const localByUrl = new Map(localBookmarks.map(b => [b.url, b]));
-        
+        const localByUrl = new Map(localBookmarks.map((b) => [b.url, b]));
+
         const toAdd = [];
         const toUpdate = [];
-        
+
         for (const cloudBm of cloudBookmarks) {
           if (!cloudBm.url) continue; // Skip folders
-          
+
           const localBm = localByUrl.get(cloudBm.url);
           if (!localBm) {
             toAdd.push(cloudBm);
@@ -145,13 +146,13 @@ describe('Cross-Browser Sync Issues', () => {
             // Check if metadata differs (normalize folder paths for comparison)
             const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
             const localFolder = normalizeFolderPath(localBm.folderPath);
-            
+
             if (cloudBm.title !== localBm.title || cloudFolder !== localFolder) {
               toUpdate.push({ cloud: cloudBm, local: localBm });
             }
           }
         }
-        
+
         return { toAdd, toUpdate };
       }
 
@@ -171,8 +172,8 @@ describe('Cross-Browser Sync Issues', () => {
       expect(toAdd[0].url).toBe('https://c.com');
 
       expect(toUpdate).toHaveLength(2);
-      expect(toUpdate.map(u => u.cloud.url)).toContain('https://a.com');
-      expect(toUpdate.map(u => u.cloud.url)).toContain('https://b.com');
+      expect(toUpdate.map((u) => u.cloud.url)).toContain('https://a.com');
+      expect(toUpdate.map((u) => u.cloud.url)).toContain('https://b.com');
     });
   });
 
@@ -189,7 +190,7 @@ describe('Cross-Browser Sync Issues', () => {
       ];
 
       // Current buggy filter - skips folders
-      const buggyNewFromCloud = cloudItems.filter(cb => {
+      const buggyNewFromCloud = cloudItems.filter((cb) => {
         if (!cb.url) return false; // BUG: This skips folders!
         return true;
       });
@@ -197,7 +198,7 @@ describe('Cross-Browser Sync Issues', () => {
       expect(buggyNewFromCloud).toHaveLength(1); // Only the bookmark
 
       // Fixed filter - includes folders
-      const fixedNewFromCloud = cloudItems.filter(cb => {
+      const fixedNewFromCloud = cloudItems.filter((cb) => {
         // Include both bookmarks (have URL) and folders (type === 'folder')
         return cb.url || cb.type === 'folder';
       });
@@ -222,13 +223,13 @@ describe('Cross-Browser Sync Issues', () => {
 
       // Should detect that Work and Personal need to be reordered
       function detectFolderOrderChanges(cloudFolders, localFolders) {
-        const localByTitle = new Map(localFolders.map(f => [`${f.folderPath}/${f.title}`, f]));
+        const localByTitle = new Map(localFolders.map((f) => [`${f.folderPath}/${f.title}`, f]));
         const changes = [];
 
         for (const cloudFolder of cloudFolders) {
           const key = `${cloudFolder.folderPath}/${cloudFolder.title}`;
           const localFolder = localByTitle.get(key);
-          
+
           if (localFolder && localFolder.index !== cloudFolder.index) {
             changes.push({
               folder: cloudFolder,
@@ -243,10 +244,10 @@ describe('Cross-Browser Sync Issues', () => {
       }
 
       const orderChanges = detectFolderOrderChanges(cloudFolders, localFolders);
-      
+
       expect(orderChanges).toHaveLength(2);
-      expect(orderChanges.find(c => c.folder.title === 'Work').toIndex).toBe(0);
-      expect(orderChanges.find(c => c.folder.title === 'Personal').toIndex).toBe(1);
+      expect(orderChanges.find((c) => c.folder.title === 'Work').toIndex).toBe(0);
+      expect(orderChanges.find((c) => c.folder.title === 'Personal').toIndex).toBe(1);
     });
   });
 
@@ -299,7 +300,7 @@ describe('Cross-Browser Sync Issues', () => {
 
       // Check if folder already exists (with normalized paths)
       const normalizedCloudPath = normalizeFolderPath(cloudFolder.folderPath);
-      const folderExists = localFolders.some(lf => {
+      const folderExists = localFolders.some((lf) => {
         const normalizedLocalPath = normalizeFolderPath(lf.folderPath);
         return lf.title === cloudFolder.title && normalizedLocalPath === normalizedCloudPath;
       });
@@ -320,14 +321,34 @@ describe('Cross-Browser Sync Issues', () => {
     it('should not push local bookmarks that conflict with cloud after force pull scenario', () => {
       // After Firefox force push, cloud has:
       const cloudBookmarks = [
-        { url: 'https://a.com', title: 'Firefox A', folderPath: 'toolbar/Work', dateAdded: 1700000000000 },
-        { url: 'https://b.com', title: 'Firefox B', folderPath: 'toolbar/Personal', dateAdded: 1700000000000 },
+        {
+          url: 'https://a.com',
+          title: 'Firefox A',
+          folderPath: 'toolbar/Work',
+          dateAdded: 1700000000000,
+        },
+        {
+          url: 'https://b.com',
+          title: 'Firefox B',
+          folderPath: 'toolbar/Personal',
+          dateAdded: 1700000000000,
+        },
       ];
 
       // Chrome's local bookmarks (stale):
       const localBookmarks = [
-        { url: 'https://a.com', title: 'Chrome A', folderPath: 'toolbar/Old', dateAdded: 1699000000000 },
-        { url: 'https://c.com', title: 'Chrome C', folderPath: 'toolbar/Old', dateAdded: 1699000000000 },
+        {
+          url: 'https://a.com',
+          title: 'Chrome A',
+          folderPath: 'toolbar/Old',
+          dateAdded: 1699000000000,
+        },
+        {
+          url: 'https://c.com',
+          title: 'Chrome C',
+          folderPath: 'toolbar/Old',
+          dateAdded: 1699000000000,
+        },
       ];
 
       // Current buggy behavior: Chrome pushes all its bookmarks
@@ -340,11 +361,11 @@ describe('Cross-Browser Sync Issues', () => {
 
       // The key insight: after a force push from another browser,
       // the syncing browser should treat cloud as authoritative for existing URLs
-      
+
       function determineLocalAdditions(localBookmarks, cloudBookmarks, lastForcePushTime) {
-        const cloudUrls = new Set(cloudBookmarks.map(b => b.url));
-        
-        return localBookmarks.filter(lb => {
+        const cloudUrls = new Set(cloudBookmarks.map((b) => b.url));
+
+        return localBookmarks.filter((lb) => {
           // Only push bookmarks that don't exist in cloud
           if (cloudUrls.has(lb.url)) {
             return false; // Cloud has this URL, don't push local version
@@ -354,7 +375,7 @@ describe('Cross-Browser Sync Issues', () => {
       }
 
       const localAdditions = determineLocalAdditions(localBookmarks, cloudBookmarks, null);
-      
+
       expect(localAdditions).toHaveLength(1);
       expect(localAdditions[0].url).toBe('https://c.com');
     });
@@ -381,14 +402,14 @@ describe('Cross-Browser Sync Issues', () => {
 
       // Step 1: Categorize cloud bookmarks
       function categorizeCloudBookmarks(cloudBookmarks, localBookmarks) {
-        const localByUrl = new Map(localBookmarks.map(b => [b.url, b]));
-        
+        const localByUrl = new Map(localBookmarks.map((b) => [b.url, b]));
+
         const toAdd = [];
         const toUpdate = [];
-        
+
         for (const cloudBm of cloudBookmarks) {
           if (!cloudBm.url) continue;
-          
+
           const localBm = localByUrl.get(cloudBm.url);
           if (!localBm) {
             toAdd.push(cloudBm);
@@ -397,14 +418,14 @@ describe('Cross-Browser Sync Issues', () => {
             toUpdate.push({ cloud: cloudBm, local: localBm });
           }
         }
-        
+
         return { toAdd, toUpdate };
       }
 
       // Step 2: Determine what to push to cloud
       function determineLocalAdditions(localBookmarks, cloudBookmarks) {
-        const cloudUrls = new Set(cloudBookmarks.map(b => b.url));
-        return localBookmarks.filter(lb => lb.url && !cloudUrls.has(lb.url));
+        const cloudUrls = new Set(cloudBookmarks.map((b) => b.url));
+        return localBookmarks.filter((lb) => lb.url && !cloudUrls.has(lb.url));
       }
 
       const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks);
@@ -430,19 +451,21 @@ describe('Folder Path Normalization', () => {
    */
   function normalizeFolderPath(path) {
     if (!path) return '';
-    return path
-      // Normalize toolbar variations
-      .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
-      .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
-      .replace(/^Speed Dial\/?/i, 'toolbar/')
-      .replace(/^Favourites Bar\/?/i, 'toolbar/')
-      // Normalize other bookmarks variations
-      .replace(/^Other Bookmarks\/?/i, 'other/')
-      .replace(/^Unsorted Bookmarks\/?/i, 'other/')
-      // Normalize menu variations (Firefox)
-      .replace(/^Bookmarks Menu\/?/i, 'menu/')
-      // Clean up trailing slashes
-      .replace(/\/+$/, '');
+    return (
+      path
+        // Normalize toolbar variations
+        .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
+        .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
+        .replace(/^Speed Dial\/?/i, 'toolbar/')
+        .replace(/^Favourites Bar\/?/i, 'toolbar/')
+        // Normalize other bookmarks variations
+        .replace(/^Other Bookmarks\/?/i, 'other/')
+        .replace(/^Unsorted Bookmarks\/?/i, 'other/')
+        // Normalize menu variations (Firefox)
+        .replace(/^Bookmarks Menu\/?/i, 'menu/')
+        // Clean up trailing slashes
+        .replace(/\/+$/, '')
+    );
   }
 
   it('should normalize Firefox toolbar path', () => {
@@ -476,7 +499,9 @@ describe('Folder Path Normalization', () => {
   });
 
   it('should handle nested paths', () => {
-    expect(normalizeFolderPath('Bookmarks Bar/Work/Projects/Active')).toBe('toolbar/Work/Projects/Active');
+    expect(normalizeFolderPath('Bookmarks Bar/Work/Projects/Active')).toBe(
+      'toolbar/Work/Projects/Active'
+    );
   });
 
   it('should be case insensitive', () => {
@@ -500,51 +525,91 @@ describe('Bookmark Update Detection', () => {
   function bookmarkNeedsUpdate(cloudBm, localBm) {
     // Title changed
     if (cloudBm.title !== localBm.title) return true;
-    
+
     // Folder changed (with normalization)
     const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
     const localFolder = normalizeFolderPath(localBm.folderPath);
     if (cloudFolder !== localFolder) return true;
-    
+
     // Index changed (position within folder)
     if (cloudBm.index !== localBm.index) return true;
-    
+
     return false;
   }
 
   it('should detect title change', () => {
-    const cloud = { url: 'https://a.com', title: 'New Title', folderPath: 'toolbar/Work', index: 0 };
-    const local = { url: 'https://a.com', title: 'Old Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
-    
+    const cloud = {
+      url: 'https://a.com',
+      title: 'New Title',
+      folderPath: 'toolbar/Work',
+      index: 0,
+    };
+    const local = {
+      url: 'https://a.com',
+      title: 'Old Title',
+      folderPath: 'Bookmarks Bar/Work',
+      index: 0,
+    };
+
     expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
   });
 
   it('should detect folder change', () => {
-    const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'toolbar/Personal', index: 0 };
-    const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
-    
+    const cloud = {
+      url: 'https://a.com',
+      title: 'Title',
+      folderPath: 'toolbar/Personal',
+      index: 0,
+    };
+    const local = {
+      url: 'https://a.com',
+      title: 'Title',
+      folderPath: 'Bookmarks Bar/Work',
+      index: 0,
+    };
+
     expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
   });
 
   it('should detect index change', () => {
     const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'toolbar/Work', index: 5 };
-    const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
-    
+    const local = {
+      url: 'https://a.com',
+      title: 'Title',
+      folderPath: 'Bookmarks Bar/Work',
+      index: 0,
+    };
+
     expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
   });
 
   it('should not detect change when only root folder name differs', () => {
-    const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Toolbar/Work', index: 0 };
-    const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
-    
+    const cloud = {
+      url: 'https://a.com',
+      title: 'Title',
+      folderPath: 'Bookmarks Toolbar/Work',
+      index: 0,
+    };
+    const local = {
+      url: 'https://a.com',
+      title: 'Title',
+      folderPath: 'Bookmarks Bar/Work',
+      index: 0,
+    };
+
     // After normalization, these are the same
     expect(bookmarkNeedsUpdate(cloud, local)).toBe(false);
   });
 
   it('should not detect change when everything matches', () => {
     const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'toolbar/Work', index: 0 };
-    const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
-    
+    const local = {
+      url: 'https://a.com',
+      title: 'Title',
+      folderPath: 'Bookmarks Bar/Work',
+      index: 0,
+    };
+
     expect(bookmarkNeedsUpdate(cloud, local)).toBe(false);
   });
 });

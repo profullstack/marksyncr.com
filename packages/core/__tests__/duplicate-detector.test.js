@@ -138,8 +138,8 @@ describe('Duplicate Detector', () => {
     it('should find duplicates with normalized URLs', () => {
       const duplicates = findDuplicatesByUrl(sampleBookmarks);
       // Should find react.dev duplicates (with/without trailing slash and www)
-      const reactDuplicates = duplicates.find(group => 
-        group.some(b => b.url.includes('react.dev'))
+      const reactDuplicates = duplicates.find((group) =>
+        group.some((b) => b.url.includes('react.dev'))
       );
       expect(reactDuplicates).toBeDefined();
       expect(reactDuplicates.length).toBeGreaterThanOrEqual(2);
@@ -163,8 +163,8 @@ describe('Duplicate Detector', () => {
 
     it('should find Vue.js Guide duplicates', () => {
       const duplicates = findDuplicatesByTitle(sampleBookmarks);
-      const vueDuplicates = duplicates.find(group =>
-        group.some(b => b.title === 'Vue.js Guide')
+      const vueDuplicates = duplicates.find((group) =>
+        group.some((b) => b.title === 'Vue.js Guide')
       );
       expect(vueDuplicates).toBeDefined();
       expect(vueDuplicates.length).toBe(2);
@@ -254,7 +254,13 @@ describe('Duplicate Detector', () => {
     it('should prefer bookmark with more metadata', () => {
       const duplicates = [
         { id: '1', title: 'Test', url: 'https://test.com', dateAdded: '2025-01-15T10:00:00Z' },
-        { id: '2', title: 'Test with Description', url: 'https://test.com', dateAdded: '2025-01-01T10:00:00Z', notes: 'Some notes' },
+        {
+          id: '2',
+          title: 'Test with Description',
+          url: 'https://test.com',
+          dateAdded: '2025-01-01T10:00:00Z',
+          notes: 'Some notes',
+        },
       ];
       const suggestion = suggestMerge(duplicates, { preferMetadata: true });
       expect(suggestion.keep.id).toBe('2');

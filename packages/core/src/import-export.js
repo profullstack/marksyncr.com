@@ -91,7 +91,7 @@ export function parseNetscapeHtml(html) {
   // Simple regex-based parser for Netscape bookmark format
   const parseFolder = (content, depth = 0) => {
     const items = [];
-    
+
     // Match folder headers and their content
     const folderRegex = /<DT><H3[^>]*>([^<]*)<\/H3>\s*<DL><p>([\s\S]*?)<\/DL><p>/gi;
     // Match individual bookmarks
@@ -113,9 +113,7 @@ export function parseNetscapeHtml(html) {
     }
 
     // Process bookmarks before first folder
-    const beforeFirstFolder = folders.length > 0 
-      ? content.slice(0, folders[0].index) 
-      : content;
+    const beforeFirstFolder = folders.length > 0 ? content.slice(0, folders[0].index) : content;
 
     while ((match = bookmarkRegex.exec(beforeFirstFolder)) !== null) {
       totalCount++;
@@ -144,12 +142,12 @@ export function parseNetscapeHtml(html) {
     // Process bookmarks after folders (between folders)
     // Reset regex
     bookmarkRegex.lastIndex = 0;
-    
+
     // Find bookmarks not inside folders
     const outsideFolderContent = content.replace(/<DL><p>[\s\S]*?<\/DL><p>/gi, '');
     while ((match = bookmarkRegex.exec(outsideFolderContent)) !== null) {
       // Check if this bookmark was already added
-      const exists = items.some(item => item.url === match[1] && item.title === match[3]);
+      const exists = items.some((item) => item.url === match[1] && item.title === match[3]);
       if (!exists) {
         totalCount++;
         items.push({
@@ -244,7 +242,7 @@ export function parseRaindropExport(jsonString) {
 
   for (const item of data.items || []) {
     const collectionTitle = item.collection?.title || 'Unsorted';
-    
+
     if (!collections.has(collectionTitle)) {
       collections.set(collectionTitle, []);
     }
@@ -291,7 +289,7 @@ export function parsePinboardJson(jsonString) {
 
   for (const item of data) {
     const tags = item.tags ? item.tags.split(' ').filter(Boolean) : [];
-    
+
     bookmarks.push({
       id: generateId(),
       title: item.description || 'Untitled',
@@ -320,8 +318,8 @@ export function parsePinboardJson(jsonString) {
 const ensureIds = (items) => {
   if (!items || !Array.isArray(items)) return [];
   return items
-    .filter(item => item != null) // Filter out null/undefined items
-    .map(item => {
+    .filter((item) => item != null) // Filter out null/undefined items
+    .map((item) => {
       const withId = {
         ...item,
         id: item.id || generateId(),
@@ -340,20 +338,20 @@ const ensureIds = (items) => {
  */
 const convertFolderPathToNested = (flatBookmarks) => {
   if (!flatBookmarks || !Array.isArray(flatBookmarks)) return [];
-  
+
   const root = [];
-  
+
   // Helper to get or create folder path
   const getOrCreateFolder = (pathParts, parentArray) => {
     if (pathParts.length === 0) return parentArray;
-    
+
     const folderName = pathParts[0];
-    
+
     // Look for existing folder in parent
-    let folder = parentArray.find(item =>
-      item && (item.type === 'folder' || item.children) && item.title === folderName
+    let folder = parentArray.find(
+      (item) => item && (item.type === 'folder' || item.children) && item.title === folderName
     );
-    
+
     if (!folder) {
       folder = {
         id: generateId(),
@@ -364,21 +362,21 @@ const convertFolderPathToNested = (flatBookmarks) => {
       };
       parentArray.push(folder);
     }
-    
+
     if (pathParts.length === 1) {
       return folder.children;
     }
-    
+
     return getOrCreateFolder(pathParts.slice(1), folder.children);
   };
-  
+
   for (const bookmark of flatBookmarks) {
     // Skip null/undefined bookmarks
     if (!bookmark) continue;
-    
+
     const folderPath = bookmark.folderPath || '';
     const pathParts = folderPath ? folderPath.split('/').filter(Boolean) : [];
-    
+
     // Create bookmark entry (without folderPath, as it's now represented by structure)
     // Use nullish coalescing to preserve empty strings
     const bookmarkEntry = {
@@ -388,16 +386,16 @@ const convertFolderPathToNested = (flatBookmarks) => {
       type: 'bookmark',
       dateAdded: bookmark.dateAdded || Date.now(),
     };
-    
+
     // Copy optional properties
     if (bookmark.tags) bookmarkEntry.tags = bookmark.tags;
     if (bookmark.notes) bookmarkEntry.notes = bookmark.notes;
-    
+
     // Find or create the target folder and add bookmark
     const targetArray = getOrCreateFolder(pathParts, root);
     targetArray.push(bookmarkEntry);
   }
-  
+
   return root;
 };
 
@@ -408,7 +406,7 @@ const convertFolderPathToNested = (flatBookmarks) => {
  */
 export function parseMarkSyncrJson(jsonString) {
   const data = JSON.parse(jsonString);
-  
+
   // Helper to count bookmarks safely
   const countBookmarks = (items) => {
     if (!items || !Array.isArray(items)) return 0;
@@ -423,17 +421,18 @@ export function parseMarkSyncrJson(jsonString) {
     }
     return count;
   };
-  
+
   // Handle MarkSyncr export format or GitHub repo format
   if (data.source === 'MarkSyncr' || data.version) {
     const rawBookmarks = data.bookmarks || [];
-    
+
     // Check if bookmarks use folderPath (GitHub repo format) or nested structure
     // Filter out null/undefined items before checking
-    const validBookmarks = rawBookmarks.filter(b => b != null);
-    const usesFolderPath = validBookmarks.length > 0 &&
-      validBookmarks.some(b => b.folderPath !== undefined && !b.children);
-    
+    const validBookmarks = rawBookmarks.filter((b) => b != null);
+    const usesFolderPath =
+      validBookmarks.length > 0 &&
+      validBookmarks.some((b) => b.folderPath !== undefined && !b.children);
+
     let bookmarks;
     if (usesFolderPath) {
       // Convert flat folderPath structure to nested
@@ -442,7 +441,7 @@ export function parseMarkSyncrJson(jsonString) {
       // Already nested structure, just ensure IDs
       bookmarks = ensureIds(rawBookmarks);
     }
-    
+
     return {
       format: IMPORT_FORMATS.JSON,
       bookmarks,
@@ -450,23 +449,23 @@ export function parseMarkSyncrJson(jsonString) {
       importedAt: new Date().toISOString(),
     };
   }
-  
+
   // Handle generic JSON array of bookmarks
   if (Array.isArray(data)) {
     // Filter out null/undefined items before checking
-    const validData = data.filter(b => b != null);
-    
+    const validData = data.filter((b) => b != null);
+
     // Check if it uses folderPath
-    const usesFolderPath = validData.length > 0 &&
-      validData.some(b => b.folderPath !== undefined && !b.children);
-    
+    const usesFolderPath =
+      validData.length > 0 && validData.some((b) => b.folderPath !== undefined && !b.children);
+
     let bookmarks;
     if (usesFolderPath) {
       bookmarks = convertFolderPathToNested(data);
     } else {
-      bookmarks = validData.map(item => ({
+      bookmarks = validData.map((item) => ({
         id: item.id || generateId(),
-        title: item.title ?? '',  // Use nullish coalescing to preserve empty strings
+        title: item.title ?? '', // Use nullish coalescing to preserve empty strings
         url: item.url || item.href || item.link,
         type: item.type || 'bookmark',
         tags: item.tags || [],
@@ -475,7 +474,7 @@ export function parseMarkSyncrJson(jsonString) {
         children: item.children ? ensureIds(item.children) : undefined,
       }));
     }
-    
+
     return {
       format: IMPORT_FORMATS.JSON,
       bookmarks,
@@ -483,7 +482,7 @@ export function parseMarkSyncrJson(jsonString) {
       importedAt: new Date().toISOString(),
     };
   }
-  
+
   throw new Error('Invalid JSON bookmark format');
 }
 
@@ -519,12 +518,16 @@ export function parseCsv(csvContent) {
 
     const title = titleIndex >= 0 ? values[titleIndex] : '';
     const url = urlIndex >= 0 ? values[urlIndex] : '';
-    
+
     if (!url) continue;
 
-    const tags = tagsIndex >= 0 && values[tagsIndex]
-      ? values[tagsIndex].split(',').map((t) => t.trim()).filter(Boolean)
-      : [];
+    const tags =
+      tagsIndex >= 0 && values[tagsIndex]
+        ? values[tagsIndex]
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
 
     bookmarks.push({
       id: generateId(),
@@ -594,17 +597,15 @@ export function formatToNetscapeHtml(bookmarks) {
       const children = (item.children || [])
         .map((child) => formatItem(child, indent + '    '))
         .join('\n');
-      
+
       return `${indent}<DT><H3 ADD_DATE="${Math.floor((item.dateAdded || Date.now()) / 1000)}">${escapeHtml(item.title)}</H3>
 ${indent}<DL><p>
 ${children}
 ${indent}</DL><p>`;
     }
 
-    const addDate = item.dateAdded 
-      ? ` ADD_DATE="${Math.floor(item.dateAdded / 1000)}"` 
-      : '';
-    
+    const addDate = item.dateAdded ? ` ADD_DATE="${Math.floor(item.dateAdded / 1000)}"` : '';
+
     return `${indent}<DT><A HREF="${escapeHtml(item.url)}"${addDate}>${escapeHtml(item.title)}</A>`;
   };
 
@@ -628,12 +629,16 @@ ${content}
  * @returns {string} JSON content
  */
 export function formatToJson(bookmarks) {
-  return JSON.stringify({
-    version: '1.1',
-    source: 'MarkSyncr',
-    exportedAt: new Date().toISOString(),
-    bookmarks,
-  }, null, 2);
+  return JSON.stringify(
+    {
+      version: '1.1',
+      source: 'MarkSyncr',
+      exportedAt: new Date().toISOString(),
+      bookmarks,
+    },
+    null,
+    2
+  );
 }
 
 /**
@@ -650,18 +655,18 @@ export function formatToCsv(bookmarks) {
         const newPath = folderPath ? `${folderPath}/${item.title}` : item.title;
         flattenBookmarks(item.children || [], newPath);
       } else {
-        const tags = (item.tags || [])
-          .map((t) => (typeof t === 'string' ? t : t.name))
-          .join(',');
-        
-        rows.push([
-          escapeCsvValue(item.title),
-          escapeCsvValue(item.url),
-          escapeCsvValue(folderPath),
-          escapeCsvValue(tags),
-          escapeCsvValue(item.notes || ''),
-          escapeCsvValue(item.dateAdded ? new Date(item.dateAdded).toISOString() : ''),
-        ].join(','));
+        const tags = (item.tags || []).map((t) => (typeof t === 'string' ? t : t.name)).join(',');
+
+        rows.push(
+          [
+            escapeCsvValue(item.title),
+            escapeCsvValue(item.url),
+            escapeCsvValue(folderPath),
+            escapeCsvValue(tags),
+            escapeCsvValue(item.notes || ''),
+            escapeCsvValue(item.dateAdded ? new Date(item.dateAdded).toISOString() : ''),
+          ].join(',')
+        );
       }
     }
   };
@@ -676,30 +681,33 @@ export function formatToCsv(bookmarks) {
  * @returns {string} Markdown content
  */
 export function formatToMarkdown(bookmarks) {
-  const lines = ['# Bookmarks', '', `*Exported from MarkSyncr on ${new Date().toLocaleDateString()}*`, ''];
+  const lines = [
+    '# Bookmarks',
+    '',
+    `*Exported from MarkSyncr on ${new Date().toLocaleDateString()}*`,
+    '',
+  ];
 
   const formatItem = (item, level = 2) => {
     if (item.type === 'folder' || item.children) {
       const heading = '#'.repeat(Math.min(level, 6));
       lines.push(`${heading} ${item.title}`, '');
-      
+
       for (const child of item.children || []) {
         formatItem(child, level + 1);
       }
     } else {
       lines.push(`- [${item.title}](${item.url})`);
-      
+
       if (item.tags && item.tags.length > 0) {
-        const tagStr = item.tags
-          .map((t) => `\`${typeof t === 'string' ? t : t.name}\``)
-          .join(' ');
+        const tagStr = item.tags.map((t) => `\`${typeof t === 'string' ? t : t.name}\``).join(' ');
         lines.push(`  Tags: ${tagStr}`);
       }
-      
+
       if (item.notes) {
         lines.push(`  > ${item.notes}`);
       }
-      
+
       lines.push('');
     }
   };
@@ -724,8 +732,10 @@ export function detectImportFormat(content) {
   const trimmed = content.trim();
 
   // Check for Netscape HTML
-  if (trimmed.includes('<!DOCTYPE NETSCAPE-Bookmark-file-1>') ||
-      trimmed.includes('NETSCAPE-Bookmark-file')) {
+  if (
+    trimmed.includes('<!DOCTYPE NETSCAPE-Bookmark-file-1>') ||
+    trimmed.includes('NETSCAPE-Bookmark-file')
+  ) {
     return IMPORT_FORMATS.NETSCAPE_HTML;
   }
 
@@ -737,27 +747,27 @@ export function detectImportFormat(content) {
   // Try to parse as JSON
   try {
     const data = JSON.parse(trimmed);
-    
+
     // MarkSyncr JSON format (has source or version)
     if (data.source === 'MarkSyncr' || (data.version && data.bookmarks)) {
       return IMPORT_FORMATS.JSON;
     }
-    
+
     // Raindrop format has 'items' array
     if (data.items && Array.isArray(data.items)) {
       return IMPORT_FORMATS.RAINDROP;
     }
-    
+
     // Pinboard format is array of objects with 'href'
     if (Array.isArray(data) && data.length > 0 && data[0].href) {
       return IMPORT_FORMATS.PINBOARD;
     }
-    
+
     // Generic JSON array with url property (not Pinboard)
     if (Array.isArray(data) && data.length > 0 && (data[0].url || data[0].link)) {
       return IMPORT_FORMATS.JSON;
     }
-    
+
     // Object with bookmarks array
     if (data.bookmarks && Array.isArray(data.bookmarks)) {
       return IMPORT_FORMATS.JSON;

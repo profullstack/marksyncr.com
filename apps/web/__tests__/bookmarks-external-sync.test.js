@@ -71,33 +71,37 @@ describe('Bookmarks API External Sync', () => {
       mockSupabase.single
         .mockResolvedValueOnce({ data: { id: mockUser.id }, error: null }) // user exists
         .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }) // no existing bookmarks
-        .mockResolvedValueOnce({ // upsert result
+        .mockResolvedValueOnce({
+          // upsert result
           data: { version: 1, checksum: 'abc123' },
           error: null,
         });
 
       // Mock sync_sources query - GitHub connected
-      mockSupabase.eq.mockImplementation(function() {
+      mockSupabase.eq.mockImplementation(function () {
         return this;
       });
-      
+
       // Create a more sophisticated mock
       mockSupabase.from.mockImplementation((table) => {
         if (table === 'sync_sources') {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'github',
-                    access_token: 'ghp_test_token',
-                    repository: 'testuser/marksyncr-bookmarks',
-                    branch: 'main',
-                    file_path: 'bookmarks.json',
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: 'testuser/marksyncr-bookmarks',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -125,7 +129,7 @@ describe('Bookmarks API External Sync', () => {
       expect(data.message).toBe('Bookmarks synced successfully');
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify GitHub sync was called
       expect(syncBookmarksToGitHub).toHaveBeenCalledWith(
@@ -140,9 +144,7 @@ describe('Bookmarks API External Sync', () => {
     });
 
     it('should not sync to GitHub when no sources are connected', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -159,10 +161,11 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -180,16 +183,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify GitHub sync was NOT called
       expect(syncBookmarksToGitHub).not.toHaveBeenCalled();
     });
 
     it('should handle GitHub sync errors gracefully', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -206,17 +207,20 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'github',
-                    access_token: 'ghp_test_token',
-                    repository: 'testuser/marksyncr-bookmarks',
-                    branch: 'main',
-                    file_path: 'bookmarks.json',
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: 'testuser/marksyncr-bookmarks',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -242,9 +246,7 @@ describe('Bookmarks API External Sync', () => {
     });
 
     it('should skip GitHub sync when access token is missing', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -263,10 +265,11 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [], // No sources returned because token is null
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [], // No sources returned because token is null
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -284,16 +287,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify GitHub sync was NOT called due to missing token
       expect(syncBookmarksToGitHub).not.toHaveBeenCalled();
     });
 
     it('should skip GitHub sync when repository is not configured', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -310,17 +311,20 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'github',
-                    access_token: 'ghp_test_token',
-                    repository: null, // No repository
-                    branch: 'main',
-                    file_path: 'bookmarks.json',
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: null, // No repository
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -338,16 +342,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify GitHub sync was NOT called due to missing repository
       expect(syncBookmarksToGitHub).not.toHaveBeenCalled();
     });
 
     it('should sync to multiple sources when multiple are connected', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -364,29 +366,30 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [
-                    {
-                      id: 'source-1',
-                      provider: 'github',
-                      access_token: 'ghp_test_token',
-                      repository: 'testuser/marksyncr-bookmarks',
-                      branch: 'main',
-                      file_path: 'bookmarks.json',
-                    },
-                    {
-                      id: 'source-2',
-                      provider: 'dropbox',
-                      access_token: 'dropbox_token',
-                    },
-                    {
-                      id: 'source-3',
-                      provider: 'google-drive',
-                      access_token: 'google_token',
-                    },
-                  ],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: 'testuser/marksyncr-bookmarks',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                      {
+                        id: 'source-2',
+                        provider: 'dropbox',
+                        access_token: 'dropbox_token',
+                      },
+                      {
+                        id: 'source-3',
+                        provider: 'google-drive',
+                        access_token: 'google_token',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -411,16 +414,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify GitHub sync was called (Dropbox and Google Drive are not yet implemented)
       expect(syncBookmarksToGitHub).toHaveBeenCalledTimes(1);
     });
 
     it('should continue syncing to other sources if one fails', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -437,27 +438,28 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [
-                    {
-                      id: 'source-1',
-                      provider: 'github',
-                      access_token: 'ghp_test_token_1',
-                      repository: 'testuser/repo1',
-                      branch: 'main',
-                      file_path: 'bookmarks.json',
-                    },
-                    {
-                      id: 'source-2',
-                      provider: 'github',
-                      access_token: 'ghp_test_token_2',
-                      repository: 'testuser/repo2',
-                      branch: 'main',
-                      file_path: 'bookmarks.json',
-                    },
-                  ],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token_1',
+                        repository: 'testuser/repo1',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                      {
+                        id: 'source-2',
+                        provider: 'github',
+                        access_token: 'ghp_test_token_2',
+                        repository: 'testuser/repo2',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -485,16 +487,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Both should have been attempted
       expect(syncBookmarksToGitHub).toHaveBeenCalledTimes(2);
     });
 
     it('should handle sync_sources query error gracefully', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -511,10 +511,11 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: null,
-                  error: { message: 'Database connection failed' },
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: null,
+                    error: { message: 'Database connection failed' },
+                  }),
               }),
             }),
           };
@@ -533,16 +534,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // GitHub sync should not have been called
       expect(syncBookmarksToGitHub).not.toHaveBeenCalled();
     });
 
     it('should use default branch and file_path when not specified', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -559,17 +558,20 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'github',
-                    access_token: 'ghp_test_token',
-                    repository: 'testuser/marksyncr-bookmarks',
-                    branch: null, // Not specified
-                    file_path: null, // Not specified
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: 'testuser/marksyncr-bookmarks',
+                        branch: null, // Not specified
+                        file_path: null, // Not specified
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -594,7 +596,7 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify GitHub sync was called with defaults
       expect(syncBookmarksToGitHub).toHaveBeenCalledWith(
@@ -609,12 +611,8 @@ describe('Bookmarks API External Sync', () => {
     });
 
     it('should pass tombstones to GitHub sync', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
-      const mockTombstones = [
-        { url: 'https://deleted.com', deletedAt: Date.now() },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
+      const mockTombstones = [{ url: 'https://deleted.com', deletedAt: Date.now() }];
 
       // Mock user exists check
       mockSupabase.single
@@ -631,17 +629,20 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'github',
-                    access_token: 'ghp_test_token',
-                    repository: 'testuser/marksyncr-bookmarks',
-                    branch: 'main',
-                    file_path: 'bookmarks.json',
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: 'testuser/marksyncr-bookmarks',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -666,7 +667,7 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify tombstones were passed to GitHub sync
       expect(syncBookmarksToGitHub).toHaveBeenCalledWith(
@@ -675,9 +676,7 @@ describe('Bookmarks API External Sync', () => {
         expect.any(String),
         expect.any(String),
         expect.any(Array),
-        expect.arrayContaining([
-          expect.objectContaining({ url: 'https://deleted.com' }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ url: 'https://deleted.com' })]),
         expect.any(String)
       );
     });
@@ -691,7 +690,8 @@ describe('Bookmarks API External Sync', () => {
       mockSupabase.single
         .mockResolvedValueOnce({ data: { id: mockUser.id }, error: null }) // user exists
         .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }) // no existing bookmarks
-        .mockResolvedValueOnce({ // upsert result
+        .mockResolvedValueOnce({
+          // upsert result
           data: { version: 1, checksum: 'abc123' },
           error: null,
         });
@@ -702,15 +702,18 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'dropbox',
-                    access_token: 'dropbox_test_token',
-                    file_path: '/Apps/MarkSyncr/bookmarks.json',
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'dropbox',
+                        access_token: 'dropbox_test_token',
+                        file_path: '/Apps/MarkSyncr/bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -739,7 +742,7 @@ describe('Bookmarks API External Sync', () => {
       expect(data.message).toBe('Bookmarks synced successfully');
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify Dropbox sync was called (5 args: token, path, bookmarks, tombstones, checksum)
       expect(syncBookmarksToDropbox).toHaveBeenCalledWith(
@@ -752,9 +755,7 @@ describe('Bookmarks API External Sync', () => {
     });
 
     it('should handle Dropbox sync errors gracefully', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -771,15 +772,18 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'dropbox',
-                    access_token: 'dropbox_test_token',
-                    file_path: '/Apps/MarkSyncr/bookmarks.json',
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'dropbox',
+                        access_token: 'dropbox_test_token',
+                        file_path: '/Apps/MarkSyncr/bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -805,9 +809,7 @@ describe('Bookmarks API External Sync', () => {
     });
 
     it('should skip Dropbox sync when access token is missing', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -825,10 +827,11 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [], // No sources returned because token is null
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [], // No sources returned because token is null
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -846,16 +849,14 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify Dropbox sync was NOT called due to missing token
       expect(syncBookmarksToDropbox).not.toHaveBeenCalled();
     });
 
     it('should sync to both GitHub and Dropbox when both are connected', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -872,25 +873,26 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [
-                    {
-                      id: 'source-1',
-                      provider: 'github',
-                      access_token: 'ghp_test_token',
-                      repository: 'testuser/marksyncr-bookmarks',
-                      branch: 'main',
-                      file_path: 'bookmarks.json',
-                    },
-                    {
-                      id: 'source-2',
-                      provider: 'dropbox',
-                      access_token: 'dropbox_test_token',
-                      file_path: '/Apps/MarkSyncr/bookmarks.json',
-                    },
-                  ],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'github',
+                        access_token: 'ghp_test_token',
+                        repository: 'testuser/marksyncr-bookmarks',
+                        branch: 'main',
+                        file_path: 'bookmarks.json',
+                      },
+                      {
+                        id: 'source-2',
+                        provider: 'dropbox',
+                        access_token: 'dropbox_test_token',
+                        file_path: '/Apps/MarkSyncr/bookmarks.json',
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -923,7 +925,7 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify both syncs were called
       expect(syncBookmarksToGitHub).toHaveBeenCalledTimes(1);
@@ -931,9 +933,7 @@ describe('Bookmarks API External Sync', () => {
     });
 
     it('should use default file_path for Dropbox when not specified', async () => {
-      const mockBookmarks = [
-        { url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ url: 'https://example.com', title: 'Example' }];
 
       // Mock user exists check
       mockSupabase.single
@@ -950,15 +950,18 @@ describe('Bookmarks API External Sync', () => {
           return {
             select: () => ({
               eq: () => ({
-                not: () => Promise.resolve({
-                  data: [{
-                    id: 'source-1',
-                    provider: 'dropbox',
-                    access_token: 'dropbox_test_token',
-                    file_path: null, // Not specified
-                  }],
-                  error: null,
-                }),
+                not: () =>
+                  Promise.resolve({
+                    data: [
+                      {
+                        id: 'source-1',
+                        provider: 'dropbox',
+                        access_token: 'dropbox_test_token',
+                        file_path: null, // Not specified
+                      },
+                    ],
+                    error: null,
+                  }),
               }),
             }),
           };
@@ -984,7 +987,7 @@ describe('Bookmarks API External Sync', () => {
       expect(response.status).toBe(200);
 
       // Wait for async external sync to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify Dropbox sync was called with default file path (5 args: token, path, bookmarks, tombstones, checksum)
       expect(syncBookmarksToDropbox).toHaveBeenCalledWith(

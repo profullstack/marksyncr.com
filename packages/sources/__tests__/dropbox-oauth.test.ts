@@ -87,7 +87,7 @@ describe('Dropbox OAuth', () => {
       // This test documents the correct API usage
       // The third parameter must be an options object, not a string
       const state = 'random_state_string_123';
-      
+
       // Correct usage: { state }
       const correctUrl = buildAuthorizationUrl(mockClientId, mockRedirectUri, { state });
       const correctParsed = new URL(correctUrl);
@@ -218,11 +218,7 @@ describe('Dropbox OAuth', () => {
         json: async () => mockRefreshResponse,
       });
 
-      const result = await refreshAccessToken(
-        'refresh_token_123',
-        mockClientId,
-        mockClientSecret
-      );
+      const result = await refreshAccessToken('refresh_token_123', mockClientId, mockClientSecret);
 
       expect(result).toEqual(mockRefreshResponse);
       expect(mockFetch).toHaveBeenCalledWith(

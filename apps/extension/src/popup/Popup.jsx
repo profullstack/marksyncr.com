@@ -4,7 +4,16 @@ import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
 import { LoginPanel } from './components/LoginPanel.jsx';
 
 // Confirmation Dialog Component using native <dialog> element
-function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onConfirm, onCancel, variant = 'warning' }) {
+function ConfirmDialog({
+  dialogRef,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  onConfirm,
+  onCancel,
+  variant = 'warning',
+}) {
   const variantStyles = {
     warning: {
       icon: 'text-orange-500',
@@ -44,7 +53,12 @@ function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onC
       <div className="p-4">
         <div className="flex items-start space-x-3">
           <div className={`flex-shrink-0 rounded-full p-2 ${styles.iconBg}`}>
-            <svg className={`h-5 w-5 ${styles.icon}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className={`h-5 w-5 ${styles.icon}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -115,12 +129,7 @@ const SettingsIcon = ({ className = '' }) => (
 
 const CheckIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M5 13l4 4L19 7"
-    />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
   </svg>
 );
 
@@ -178,10 +187,7 @@ function StatusIndicator({ status }) {
       <span
         className={`h-2 w-2 rounded-full ${config.color} ${status === 'syncing' ? 'animate-status-pulse' : ''}`}
       />
-      <Icon
-        className={`h-4 w-4 text-slate-600`}
-        spinning={config.spinning}
-      />
+      <Icon className={`h-4 w-4 text-slate-600`} spinning={config.spinning} />
       <span className="text-sm text-slate-600">{config.text}</span>
     </div>
   );
@@ -190,37 +196,52 @@ function StatusIndicator({ status }) {
 // Service icons
 const GitHubIcon = ({ className = '' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
   </svg>
 );
 
 const DropboxIcon = ({ className = '' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75-6 3.75-6-3.75zm18-3.75l6 3.75-6 3.75-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z"/>
+    <path d="M6 2l6 3.75L6 9.5 0 5.75 6 2zm12 0l6 3.75-6 3.75-6-3.75L18 2zM0 13.25L6 9.5l6 3.75-6 3.75-6-3.75zm18-3.75l6 3.75-6 3.75-6-3.75 6-3.75zM6 18.25l6-3.75 6 3.75-6 3.75-6-3.75z" />
   </svg>
 );
 
 const GoogleDriveIcon = ({ className = '' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M7.71 3.5L1.15 15l3.43 5.5h6.56l3.43-5.5L7.71 3.5zm1.44 1.5l5.14 8.5H4.29L9.15 5zm6.56 0L22.85 15l-3.43 5.5H12.86l3.43-5.5-1.58-2.5 1.58-2.5L22.85 15l-3.43-5.5L13.71 5z"/>
+    <path d="M7.71 3.5L1.15 15l3.43 5.5h6.56l3.43-5.5L7.71 3.5zm1.44 1.5l5.14 8.5H4.29L9.15 5zm6.56 0L22.85 15l-3.43 5.5H12.86l3.43-5.5-1.58-2.5 1.58-2.5L22.85 15l-3.43-5.5L13.71 5z" />
   </svg>
 );
 
 const CloudIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+    />
   </svg>
 );
 
 const MarkSyncrIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+    />
   </svg>
 );
 
 const ExternalLinkIcon = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+    />
   </svg>
 );
 
@@ -260,8 +281,8 @@ function ConnectedServices({ sources, isAuthenticated, isLoading }) {
 
   // Filter to only external services (not browser-bookmarks)
   const externalServices = ['github', 'dropbox', 'google-drive', 'google_drive'];
-  const connectedSources = sources.filter(s =>
-    s.connected && externalServices.includes(getSourceType(s))
+  const connectedSources = sources.filter(
+    (s) => s.connected && externalServices.includes(getSourceType(s))
   );
 
   const openDashboard = () => {
@@ -273,9 +294,7 @@ function ConnectedServices({ sources, isAuthenticated, isLoading }) {
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-slate-700">Sync Destinations</label>
         <div className="flex items-center gap-2">
-          {isLoading && (
-            <SyncIcon className="h-3 w-3 text-slate-400" spinning />
-          )}
+          {isLoading && <SyncIcon className="h-3 w-3 text-slate-400" spinning />}
           <button
             onClick={openDashboard}
             className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
@@ -379,9 +398,7 @@ function SyncStats({ stats }) {
 // Last sync info component
 function LastSyncInfo({ lastSync }) {
   if (!lastSync) {
-    return (
-      <p className="text-sm text-slate-500">Never synced</p>
-    );
+    return <p className="text-sm text-slate-500">Never synced</p>;
   }
 
   const formatTime = (date) => {
@@ -397,11 +414,7 @@ function LastSyncInfo({ lastSync }) {
     return `${days}d ago`;
   };
 
-  return (
-    <p className="text-sm text-slate-500">
-      Last sync: {formatTime(lastSync)}
-    </p>
-  );
+  return <p className="text-sm text-slate-500">Last sync: {formatTime(lastSync)}</p>;
 }
 
 // User icon for account tab
@@ -541,7 +554,10 @@ export function Popup() {
     try {
       setForceActionMessage({ type: 'info', text: 'Force pushing...' });
       await forcePush();
-      setForceActionMessage({ type: 'success', text: 'Force push completed! Cloud bookmarks replaced with local.' });
+      setForceActionMessage({
+        type: 'success',
+        text: 'Force push completed! Cloud bookmarks replaced with local.',
+      });
       setTimeout(() => setForceActionMessage(null), 5000);
     } catch (err) {
       console.error('Force push failed:', err);
@@ -560,7 +576,10 @@ export function Popup() {
     try {
       setForceActionMessage({ type: 'info', text: 'Force pulling...' });
       await forcePull();
-      setForceActionMessage({ type: 'success', text: 'Force pull completed! Local bookmarks replaced with cloud.' });
+      setForceActionMessage({
+        type: 'success',
+        text: 'Force pull completed! Local bookmarks replaced with cloud.',
+      });
       setTimeout(() => setForceActionMessage(null), 5000);
     } catch (err) {
       console.error('Force pull failed:', err);
@@ -584,7 +603,7 @@ export function Popup() {
     try {
       const browserAPI = typeof chrome !== 'undefined' && chrome.bookmarks ? chrome : browser;
       const tree = await browserAPI.bookmarks.getTree();
-      
+
       // Convert browser bookmarks to exportable format
       const convertNode = (node) => {
         if (node.url) {
@@ -604,7 +623,7 @@ export function Popup() {
       };
 
       const bookmarks = tree[0]?.children?.map(convertNode) || [];
-      
+
       // Format to Netscape HTML
       const escapeHtml = (str) => {
         if (!str) return '';
@@ -620,17 +639,15 @@ export function Popup() {
           const children = (item.children || [])
             .map((child) => formatItem(child, indent + '    '))
             .join('\n');
-          
+
           return `${indent}<DT><H3 ADD_DATE="${Math.floor((item.dateAdded || Date.now()) / 1000)}">${escapeHtml(item.title)}</H3>
 ${indent}<DL><p>
 ${children}
 ${indent}</DL><p>`;
         }
 
-        const addDate = item.dateAdded
-          ? ` ADD_DATE="${Math.floor(item.dateAdded / 1000)}"`
-          : '';
-        
+        const addDate = item.dateAdded ? ` ADD_DATE="${Math.floor(item.dateAdded / 1000)}"` : '';
+
         return `${indent}<DT><A HREF="${escapeHtml(item.url)}"${addDate}>${escapeHtml(item.title)}</A>`;
       };
 
@@ -682,14 +699,14 @@ ${content}
 
     try {
       const content = await file.text();
-      
+
       // Parse Netscape HTML format
       const bookmarks = [];
-      
+
       const parseFolder = (htmlContent) => {
         const items = [];
         const bookmarkRegex = /<DT><A\s+HREF="([^"]*)"[^>]*>([^<]*)<\/A>/gi;
-        
+
         let match;
         while ((match = bookmarkRegex.exec(htmlContent)) !== null) {
           items.push({
@@ -701,7 +718,7 @@ ${content}
       };
 
       const parsedBookmarks = parseFolder(content);
-      
+
       if (parsedBookmarks.length === 0) {
         setExportMessage({ type: 'error', text: 'No bookmarks found in file' });
         setTimeout(() => setExportMessage(null), 5000);
@@ -710,7 +727,7 @@ ${content}
 
       // Import bookmarks using browser API
       const browserAPI = typeof chrome !== 'undefined' && chrome.bookmarks ? chrome : browser;
-      
+
       // Create an "Imported" folder
       const importFolder = await browserAPI.bookmarks.create({
         title: `Imported ${new Date().toLocaleDateString()}`,
@@ -733,7 +750,7 @@ ${content}
 
       setExportMessage({
         type: 'success',
-        text: `Imported ${importedCount} bookmarks!`
+        text: `Imported ${importedCount} bookmarks!`,
       });
       setTimeout(() => setExportMessage(null), 3000);
 
@@ -824,9 +841,7 @@ ${content}
           <div className="flex items-center justify-center gap-1">
             <UserIcon className="h-4 w-4" />
             Account
-            {isAuthenticated && (
-              <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />
-            )}
+            {isAuthenticated && <span className="ml-1 h-2 w-2 rounded-full bg-green-500" />}
           </div>
         </button>
       </div>
@@ -864,11 +879,10 @@ ${content}
                     <AlertIcon className="h-5 w-5 text-orange-500" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-orange-800">
-                      Sync Paused
-                    </h3>
+                    <h3 className="text-sm font-semibold text-orange-800">Sync Paused</h3>
                     <p className="mt-1 text-sm text-orange-700">
-                      Automatic sync stopped after {syncFailureStatus.maxFailures} consecutive failures.
+                      Automatic sync stopped after {syncFailureStatus.maxFailures} consecutive
+                      failures.
                       {syncFailureStatus.lastError && (
                         <span className="block mt-1 text-xs text-orange-600">
                           Last error: {syncFailureStatus.lastError}
@@ -892,7 +906,11 @@ ${content}
             <SyncStats stats={stats} />
 
             {/* Connected services display */}
-            <ConnectedServices sources={sources} isAuthenticated={isAuthenticated} isLoading={isSourcesLoading} />
+            <ConnectedServices
+              sources={sources}
+              isAuthenticated={isAuthenticated}
+              isLoading={isSourcesLoading}
+            />
 
             {/* Sync button */}
             <button
@@ -928,24 +946,28 @@ ${content}
 
             {/* Force action message */}
             {forceActionMessage && (
-              <div className={`rounded-lg p-3 text-sm ${
-                forceActionMessage.type === 'success'
-                  ? 'bg-green-50 text-green-700'
-                  : forceActionMessage.type === 'error'
-                  ? 'bg-red-50 text-red-700'
-                  : 'bg-blue-50 text-blue-700'
-              }`}>
+              <div
+                className={`rounded-lg p-3 text-sm ${
+                  forceActionMessage.type === 'success'
+                    ? 'bg-green-50 text-green-700'
+                    : forceActionMessage.type === 'error'
+                      ? 'bg-red-50 text-red-700'
+                      : 'bg-blue-50 text-blue-700'
+                }`}
+              >
                 {forceActionMessage.text}
               </div>
             )}
 
             {/* Export/Import message */}
             {exportMessage && (
-              <div className={`rounded-lg p-3 text-sm ${
-                exportMessage.type === 'success'
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
-              }`}>
+              <div
+                className={`rounded-lg p-3 text-sm ${
+                  exportMessage.type === 'success'
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-red-50 text-red-700'
+                }`}
+              >
                 {exportMessage.text}
               </div>
             )}

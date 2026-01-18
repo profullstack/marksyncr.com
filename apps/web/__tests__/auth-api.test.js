@@ -52,7 +52,7 @@ const { POST: refreshPOST } = await import('../app/api/auth/refresh/route.js');
  */
 function createMockRequest(options = {}) {
   const { method = 'POST', body = null, headers = {} } = options;
-  
+
   return {
     method,
     headers: {
@@ -283,7 +283,7 @@ describe('Auth API Routes', () => {
 
     it('should use correct email redirect URL', async () => {
       process.env.NEXT_PUBLIC_APP_URL = 'https://app.marksyncr.com';
-      
+
       mockSignUp.mockResolvedValue({
         data: { user: { id: 'user-123', identities: [{ id: 'identity-1' }] } },
         error: null,
@@ -563,7 +563,7 @@ describe('Auth API Edge Cases', () => {
 
   it('should handle very long email addresses', async () => {
     const longEmail = 'a'.repeat(200) + '@example.com';
-    
+
     mockSignInWithPassword.mockResolvedValue({
       data: { user: null, session: null },
       error: { message: 'Invalid email format' },
@@ -580,7 +580,7 @@ describe('Auth API Edge Cases', () => {
 
   it('should handle very long passwords', async () => {
     const longPassword = 'a'.repeat(1000);
-    
+
     mockSignInWithPassword.mockResolvedValue({
       data: { user: { id: 'user-123' }, session: { access_token: 'token' } },
       error: null,

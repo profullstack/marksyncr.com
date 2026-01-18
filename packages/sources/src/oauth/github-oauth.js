@@ -155,17 +155,14 @@ export async function validateToken(accessToken) {
 export async function revokeToken(accessToken, clientId, clientSecret) {
   try {
     // GitHub uses a different endpoint for token revocation
-    const response = await fetch(
-      `https://api.github.com/applications/${clientId}/token`,
-      {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-        body: JSON.stringify({ access_token: accessToken }),
-      }
-    );
+    const response = await fetch(`https://api.github.com/applications/${clientId}/token`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({ access_token: accessToken }),
+    });
 
     return response.ok || response.status === 404;
   } catch (error) {

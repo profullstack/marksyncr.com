@@ -26,7 +26,7 @@ export async function OPTIONS(request) {
  */
 export async function POST(request, { params }) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
@@ -66,17 +66,20 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Failed to rollback' }, { status: 500, headers });
     }
 
-    return NextResponse.json({
-      success: true,
-      newVersion: {
-        id: data.id,
-        version: data.version,
-        checksum: data.checksum,
-        createdAt: data.created_at,
-        changeSummary: data.change_summary,
+    return NextResponse.json(
+      {
+        success: true,
+        newVersion: {
+          id: data.id,
+          version: data.version,
+          checksum: data.checksum,
+          createdAt: data.created_at,
+          changeSummary: data.change_summary,
+        },
+        message: `Successfully rolled back to version ${targetVersion}`,
       },
-      message: `Successfully rolled back to version ${targetVersion}`,
-    }, { headers });
+      { headers }
+    );
   } catch (error) {
     console.error('Rollback error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });

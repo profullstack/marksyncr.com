@@ -265,7 +265,7 @@ export const hasChanges = (localBookmarks, remoteBookmarks) => {
 export const applyChanges = (bookmarks, changes) => {
   // Deep clone the bookmarks to avoid mutation
   const result = JSON.parse(JSON.stringify(bookmarks));
-  
+
   for (const change of changes) {
     switch (change.type) {
       case CHANGE_TYPE.ADDED:
@@ -293,7 +293,7 @@ export const applyChanges = (bookmarks, changes) => {
         break;
     }
   }
-  
+
   return result;
 };
 
@@ -306,17 +306,17 @@ export const applyChanges = (bookmarks, changes) => {
 const addBookmarkToPath = (bookmarks, path, item) => {
   const parts = path.split('/');
   const rootKey = parts[0]; // toolbar, menu, or other
-  
+
   if (!bookmarks[rootKey]) {
     bookmarks[rootKey] = { id: rootKey, title: rootKey, type: 'folder', children: [] };
   }
-  
+
   let current = bookmarks[rootKey];
-  
+
   // Navigate to parent folder
   for (let i = 1; i < parts.length - 1; i++) {
     const folderName = parts[i];
-    let folder = current.children?.find(c => c.title === folderName && c.type === 'folder');
+    let folder = current.children?.find((c) => c.title === folderName && c.type === 'folder');
     if (!folder) {
       folder = { id: `folder-${Date.now()}`, title: folderName, type: 'folder', children: [] };
       current.children = current.children || [];
@@ -324,7 +324,7 @@ const addBookmarkToPath = (bookmarks, path, item) => {
     }
     current = folder;
   }
-  
+
   // Add the item
   current.children = current.children || [];
   current.children.push(item);
@@ -339,22 +339,22 @@ const addBookmarkToPath = (bookmarks, path, item) => {
 const updateBookmarkAtPath = (bookmarks, path, item) => {
   const parts = path.split('/');
   const rootKey = parts[0];
-  
+
   if (!bookmarks[rootKey]) return;
-  
+
   let current = bookmarks[rootKey];
-  
+
   // Navigate to parent folder
   for (let i = 1; i < parts.length - 1; i++) {
     const folderName = parts[i];
-    const folder = current.children?.find(c => c.title === folderName && c.type === 'folder');
+    const folder = current.children?.find((c) => c.title === folderName && c.type === 'folder');
     if (!folder) return;
     current = folder;
   }
-  
+
   // Find and update the item
   const itemName = parts[parts.length - 1];
-  const index = current.children?.findIndex(c => c.title === itemName);
+  const index = current.children?.findIndex((c) => c.title === itemName);
   if (index !== undefined && index >= 0) {
     current.children[index] = { ...current.children[index], ...item };
   }
@@ -368,22 +368,22 @@ const updateBookmarkAtPath = (bookmarks, path, item) => {
 const removeBookmarkAtPath = (bookmarks, path) => {
   const parts = path.split('/');
   const rootKey = parts[0];
-  
+
   if (!bookmarks[rootKey]) return;
-  
+
   let current = bookmarks[rootKey];
-  
+
   // Navigate to parent folder
   for (let i = 1; i < parts.length - 1; i++) {
     const folderName = parts[i];
-    const folder = current.children?.find(c => c.title === folderName && c.type === 'folder');
+    const folder = current.children?.find((c) => c.title === folderName && c.type === 'folder');
     if (!folder) return;
     current = folder;
   }
-  
+
   // Find and remove the item
   const itemName = parts[parts.length - 1];
-  const index = current.children?.findIndex(c => c.title === itemName);
+  const index = current.children?.findIndex((c) => c.title === itemName);
   if (index !== undefined && index >= 0) {
     current.children.splice(index, 1);
   }

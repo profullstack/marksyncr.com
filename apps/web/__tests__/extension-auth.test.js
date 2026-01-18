@@ -64,7 +64,7 @@ const { POST: extensionRefreshPOST } = await import('../app/api/auth/extension/r
  */
 function createMockRequest(options = {}) {
   const { method = 'POST', body = null, headers = {} } = options;
-  
+
   return {
     method,
     headers: {
@@ -197,8 +197,8 @@ describe('Extension Auth API - POST /api/auth/extension/login', () => {
     });
 
     const request = createMockRequest({
-      body: { 
-        email: 'test@example.com', 
+      body: {
+        email: 'test@example.com',
         password: 'password123',
         device_id: 'chrome-device-123',
       },
@@ -316,7 +316,7 @@ describe('Extension Auth API - POST /api/auth/extension/refresh', () => {
 
   it('should return new access token for valid extension_token', async () => {
     const futureDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    
+
     // Return a valid session
     dbChain.select.mockReturnValue(dbChain);
     dbChain.eq.mockReturnValue(dbChain);
@@ -367,7 +367,7 @@ describe('Extension Auth API - POST /api/auth/extension/refresh', () => {
 
   it('should update last_used_at on successful refresh', async () => {
     const futureDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    
+
     dbChain.select.mockReturnValue(dbChain);
     dbChain.eq.mockReturnValue(dbChain);
     dbChain.maybeSingle.mockResolvedValue({
@@ -421,7 +421,7 @@ describe('Extension Auth API - Session Expiration', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
   });
 
-  it('should create session with 1 year expiration by default', async () => {
+  it('should create session with 2 year expiration by default', async () => {
     const mockUser = { id: 'user-123', email: 'test@example.com' };
     const mockSession = {
       access_token: 'access-token-123',
@@ -456,13 +456,13 @@ describe('Extension Auth API - Session Expiration', () => {
 
     await extensionLoginPOST(request);
 
-    // Verify the expiration is approximately 1 year from now
+    // Verify the expiration is approximately 2 years from now
     expect(insertedData).toBeDefined();
     if (insertedData) {
       const expiresAt = new Date(insertedData.expires_at);
-      const oneYearFromNow = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      const twoYearsFromNow = new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000);
       // Allow 1 minute tolerance
-      expect(Math.abs(expiresAt.getTime() - oneYearFromNow.getTime())).toBeLessThan(60000);
+      expect(Math.abs(expiresAt.getTime() - twoYearsFromNow.getTime())).toBeLessThan(60000);
     }
   });
 });
@@ -477,9 +477,9 @@ describe('Extension Auth API - CORS', () => {
 
   it('should handle OPTIONS preflight request for login', async () => {
     const { OPTIONS } = await import('../app/api/auth/extension/login/route.js');
-    
+
     const response = await OPTIONS();
-    
+
     expect(response.status).toBe(204);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
     expect(response.headers.get('Access-Control-Allow-Methods')).toContain('POST');
@@ -487,9 +487,9 @@ describe('Extension Auth API - CORS', () => {
 
   it('should handle OPTIONS preflight request for refresh', async () => {
     const { OPTIONS } = await import('../app/api/auth/extension/refresh/route.js');
-    
+
     const response = await OPTIONS();
-    
+
     expect(response.status).toBe(204);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
     expect(response.headers.get('Access-Control-Allow-Methods')).toContain('POST');
@@ -562,11 +562,11 @@ describe('Extension Auth API - Security', () => {
     expect(response.status).toBe(200);
     expect(data.session.extension_token).toBeDefined();
     expect(data.session.extension_token.length).toBe(64); // 32 bytes = 64 hex chars
-    
+
     // The hash stored in DB should also be 64 chars (SHA-256 = 64 hex chars)
     expect(insertedTokenHash).toBeDefined();
     expect(insertedTokenHash.length).toBe(64);
-    
+
     // The plain token and hash should be different
     expect(data.session.extension_token).not.toBe(insertedTokenHash);
   });

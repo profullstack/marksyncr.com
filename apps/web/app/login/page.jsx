@@ -43,9 +43,7 @@ function LoginForm() {
       )}
 
       {message && (
-        <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
-          {message}
-        </div>
+        <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{message}</div>
       )}
 
       {/* OAuth buttons */}
@@ -98,10 +96,7 @@ function LoginForm() {
       {/* Email form */}
       <form action={handleEmailLogin} className="space-y-4">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
             Email
           </label>
           <input
@@ -115,10 +110,7 @@ function LoginForm() {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
             Password
           </label>
           <input
@@ -132,10 +124,7 @@ function LoginForm() {
         </div>
 
         <div className="flex items-center justify-between">
-          <Link
-            href="/forgot-password"
-            className="text-sm text-primary-600 hover:text-primary-700"
-          >
+          <Link href="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
             Forgot password?
           </Link>
         </div>
@@ -173,9 +162,7 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="mb-6 text-center text-2xl font-bold text-slate-900">
-            Welcome back
-          </h1>
+          <h1 className="mb-6 text-center text-2xl font-bold text-slate-900">Welcome back</h1>
 
           <Suspense fallback={<LoginFormFallback />}>
             <LoginForm />
@@ -185,10 +172,7 @@ export default function LoginPage() {
         {/* Sign up link */}
         <p className="mt-6 text-center text-sm text-slate-600">
           Don&apos;t have an account?{' '}
-          <Link
-            href="/signup"
-            className="font-medium text-primary-600 hover:text-primary-700"
-          >
+          <Link href="/signup" className="font-medium text-primary-600 hover:text-primary-700">
             Sign up
           </Link>
         </p>

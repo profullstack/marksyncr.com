@@ -43,7 +43,7 @@ const { getAuthenticatedUser } = await import('@/lib/auth-helper');
  */
 function createMockRequest(options = {}) {
   const { headers = {} } = options;
-  
+
   return {
     method: 'GET',
     headers: {

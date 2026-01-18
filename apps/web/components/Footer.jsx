@@ -11,22 +11,13 @@ export default function Footer() {
             <img src="/logo.svg" alt="MarkSyncr" className="h-6 w-auto" />
           </Link>
           <div className="mt-4 flex space-x-6 md:mt-0">
-            <Link
-              href="/privacy"
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
+            <Link href="/privacy" className="text-sm text-slate-600 hover:text-slate-900">
               Privacy
             </Link>
-            <Link
-              href="/terms"
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
+            <Link href="/terms" className="text-sm text-slate-600 hover:text-slate-900">
               Terms
             </Link>
-            <Link
-              href="/docs"
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
+            <Link href="/docs" className="text-sm text-slate-600 hover:text-slate-900">
               Docs
             </Link>
             <a

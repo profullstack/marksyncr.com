@@ -36,17 +36,16 @@ describe('Dropbox Sync', () => {
           lastModified: '2025-01-01T00:00:00.000Z',
           source: 'marksyncr',
         },
-        bookmarks: [
-          { url: 'https://example.com', title: 'Example' },
-        ],
+        bookmarks: [{ url: 'https://example.com', title: 'Example' }],
       };
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         headers: {
-          get: (name: string) => name === 'dropbox-api-result' 
-            ? JSON.stringify({ rev: 'abc123rev', content_hash: 'hash123' })
-            : null,
+          get: (name: string) =>
+            name === 'dropbox-api-result'
+              ? JSON.stringify({ rev: 'abc123rev', content_hash: 'hash123' })
+              : null,
         },
         text: async () => JSON.stringify(existingContent),
       });
@@ -73,7 +72,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -90,9 +90,9 @@ describe('Dropbox Sync', () => {
         json: async () => ({ error_summary: 'Internal Server Error' }),
       });
 
-      await expect(
-        getBookmarkFile(mockAccessToken, mockPath)
-      ).rejects.toThrow('Failed to get bookmark file');
+      await expect(getBookmarkFile(mockAccessToken, mockPath)).rejects.toThrow(
+        'Failed to get bookmark file'
+      );
     });
 
     it('should use default path if not provided', async () => {
@@ -142,7 +142,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -155,11 +156,7 @@ describe('Dropbox Sync', () => {
         }),
       });
 
-      const result = await updateBookmarkFile(
-        mockAccessToken,
-        mockPath,
-        mockBookmarks
-      );
+      const result = await updateBookmarkFile(mockAccessToken, mockPath, mockBookmarks);
 
       expect(result.success).toBe(true);
       expect(result.created).toBe(true);
@@ -196,11 +193,7 @@ describe('Dropbox Sync', () => {
         }),
       });
 
-      const result = await updateBookmarkFile(
-        mockAccessToken,
-        mockPath,
-        mockBookmarks
-      );
+      const result = await updateBookmarkFile(mockAccessToken, mockPath, mockBookmarks);
 
       expect(result.success).toBe(true);
       expect(result.created).toBe(false);
@@ -213,16 +206,17 @@ describe('Dropbox Sync', () => {
     });
 
     it('should throw error if access token is missing', async () => {
-      await expect(
-        updateBookmarkFile('', mockPath, mockBookmarks)
-      ).rejects.toThrow('Access token is required');
+      await expect(updateBookmarkFile('', mockPath, mockBookmarks)).rejects.toThrow(
+        'Access token is required'
+      );
     });
 
     it('should throw error on upload failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -233,9 +227,9 @@ describe('Dropbox Sync', () => {
         json: async () => ({ error_summary: 'path/conflict/file' }),
       });
 
-      await expect(
-        updateBookmarkFile(mockAccessToken, mockPath, mockBookmarks)
-      ).rejects.toThrow('Failed to update bookmark file');
+      await expect(updateBookmarkFile(mockAccessToken, mockPath, mockBookmarks)).rejects.toThrow(
+        'Failed to update bookmark file'
+      );
     });
 
     it('should preserve metadata from existing file', async () => {
@@ -283,7 +277,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -352,9 +347,7 @@ describe('Dropbox Sync', () => {
           source: 'marksyncr',
           checksum: 'different_checksum', // Different checksum
         },
-        bookmarks: [
-          { url: 'https://old.com', title: 'Old' },
-        ],
+        bookmarks: [{ url: 'https://old.com', title: 'Old' }],
       };
 
       // First call: get existing file with different checksum
@@ -398,9 +391,7 @@ describe('Dropbox Sync', () => {
           source: 'marksyncr',
           // No checksum field
         },
-        bookmarks: [
-          { url: 'https://old.com', title: 'Old' },
-        ],
+        bookmarks: [{ url: 'https://old.com', title: 'Old' }],
       };
 
       // First call: get existing file without checksum
@@ -421,11 +412,7 @@ describe('Dropbox Sync', () => {
         }),
       });
 
-      const result = await updateBookmarkFile(
-        mockAccessToken,
-        mockPath,
-        mockBookmarks
-      );
+      const result = await updateBookmarkFile(mockAccessToken, mockPath, mockBookmarks);
 
       expect(result.success).toBe(true);
       expect(result.skipped).toBe(false);
@@ -444,9 +431,7 @@ describe('Dropbox Sync', () => {
           source: 'marksyncr',
           checksum: 'existing_checksum',
         },
-        bookmarks: [
-          { url: 'https://old.com', title: 'Old' },
-        ],
+        bookmarks: [{ url: 'https://old.com', title: 'Old' }],
       };
 
       // First call: get existing file
@@ -468,18 +453,12 @@ describe('Dropbox Sync', () => {
       });
 
       const bookmarksWithoutChecksum: BookmarkSyncData = {
-        bookmarks: [
-          { url: 'https://example.com', title: 'Example' },
-        ],
+        bookmarks: [{ url: 'https://example.com', title: 'Example' }],
         tombstones: [],
         // No checksum
       };
 
-      const result = await updateBookmarkFile(
-        mockAccessToken,
-        mockPath,
-        bookmarksWithoutChecksum
-      );
+      const result = await updateBookmarkFile(mockAccessToken, mockPath, bookmarksWithoutChecksum);
 
       expect(result.success).toBe(true);
       expect(result.skipped).toBe(false);
@@ -491,7 +470,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -505,9 +485,7 @@ describe('Dropbox Sync', () => {
 
       const dataWithTombstones: BookmarkSyncData = {
         bookmarks: [{ url: 'https://example.com', title: 'Example' }],
-        tombstones: [
-          { url: 'https://deleted.com', deletedAt: 1703980800000 },
-        ],
+        tombstones: [{ url: 'https://deleted.com', deletedAt: 1703980800000 }],
         checksum: 'checksum123',
       };
 
@@ -524,7 +502,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -549,7 +528,8 @@ describe('Dropbox Sync', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
-        text: async () => JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
+        text: async () =>
+          JSON.stringify({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
         json: async () => ({ error_summary: 'path/not_found/.', error: { '.tag': 'path' } }),
       });
 
@@ -561,11 +541,10 @@ describe('Dropbox Sync', () => {
         }),
       });
 
-      const result: DropboxSyncResult = await updateBookmarkFile(
-        mockAccessToken,
-        mockPath,
-        { bookmarks: [], tombstones: [] }
-      );
+      const result: DropboxSyncResult = await updateBookmarkFile(mockAccessToken, mockPath, {
+        bookmarks: [],
+        tombstones: [],
+      });
 
       expect(result).toHaveProperty('success', true);
       expect(result).toHaveProperty('rev');

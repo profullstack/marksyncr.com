@@ -45,10 +45,7 @@ export async function DELETE(request) {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     console.log(`[Delete Cloud Data] User ${user.id} requested deletion of all cloud data`);
@@ -119,9 +116,6 @@ export async function DELETE(request) {
     );
   } catch (error) {
     console.error('[Delete Cloud Data] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }

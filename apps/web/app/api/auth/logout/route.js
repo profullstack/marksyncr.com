@@ -30,7 +30,7 @@ export async function OPTIONS() {
 export async function POST(request) {
   try {
     const authHeader = request.headers.get('authorization');
-    
+
     // If request has Bearer token (from extension), use stateless approach
     // The extension will clear its local tokens, we just acknowledge
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -41,7 +41,7 @@ export async function POST(request) {
         message: 'Logged out successfully',
       });
     }
-    
+
     // For cookie-based clients (web app), use the cookie-based client
     const supabase = await createClient();
 
@@ -50,10 +50,7 @@ export async function POST(request) {
     const { error } = await supabase.auth.signOut({ scope: 'local' });
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -61,9 +58,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Logout error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

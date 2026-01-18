@@ -29,11 +29,41 @@ global.browser = {
 
 // Default sources (same as in background/index.js)
 const DEFAULT_SOURCES = [
-  { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true, description: 'Sync your browser bookmarks' },
-  { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false, description: 'Sync to cloud (requires login)' },
-  { id: 'github', name: 'GitHub', type: 'github', connected: false, description: 'Sync to GitHub repository' },
-  { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false, description: 'Sync to Dropbox' },
-  { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false, description: 'Sync to Google Drive' },
+  {
+    id: 'browser-bookmarks',
+    name: 'Browser Bookmarks',
+    type: 'browser-bookmarks',
+    connected: true,
+    description: 'Sync your browser bookmarks',
+  },
+  {
+    id: 'supabase-cloud',
+    name: 'MarkSyncr Cloud',
+    type: 'supabase-cloud',
+    connected: false,
+    description: 'Sync to cloud (requires login)',
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    type: 'github',
+    connected: false,
+    description: 'Sync to GitHub repository',
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    type: 'dropbox',
+    connected: false,
+    description: 'Sync to Dropbox',
+  },
+  {
+    id: 'google-drive',
+    name: 'Google Drive',
+    type: 'google-drive',
+    connected: false,
+    description: 'Sync to Google Drive',
+  },
 ];
 
 /**
@@ -43,43 +73,43 @@ const DEFAULT_SOURCES = [
 async function refreshConnectedSources(getAccessToken, getApiBaseUrl) {
   const baseUrl = getApiBaseUrl();
   const token = await getAccessToken();
-  
+
   if (!token) {
     return { success: false, error: 'Not authenticated' };
   }
-  
+
   const response = await fetch(`${baseUrl}/api/sources`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json',
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
     },
   });
-  
+
   if (!response.ok) {
     return { success: false, error: 'Failed to fetch sources' };
   }
-  
+
   const data = await response.json();
   const serverSources = data.sources || [];
-  
+
   // Get current local sources
   const storageData = await browser.storage.local.get('sources');
   const localSources = storageData.sources || DEFAULT_SOURCES;
-  
+
   // Merge server sources with local sources
   const updatedSources = localSources.map((localSource) => {
     // browser-bookmarks is always connected (it's a local source)
     if (localSource.id === 'browser-bookmarks') {
       return { ...localSource, connected: true };
     }
-    
+
     // supabase-cloud is connected when user is authenticated
     if (localSource.id === 'supabase-cloud') {
       return { ...localSource, connected: true };
     }
-    
+
     // For OAuth sources, check server response
-    const serverSource = serverSources.find(s => s.id === localSource.id);
+    const serverSource = serverSources.find((s) => s.id === localSource.id);
     if (serverSource) {
       return {
         ...localSource,
@@ -91,13 +121,13 @@ async function refreshConnectedSources(getAccessToken, getApiBaseUrl) {
         connectedAt: serverSource.connectedAt,
       };
     }
-    
+
     // OAuth source not found on server - mark as disconnected
     return { ...localSource, connected: false };
   });
-  
+
   await browser.storage.local.set({ sources: updatedSources });
-  
+
   return { success: true, sources: updatedSources };
 }
 
@@ -136,8 +166,8 @@ describe('refreshConnectedSources', () => {
     const result = await refreshConnectedSources(getAccessToken, getApiBaseUrl);
 
     expect(result.success).toBe(true);
-    
-    const supabaseCloud = result.sources.find(s => s.id === 'supabase-cloud');
+
+    const supabaseCloud = result.sources.find((s) => s.id === 'supabase-cloud');
     expect(supabaseCloud.connected).toBe(true);
   });
 
@@ -153,8 +183,8 @@ describe('refreshConnectedSources', () => {
     const result = await refreshConnectedSources(getAccessToken, getApiBaseUrl);
 
     expect(result.success).toBe(true);
-    
-    const browserBookmarks = result.sources.find(s => s.id === 'browser-bookmarks');
+
+    const browserBookmarks = result.sources.find((s) => s.id === 'browser-bookmarks');
     expect(browserBookmarks.connected).toBe(true);
   });
 
@@ -165,26 +195,27 @@ describe('refreshConnectedSources', () => {
     // Server returns GitHub as connected
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        sources: [
-          {
-            id: 'github',
-            provider: 'github',
-            providerUsername: 'testuser',
-            repository: 'bookmarks',
-            branch: 'main',
-            filePath: 'bookmarks.json',
-            connectedAt: '2024-01-01T00:00:00Z',
-          },
-        ],
-      }),
+      json: () =>
+        Promise.resolve({
+          sources: [
+            {
+              id: 'github',
+              provider: 'github',
+              providerUsername: 'testuser',
+              repository: 'bookmarks',
+              branch: 'main',
+              filePath: 'bookmarks.json',
+              connectedAt: '2024-01-01T00:00:00Z',
+            },
+          ],
+        }),
     });
 
     const result = await refreshConnectedSources(getAccessToken, getApiBaseUrl);
 
     expect(result.success).toBe(true);
-    
-    const github = result.sources.find(s => s.id === 'github');
+
+    const github = result.sources.find((s) => s.id === 'github');
     expect(github.connected).toBe(true);
     expect(github.providerUsername).toBe('testuser');
     expect(github.repository).toBe('bookmarks');
@@ -197,21 +228,20 @@ describe('refreshConnectedSources', () => {
     // Server returns only GitHub, not Dropbox or Google Drive
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        sources: [
-          { id: 'github', provider: 'github', providerUsername: 'testuser' },
-        ],
-      }),
+      json: () =>
+        Promise.resolve({
+          sources: [{ id: 'github', provider: 'github', providerUsername: 'testuser' }],
+        }),
     });
 
     const result = await refreshConnectedSources(getAccessToken, getApiBaseUrl);
 
     expect(result.success).toBe(true);
-    
-    const dropbox = result.sources.find(s => s.id === 'dropbox');
+
+    const dropbox = result.sources.find((s) => s.id === 'dropbox');
     expect(dropbox.connected).toBe(false);
-    
-    const googleDrive = result.sources.find(s => s.id === 'google-drive');
+
+    const googleDrive = result.sources.find((s) => s.id === 'google-drive');
     expect(googleDrive.connected).toBe(false);
   });
 
@@ -222,25 +252,26 @@ describe('refreshConnectedSources', () => {
     // Server returns GitHub and Dropbox as connected
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({
-        sources: [
-          { id: 'github', provider: 'github', providerUsername: 'testuser' },
-          { id: 'dropbox', provider: 'dropbox', providerUsername: 'dropboxuser' },
-        ],
-      }),
+      json: () =>
+        Promise.resolve({
+          sources: [
+            { id: 'github', provider: 'github', providerUsername: 'testuser' },
+            { id: 'dropbox', provider: 'dropbox', providerUsername: 'dropboxuser' },
+          ],
+        }),
     });
 
     const result = await refreshConnectedSources(getAccessToken, getApiBaseUrl);
 
     expect(result.success).toBe(true);
-    
-    const github = result.sources.find(s => s.id === 'github');
+
+    const github = result.sources.find((s) => s.id === 'github');
     expect(github.connected).toBe(true);
-    
-    const dropbox = result.sources.find(s => s.id === 'dropbox');
+
+    const dropbox = result.sources.find((s) => s.id === 'dropbox');
     expect(dropbox.connected).toBe(true);
-    
-    const googleDrive = result.sources.find(s => s.id === 'google-drive');
+
+    const googleDrive = result.sources.find((s) => s.id === 'google-drive');
     expect(googleDrive.connected).toBe(false);
   });
 
@@ -322,7 +353,7 @@ describe('logout source disconnection', () => {
 
     const updated = updateSourcesOnLogout(sources);
 
-    const supabaseCloud = updated.find(s => s.id === 'supabase-cloud');
+    const supabaseCloud = updated.find((s) => s.id === 'supabase-cloud');
     expect(supabaseCloud.connected).toBe(false);
   });
 
@@ -337,9 +368,9 @@ describe('logout source disconnection', () => {
 
     const updated = updateSourcesOnLogout(sources);
 
-    expect(updated.find(s => s.id === 'github').connected).toBe(false);
-    expect(updated.find(s => s.id === 'dropbox').connected).toBe(false);
-    expect(updated.find(s => s.id === 'google-drive').connected).toBe(false);
+    expect(updated.find((s) => s.id === 'github').connected).toBe(false);
+    expect(updated.find((s) => s.id === 'dropbox').connected).toBe(false);
+    expect(updated.find((s) => s.id === 'google-drive').connected).toBe(false);
   });
 
   it('should keep browser-bookmarks connected on logout', () => {
@@ -350,7 +381,7 @@ describe('logout source disconnection', () => {
 
     const updated = updateSourcesOnLogout(sources);
 
-    const browserBookmarks = updated.find(s => s.id === 'browser-bookmarks');
+    const browserBookmarks = updated.find((s) => s.id === 'browser-bookmarks');
     expect(browserBookmarks.connected).toBe(true);
   });
 });

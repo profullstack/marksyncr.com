@@ -217,10 +217,7 @@ export async function checkLinks(bookmarks, options = {}) {
   const processBatch = async (batch) => {
     const batchResults = await Promise.all(
       batch.map(async (bookmark) => {
-        const result = await checkLink(
-          { bookmarkId: bookmark.id, url: bookmark.url },
-          opts
-        );
+        const result = await checkLink({ bookmarkId: bookmark.id, url: bookmark.url }, opts);
 
         completed++;
         if (onProgress) {

@@ -109,7 +109,7 @@ export async function getBookmarkFile(
   }
 
   const data = await response.json();
-  
+
   // Decode base64 content
   const contentString = Buffer.from(data.content, 'base64').toString('utf-8');
   const content = JSON.parse(contentString) as BookmarkFile;
@@ -146,7 +146,7 @@ export async function updateBookmarkFile(
 
   // Try to get existing file to get SHA and preserve metadata
   const existing = await getBookmarkFile(accessToken, repository, branch, filePath);
-  
+
   const bookmarkCount = data.bookmarks.length;
 
   // Check if checksum matches - skip update if data hasn't changed
@@ -196,19 +196,16 @@ export async function updateBookmarkFile(
     requestBody.sha = existing.sha;
   }
 
-  const response = await fetch(
-    `${GITHUB_API_BASE}/repos/${repository}/contents/${filePath}`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    }
-  );
+  const response = await fetch(`${GITHUB_API_BASE}/repos/${repository}/contents/${filePath}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Unknown error' }));

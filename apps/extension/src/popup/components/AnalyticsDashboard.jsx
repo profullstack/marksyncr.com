@@ -78,10 +78,7 @@ const DomainItem = ({ domain, count, totalVisits, maxCount }) => {
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-gray-900 truncate">{domain}</div>
         <div className="h-1.5 bg-gray-100 rounded-full mt-1">
-          <div
-            className="h-full bg-blue-500 rounded-full"
-            style={{ width: `${percentage}%` }}
-          />
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${percentage}%` }} />
         </div>
       </div>
       <div className="text-right">
@@ -149,10 +146,11 @@ export default function AnalyticsDashboard({ bookmarks, folders, isPro, onUpgrad
       return null;
     }
 
-    const folderMap = folders?.reduce((acc, f) => {
-      acc[f.id] = f;
-      return acc;
-    }, {}) || {};
+    const folderMap =
+      folders?.reduce((acc, f) => {
+        acc[f.id] = f;
+        return acc;
+      }, {}) || {};
 
     return {
       stats: calculateBookmarkStats(bookmarks, folderMap),
@@ -208,9 +206,7 @@ export default function AnalyticsDashboard({ bookmarks, folders, isPro, onUpgrad
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-2 py-1 text-xs rounded ${
-                activeTab === tab
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
+                activeTab === tab ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -235,27 +231,15 @@ export default function AnalyticsDashboard({ bookmarks, folders, isPro, onUpgrad
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-2">
-            <StatCard
-              icon="🔖"
-              label="Total Bookmarks"
-              value={stats.totalBookmarks}
-            />
-            <StatCard
-              icon="🌐"
-              label="Unique Domains"
-              value={stats.uniqueDomains}
-            />
+            <StatCard icon="🔖" label="Total Bookmarks" value={stats.totalBookmarks} />
+            <StatCard icon="🌐" label="Unique Domains" value={stats.uniqueDomains} />
             <StatCard
               icon="🏷️"
               label="Tags Used"
               value={stats.totalTags}
               subtext={`${Math.round(stats.taggedPercentage)}% tagged`}
             />
-            <StatCard
-              icon="👁️"
-              label="Total Visits"
-              value={stats.totalVisits}
-            />
+            <StatCard icon="👁️" label="Total Visits" value={stats.totalVisits} />
           </div>
 
           {/* Age Distribution */}
@@ -285,11 +269,7 @@ export default function AnalyticsDashboard({ bookmarks, folders, isPro, onUpgrad
           {topDomains.length > 0 ? (
             <div className="space-y-2">
               {topDomains.map((domain) => (
-                <DomainItem
-                  key={domain.domain}
-                  {...domain}
-                  maxCount={topDomains[0].count}
-                />
+                <DomainItem key={domain.domain} {...domain} maxCount={topDomains[0].count} />
               ))}
             </div>
           ) : (

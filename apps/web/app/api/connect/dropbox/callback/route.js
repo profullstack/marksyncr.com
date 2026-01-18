@@ -69,7 +69,7 @@ export async function GET(request) {
 
     // Store connection in database with file path configuration
     const supabase = await createClient();
-    
+
     // Default Dropbox file path for bookmarks
     const filePath = '/Apps/MarkSyncr/bookmarks.json';
 

@@ -42,7 +42,10 @@ vi.mock('webextension-polyfill', () => ({
 global.fetch = vi.fn();
 
 // Mock navigator for browser detection
-const mockUserAgent = { value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' };
+const mockUserAgent = {
+  value:
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+};
 Object.defineProperty(global, 'navigator', {
   value: {
     get userAgent() {
@@ -70,7 +73,7 @@ describe('Background Service Worker', () => {
 
         // Import the module to test
         const { getAuthToken } = await import('../src/background/index.js').catch(() => ({}));
-        
+
         // Since we can't directly test internal functions, we test through performSync
         // which uses getAuthToken internally
       });
@@ -79,7 +82,7 @@ describe('Background Service Worker', () => {
     describe('apiRequest', () => {
       it('should add authorization header when token exists', async () => {
         mockBrowser.storage.local.get.mockResolvedValue({ authToken: 'test-token-123' });
-        
+
         global.fetch.mockResolvedValue({
           ok: true,
           json: () => Promise.resolve({ success: true }),
@@ -93,10 +96,11 @@ describe('Background Service Worker', () => {
   describe('syncBookmarksToCloud', () => {
     it('should POST bookmarks to /api/bookmarks', async () => {
       mockBrowser.storage.local.get.mockResolvedValue({ authToken: 'test-token-123' });
-      
+
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ synced: 10, total: 10, message: 'Bookmarks synced successfully' }),
+        json: () =>
+          Promise.resolve({ synced: 10, total: 10, message: 'Bookmarks synced successfully' }),
       });
 
       // Test through the sync flow
@@ -111,7 +115,7 @@ describe('Background Service Worker', () => {
 
     it('should throw error if API returns error', async () => {
       mockBrowser.storage.local.get.mockResolvedValue({ authToken: 'test-token-123' });
-      
+
       global.fetch.mockResolvedValue({
         ok: false,
         json: () => Promise.resolve({ error: 'Failed to sync bookmarks' }),
@@ -124,7 +128,7 @@ describe('Background Service Worker', () => {
   describe('saveVersionToCloud', () => {
     it('should POST version data to /api/versions', async () => {
       mockBrowser.storage.local.get.mockResolvedValue({ authToken: 'test-token-123' });
-      
+
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ version: { id: 'v1', version: 1 } }),
@@ -135,7 +139,7 @@ describe('Background Service Worker', () => {
 
     it('should include bookmarkData, sourceType, and deviceName', async () => {
       mockBrowser.storage.local.get.mockResolvedValue({ authToken: 'test-token-123' });
-      
+
       global.fetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ version: { id: 'v1', version: 1 } }),
@@ -188,9 +192,7 @@ describe('Background Service Worker', () => {
                     {
                       id: 'f3',
                       title: 'Level 3',
-                      children: [
-                        { id: 'b1', url: 'https://deep.com', title: 'Deep' },
-                      ],
+                      children: [{ id: 'b1', url: 'https://deep.com', title: 'Deep' }],
                     },
                   ],
                 },
@@ -308,7 +310,7 @@ describe('Background Service Worker', () => {
         sources: [{ id: 'browser-bookmarks', connected: true }],
         session: {
           access_token: 'expired-token',
-          refresh_token: 'valid-refresh-token'
+          refresh_token: 'valid-refresh-token',
         },
       });
 
@@ -321,9 +323,10 @@ describe('Background Service Worker', () => {
         .mockResolvedValueOnce({ ok: false, status: 401 }) // validate token fails
         .mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve({
-            session: { access_token: 'new-token', refresh_token: 'new-refresh' }
-          })
+          json: () =>
+            Promise.resolve({
+              session: { access_token: 'new-token', refresh_token: 'new-refresh' },
+            }),
         }) // refresh succeeds
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 2 }) }) // sync succeeds
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // version save succeeds
@@ -337,7 +340,7 @@ describe('Background Service Worker', () => {
         sources: [{ id: 'browser-bookmarks', connected: true }],
         session: {
           access_token: 'expired-token',
-          refresh_token: 'invalid-refresh-token'
+          refresh_token: 'invalid-refresh-token',
         },
       });
 
@@ -402,16 +405,12 @@ describe('Background Service Worker', () => {
             {
               id: '1',
               title: 'Bookmarks Bar',
-              children: [
-                { id: 'b1', url: 'https://example.com', title: 'Example' },
-              ],
+              children: [{ id: 'b1', url: 'https://example.com', title: 'Example' }],
             },
             {
               id: '2',
               title: 'Other Bookmarks',
-              children: [
-                { id: 'b2', url: 'https://test.com', title: 'Test' },
-              ],
+              children: [{ id: 'b2', url: 'https://test.com', title: 'Test' }],
             },
           ],
         },
@@ -428,16 +427,12 @@ describe('Background Service Worker', () => {
             {
               id: 'menu',
               title: 'Bookmarks Menu',
-              children: [
-                { id: 'b1', url: 'https://example.com', title: 'Example' },
-              ],
+              children: [{ id: 'b1', url: 'https://example.com', title: 'Example' }],
             },
             {
               id: 'toolbar',
               title: 'Bookmarks Toolbar',
-              children: [
-                { id: 'b2', url: 'https://test.com', title: 'Test' },
-              ],
+              children: [{ id: 'b2', url: 'https://test.com', title: 'Test' }],
             },
           ],
         },
@@ -467,9 +462,7 @@ describe('Background Service Worker', () => {
             { id: 'b2', url: 'https://test.com' },
             {
               id: 'f1',
-              children: [
-                { id: 'b3', url: 'https://other.com' },
-              ],
+              children: [{ id: 'b3', url: 'https://other.com' }],
             },
           ],
         },
@@ -488,9 +481,7 @@ describe('Background Service Worker', () => {
               children: [
                 {
                   id: 'f2',
-                  children: [
-                    { id: 'b1', url: 'https://example.com' },
-                  ],
+                  children: [{ id: 'b1', url: 'https://example.com' }],
                 },
               ],
             },
@@ -545,9 +536,7 @@ describe('Background Service Worker', () => {
 
     describe('GET_BOOKMARKS', () => {
       it('should return converted bookmark tree', async () => {
-        mockBrowser.bookmarks.getTree.mockResolvedValue([
-          { id: 'root', children: [] },
-        ]);
+        mockBrowser.bookmarks.getTree.mockResolvedValue([{ id: 'root', children: [] }]);
 
         // Should return { success: true, bookmarks: {...} }
       });
@@ -714,9 +703,7 @@ describe('Background Service Worker', () => {
         const tree = [
           {
             id: 'root',
-            children: [
-              { id: 'b1', url: 'https://example.com/very/long/path' },
-            ],
+            children: [{ id: 'b1', url: 'https://example.com/very/long/path' }],
           },
         ];
 
@@ -775,9 +762,7 @@ describe('Background Service Worker', () => {
               {
                 id: 'toolbar',
                 title: 'Bookmarks Bar',
-                children: [
-                  { id: 'b1', url: 'https://example.com', title: 'Example' },
-                ],
+                children: [{ id: 'b1', url: 'https://example.com', title: 'Example' }],
               },
             ],
           },
@@ -835,9 +820,7 @@ describe('Background Service Worker', () => {
               {
                 id: 'toolbar',
                 title: 'Bookmarks Bar',
-                children: [
-                  { id: 'existing1', url: 'https://old.com', title: 'Old' },
-                ],
+                children: [{ id: 'existing1', url: 'https://old.com', title: 'Old' }],
               },
             ],
           },
@@ -853,22 +836,24 @@ describe('Background Service Worker', () => {
 
         global.fetch
           .mockResolvedValueOnce({ ok: true }) // validate token
-          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [{ version: 1 }] }) })
           .mockResolvedValueOnce({
             ok: true,
-            json: () => Promise.resolve({
-              version: {
-                bookmarkData: {
-                  roots: {
-                    toolbar: {
-                      children: [
-                        { type: 'bookmark', url: 'https://new.com', title: 'New' },
-                      ],
+            json: () => Promise.resolve({ versions: [{ version: 1 }] }),
+          })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                version: {
+                  bookmarkData: {
+                    roots: {
+                      toolbar: {
+                        children: [{ type: 'bookmark', url: 'https://new.com', title: 'New' }],
+                      },
                     },
                   },
                 },
-              },
-            }),
+              }),
           });
 
         // browser.bookmarks.removeTree should be called for existing bookmarks
@@ -883,9 +868,7 @@ describe('Background Service Worker', () => {
         const cloudData = {
           roots: {
             toolbar: {
-              children: [
-                { type: 'bookmark', url: 'https://example.com', title: '' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://example.com', title: '' }],
             },
           },
         };
@@ -934,9 +917,7 @@ describe('Background Service Worker', () => {
               {
                 id: 'toolbar',
                 title: 'Bookmarks Bar',
-                children: [
-                  { id: 'b1', url: 'https://local.com', title: 'Local' },
-                ],
+                children: [{ id: 'b1', url: 'https://local.com', title: 'Local' }],
               },
             ],
           },
@@ -950,11 +931,10 @@ describe('Background Service Worker', () => {
           .mockResolvedValueOnce({ ok: true }) // validate token
           .mockResolvedValueOnce({
             ok: true,
-            json: () => Promise.resolve({
-              bookmarks: [
-                { url: 'https://cloud.com', title: 'Cloud', folderPath: '' },
-              ],
-            }),
+            json: () =>
+              Promise.resolve({
+                bookmarks: [{ url: 'https://cloud.com', title: 'Cloud', folderPath: '' }],
+              }),
           }) // get bookmarks from cloud
           .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 2 }) }) // sync to cloud
           .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // save version
@@ -986,9 +966,7 @@ describe('Background Service Worker', () => {
               {
                 id: 'toolbar',
                 title: 'Bookmarks Bar',
-                children: [
-                  { id: 'b1', url: 'https://same.com', title: 'Same' },
-                ],
+                children: [{ id: 'b1', url: 'https://same.com', title: 'Same' }],
               },
             ],
           },
@@ -1000,11 +978,10 @@ describe('Background Service Worker', () => {
           .mockResolvedValueOnce({ ok: true }) // validate token
           .mockResolvedValueOnce({
             ok: true,
-            json: () => Promise.resolve({
-              bookmarks: [
-                { url: 'https://same.com', title: 'Same', folderPath: '' },
-              ],
-            }),
+            json: () =>
+              Promise.resolve({
+                bookmarks: [{ url: 'https://same.com', title: 'Same', folderPath: '' }],
+              }),
           }); // cloud has same bookmark
 
         // No new bookmarks should be added since URL already exists locally
@@ -1055,14 +1032,13 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
         mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
-        mockBrowser.bookmarks.create = vi.fn()
+        mockBrowser.bookmarks.create = vi
+          .fn()
           .mockResolvedValueOnce({ id: 'folder1' }) // Create 'Work' folder
           .mockResolvedValueOnce({ id: 'folder2' }) // Create 'Projects' folder
           .mockResolvedValueOnce({ id: 'bookmark1' }); // Create bookmark
@@ -1074,18 +1050,16 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
         // First call returns existing 'Work' folder
-        mockBrowser.bookmarks.getChildren = vi.fn()
+        mockBrowser.bookmarks.getChildren = vi
+          .fn()
           .mockResolvedValueOnce([{ id: 'existing-work', title: 'Work' }]);
 
-        mockBrowser.bookmarks.create = vi.fn()
-          .mockResolvedValueOnce({ id: 'bookmark1' });
+        mockBrowser.bookmarks.create = vi.fn().mockResolvedValueOnce({ id: 'bookmark1' });
 
         // Should use existing 'Work' folder, not create a new one
       });
@@ -1094,9 +1068,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
@@ -1127,14 +1099,13 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
         mockBrowser.bookmarks.getChildren = vi.fn().mockResolvedValue([]);
-        mockBrowser.bookmarks.create = vi.fn()
+        mockBrowser.bookmarks.create = vi
+          .fn()
           .mockRejectedValueOnce(new Error('Failed')) // First bookmark fails
           .mockResolvedValueOnce({ id: 'new2' }); // Second succeeds
 
@@ -1219,7 +1190,7 @@ describe('Background Service Worker', () => {
       it('should map cloud menu to local other when browser has no menu folder', async () => {
         // This is the Opera/Chrome case: Firefox cloud data has menu, but Opera doesn't
         // The fix maps cloud.menu to local.other as fallback
-        
+
         const cloudBookmarks = {
           roots: {
             toolbar: {
@@ -1228,14 +1199,10 @@ describe('Background Service Worker', () => {
               ],
             },
             menu: {
-              children: [
-                { type: 'bookmark', url: 'https://menu.com', title: 'Menu Bookmark' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://menu.com', title: 'Menu Bookmark' }],
             },
             other: {
-              children: [
-                { type: 'bookmark', url: 'https://other.com', title: 'Other Bookmark' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://other.com', title: 'Other Bookmark' }],
             },
           },
         };
@@ -1251,13 +1218,13 @@ describe('Background Service Worker', () => {
         // - cloud.toolbar -> local.toolbar (id: '1')
         // - cloud.menu -> local.other (id: '2') - FALLBACK
         // - cloud.other -> local.other (id: '2')
-        
+
         // Result: Menu bookmarks should be imported to 'Other Bookmarks' folder
       });
 
       it('should map cloud toolbar to local other when browser has no toolbar folder', async () => {
         // Edge case: browser only has 'other' folder
-        
+
         const cloudBookmarks = {
           roots: {
             toolbar: {
@@ -1278,13 +1245,11 @@ describe('Background Service Worker', () => {
 
       it('should map cloud other to local toolbar when browser has no other folder', async () => {
         // Edge case: browser only has 'toolbar' folder
-        
+
         const cloudBookmarks = {
           roots: {
             other: {
-              children: [
-                { type: 'bookmark', url: 'https://other.com', title: 'Other Bookmark' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://other.com', title: 'Other Bookmark' }],
             },
           },
         };
@@ -1302,7 +1267,7 @@ describe('Background Service Worker', () => {
       it('should append bookmarks when multiple cloud roots map to same local folder', async () => {
         // When cloud.menu and cloud.other both map to local.other,
         // the second import should append, not replace
-        
+
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: '0',
@@ -1315,10 +1280,12 @@ describe('Background Service Worker', () => {
 
         // After importing cloud.other, local.other has 2 bookmarks
         // When importing cloud.menu (which maps to local.other), should append at index 2
-        mockBrowser.bookmarks.getChildren = vi.fn()
+        mockBrowser.bookmarks.getChildren = vi
+          .fn()
           .mockResolvedValueOnce([]) // First call: clearing toolbar
           .mockResolvedValueOnce([]) // Second call: clearing other
-          .mockResolvedValueOnce([   // Third call: getting existing children for shared target
+          .mockResolvedValueOnce([
+            // Third call: getting existing children for shared target
             { id: 'b1', url: 'https://other1.com', title: 'Other 1' },
             { id: 'b2', url: 'https://other2.com', title: 'Other 2' },
           ]);
@@ -1333,18 +1300,16 @@ describe('Background Service Worker', () => {
       it('should track processed cloud roots to detect shared targets', async () => {
         // The implementation uses processedCloudRoots Set to track which local folders
         // have already been used, so it knows when to append vs replace
-        
         // First cloud root (toolbar) -> local toolbar (new target)
         // Second cloud root (menu) -> local other (new target)
         // Third cloud root (other) -> local other (SHARED target - should append)
-        
         // This test verifies the shared target detection logic
       });
 
       it('should preserve bookmark order within each cloud root', async () => {
         // When importing from a cloud root, bookmarks should maintain their order
         // using the index parameter in browser.bookmarks.create
-        
+
         const cloudBookmarks = {
           roots: {
             toolbar: {
@@ -1368,11 +1333,9 @@ describe('Background Service Worker', () => {
       it('should continue indexing correctly after shared target append', async () => {
         // When appending to a shared target, the startIndex should be set
         // to the current number of children in that folder
-        
         // Scenario:
         // 1. Import cloud.other (3 bookmarks) -> local.other at index 0, 1, 2
         // 2. Import cloud.menu (2 bookmarks) -> local.other at index 3, 4 (appending)
-        
         // This ensures all 5 bookmarks end up in local.other in the correct order
       });
     });
@@ -1386,13 +1349,11 @@ describe('Background Service Worker', () => {
         // - Firefox toolbar -> Opera toolbar
         // - Firefox menu -> Opera other (fallback)
         // - Firefox other -> Opera other (appended after menu bookmarks)
-        
+
         const firefoxCloudData = {
           roots: {
             toolbar: {
-              children: [
-                { type: 'bookmark', url: 'https://ff-toolbar.com', title: 'FF Toolbar' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://ff-toolbar.com', title: 'FF Toolbar' }],
             },
             menu: {
               children: [
@@ -1401,9 +1362,7 @@ describe('Background Service Worker', () => {
               ],
             },
             other: {
-              children: [
-                { type: 'bookmark', url: 'https://ff-other.com', title: 'FF Other' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://ff-other.com', title: 'FF Other' }],
             },
           },
         };
@@ -1432,7 +1391,7 @@ describe('Background Service Worker', () => {
         // - Chrome toolbar -> Firefox toolbar
         // - Chrome other -> Firefox other
         // - Firefox menu remains empty (Chrome has no menu)
-        
+
         const chromeCloudData = {
           roots: {
             toolbar: {
@@ -1469,14 +1428,12 @@ describe('Background Service Worker', () => {
       it('should handle empty cloud roots gracefully', async () => {
         // Cloud data may have empty roots (no children)
         // These should be skipped without error
-        
+
         const cloudData = {
           roots: {
             toolbar: { children: [] }, // Empty
             menu: {
-              children: [
-                { type: 'bookmark', url: 'https://menu.com', title: 'Menu' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://menu.com', title: 'Menu' }],
             },
             other: { children: [] }, // Empty
           },
@@ -1489,18 +1446,15 @@ describe('Background Service Worker', () => {
       it('should skip cloud roots with no matching local folder', async () => {
         // Edge case: cloud has a root that cannot be mapped to any local folder
         // This should log a warning and skip, not throw an error
-        
+
         const cloudData = {
           roots: {
             toolbar: {
-              children: [
-                { type: 'bookmark', url: 'https://toolbar.com', title: 'Toolbar' },
-              ],
+              children: [{ type: 'bookmark', url: 'https://toolbar.com', title: 'Toolbar' }],
             },
-            customRoot: { // Unknown root type
-              children: [
-                { type: 'bookmark', url: 'https://custom.com', title: 'Custom' },
-              ],
+            customRoot: {
+              // Unknown root type
+              children: [{ type: 'bookmark', url: 'https://custom.com', title: 'Custom' }],
             },
           },
         };
@@ -1520,14 +1474,15 @@ describe('Background Service Worker', () => {
 
         // When startIndex is 5, bookmarks should be created at index 5 and 6
         // This is used when appending to a shared target folder
-        
+
         // Expected calls:
         // browser.bookmarks.create({ parentId: 'parent', index: 5, title: 'First', url: '...' })
         // browser.bookmarks.create({ parentId: 'parent', index: 6, title: 'Second', url: '...' })
       });
 
       it('should handle nested folders with correct indexing', async () => {
-        mockBrowser.bookmarks.create = vi.fn()
+        mockBrowser.bookmarks.create = vi
+          .fn()
           .mockResolvedValueOnce({ id: 'folder1' })
           .mockResolvedValueOnce({ id: 'bookmark1' })
           .mockResolvedValueOnce({ id: 'bookmark2' });
@@ -1545,7 +1500,7 @@ describe('Background Service Worker', () => {
 
         // Parent folder created at startIndex
         // Child bookmarks start at index 0 within the folder
-        
+
         // Expected calls:
         // browser.bookmarks.create({ parentId: 'parent', index: 0, title: 'My Folder' })
         // browser.bookmarks.create({ parentId: 'folder1', index: 0, title: 'Nested 1', url: '...' })
@@ -1553,7 +1508,8 @@ describe('Background Service Worker', () => {
       });
 
       it('should increment index even when bookmark creation fails', async () => {
-        mockBrowser.bookmarks.create = vi.fn()
+        mockBrowser.bookmarks.create = vi
+          .fn()
           .mockRejectedValueOnce(new Error('Failed')) // First bookmark fails
           .mockResolvedValueOnce({ id: 'bookmark2' }); // Second succeeds
 
@@ -1564,7 +1520,7 @@ describe('Background Service Worker', () => {
 
         // Even though first bookmark fails, second should be at index 1
         // This maintains relative order of remaining items
-        
+
         // Expected: Second bookmark created at index 1, not index 0
       });
 
@@ -1652,9 +1608,7 @@ describe('Background Service Worker', () => {
                   {
                     id: 'subfolder',
                     title: 'Subfolder',
-                    children: [
-                      { id: 'b2', url: 'https://nested.com', title: 'Nested', index: 0 },
-                    ],
+                    children: [{ id: 'b2', url: 'https://nested.com', title: 'Nested', index: 0 }],
                   },
                   { id: 'b3', url: 'https://third.com', title: 'Third', index: 2 },
                 ],
@@ -1696,9 +1650,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
@@ -1733,9 +1685,19 @@ describe('Background Service Worker', () => {
         // Bookmarks from different folders with different indices
         const cloudBookmarks = [
           { url: 'https://other2.com', title: 'Other 2', folderPath: 'Other Bookmarks', index: 1 },
-          { url: 'https://toolbar1.com', title: 'Toolbar 1', folderPath: 'Bookmarks Bar', index: 0 },
+          {
+            url: 'https://toolbar1.com',
+            title: 'Toolbar 1',
+            folderPath: 'Bookmarks Bar',
+            index: 0,
+          },
           { url: 'https://other1.com', title: 'Other 1', folderPath: 'Other Bookmarks', index: 0 },
-          { url: 'https://toolbar2.com', title: 'Toolbar 2', folderPath: 'Bookmarks Bar', index: 1 },
+          {
+            url: 'https://toolbar2.com',
+            title: 'Toolbar 2',
+            folderPath: 'Bookmarks Bar',
+            index: 1,
+          },
         ];
 
         // Expected: Each folder's bookmarks should be sorted independently
@@ -1747,9 +1709,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
@@ -1767,9 +1727,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
@@ -1790,9 +1748,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: 'root',
-            children: [
-              { id: 'other', title: 'Other Bookmarks', children: [] },
-            ],
+            children: [{ id: 'other', title: 'Other Bookmarks', children: [] }],
           },
         ]);
 
@@ -1863,9 +1819,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: '0',
-            children: [
-              { id: '1', title: 'Bookmarks Bar', children: [] },
-            ],
+            children: [{ id: '1', title: 'Bookmarks Bar', children: [] }],
           },
         ]);
 
@@ -1875,7 +1829,10 @@ describe('Background Service Worker', () => {
 
         global.fetch
           .mockResolvedValueOnce({ ok: true }) // validate token
-          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [{ version: 1 }] }) })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ versions: [{ version: 1 }] }),
+          })
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({ version: { bookmarkData: cloudBookmarks } }),
@@ -1907,9 +1864,7 @@ describe('Background Service Worker', () => {
         mockBrowser.bookmarks.getTree.mockResolvedValue([
           {
             id: '0',
-            children: [
-              { id: '1', title: 'Bookmarks Bar', children: [] },
-            ],
+            children: [{ id: '1', title: 'Bookmarks Bar', children: [] }],
           },
         ]);
 
@@ -1919,7 +1874,10 @@ describe('Background Service Worker', () => {
 
         global.fetch
           .mockResolvedValueOnce({ ok: true }) // validate token
-          .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ versions: [{ version: 1 }] }) })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ versions: [{ version: 1 }] }),
+          })
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({ version: { bookmarkData: cloudBookmarks } }),
@@ -1947,9 +1905,7 @@ describe('Background Service Worker', () => {
               {
                 id: 'toolbar',
                 title: 'Bookmarks Bar',
-                children: [
-                  { id: 'b1', url: 'https://local.com', title: 'Local', index: 0 },
-                ],
+                children: [{ id: 'b1', url: 'https://local.com', title: 'Local', index: 0 }],
               },
             ],
           },
@@ -1964,13 +1920,14 @@ describe('Background Service Worker', () => {
           .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }) // register device
           .mockResolvedValueOnce({
             ok: true,
-            json: () => Promise.resolve({
-              bookmarks: [
-                { url: 'https://cloud1.com', title: 'Cloud 1', folderPath: '', index: 0 },
-                { url: 'https://cloud2.com', title: 'Cloud 2', folderPath: '', index: 1 },
-              ],
-              tombstones: [],
-            }),
+            json: () =>
+              Promise.resolve({
+                bookmarks: [
+                  { url: 'https://cloud1.com', title: 'Cloud 1', folderPath: '', index: 0 },
+                  { url: 'https://cloud2.com', title: 'Cloud 2', folderPath: '', index: 1 },
+                ],
+                tombstones: [],
+              }),
           }) // get bookmarks from cloud
           .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ synced: 3 }) }) // sync to cloud
           .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ version: 1 }) }); // save version

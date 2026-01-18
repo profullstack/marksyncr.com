@@ -72,37 +72,39 @@ export async function OPTIONS(request) {
  */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
-  
-  return items.map(item => {
-    if (item.type === 'folder') {
-      // Folder entry
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      // Bookmark entry (default for backwards compatibility)
-      // NOTE: dateAdded is intentionally excluded - see function comment
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    // Sort by folderPath first, then by index within the folder
-    // IMPORTANT: Do NOT sort by type - this would break the interleaved order
-    // of folders and bookmarks. When a user moves a folder from position 3 to
-    // the last position, the index should be preserved, not reset based on type.
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder to preserve original order
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        // Folder entry
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        // Bookmark entry (default for backwards compatibility)
+        // NOTE: dateAdded is intentionally excluded - see function comment
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      // Sort by folderPath first, then by index within the folder
+      // IMPORTANT: Do NOT sort by type - this would break the interleaved order
+      // of folders and bookmarks. When a user moves a folder from position 3 to
+      // the last position, the index should be preserved, not reset based on type.
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      // Then by index within the folder to preserve original order
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -140,15 +142,13 @@ async function ensureUserExists(supabase, user) {
   }
 
   // User doesn't exist, create them
-  const { error: insertError } = await supabase
-    .from('users')
-    .insert({
-      id: user.id,
-      email: user.email,
-      name: user.user_metadata?.name || user.user_metadata?.full_name || null,
-      avatar_url: user.user_metadata?.avatar_url || null,
-      created_at: new Date().toISOString(),
-    });
+  const { error: insertError } = await supabase.from('users').insert({
+    id: user.id,
+    email: user.email,
+    name: user.user_metadata?.name || user.user_metadata?.full_name || null,
+    avatar_url: user.user_metadata?.avatar_url || null,
+    created_at: new Date().toISOString(),
+  });
 
   if (insertError && insertError.code !== '23505') {
     // 23505 = unique violation (user already exists, race condition)
@@ -157,15 +157,13 @@ async function ensureUserExists(supabase, user) {
   }
 
   // Also create a free subscription for the user
-  const { error: subError } = await supabase
-    .from('subscriptions')
-    .insert({
-      user_id: user.id,
-      plan: 'free',
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
+  const { error: subError } = await supabase.from('subscriptions').insert({
+    user_id: user.id,
+    plan: 'free',
+    status: 'active',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
 
   if (subError && subError.code !== '23505') {
     console.error('Error creating subscription:', subError);
@@ -177,15 +175,12 @@ async function ensureUserExists(supabase, user) {
 
 export async function GET(request) {
   const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     // Get bookmarks from database (single row per user with JSONB data)
@@ -198,43 +193,44 @@ export async function GET(request) {
     if (bookmarksError && bookmarksError.code !== 'PGRST116') {
       // PGRST116 = no rows found, which is fine for new users
       console.error('Bookmarks fetch error:', bookmarksError);
-      return NextResponse.json(
-        { error: 'Failed to fetch bookmarks' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to fetch bookmarks' }, { status: 500, headers });
     }
 
     // Extract bookmarks array from JSONB (handle both flat array and nested format)
     const rawBookmarks = cloudBookmarks?.bookmark_data;
     const bookmarksArray = extractBookmarksFromNested(rawBookmarks);
-    
+
     // Extract tombstones (deleted bookmark URLs)
     const tombstones = Array.isArray(cloudBookmarks?.tombstones) ? cloudBookmarks.tombstones : [];
-    
+
     console.log(`[Bookmarks API GET] User: ${user.id}`);
-    console.log(`[Bookmarks API GET] Raw data type: ${Array.isArray(rawBookmarks) ? 'array' : typeof rawBookmarks}`);
-    console.log(`[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks, ${tombstones.length} tombstones`);
+    console.log(
+      `[Bookmarks API GET] Raw data type: ${Array.isArray(rawBookmarks) ? 'array' : typeof rawBookmarks}`
+    );
+    console.log(
+      `[Bookmarks API GET] Returning ${bookmarksArray.length} bookmarks, ${tombstones.length} tombstones`
+    );
     console.log(`[Bookmarks API GET] Version: ${cloudBookmarks?.version || 0}`);
-    
+
     // Debug: Log sample tombstones to verify they're being returned correctly
     if (tombstones.length > 0) {
       console.log(`[Bookmarks API GET] Sample tombstones:`, JSON.stringify(tombstones.slice(0, 5)));
     }
 
-    return NextResponse.json({
-      bookmarks: bookmarksArray,
-      tombstones,
-      count: bookmarksArray.length,
-      version: cloudBookmarks?.version || 0,
-      checksum: cloudBookmarks?.checksum || null,
-      lastModified: cloudBookmarks?.last_modified || null,
-    }, { headers });
+    return NextResponse.json(
+      {
+        bookmarks: bookmarksArray,
+        tombstones,
+        count: bookmarksArray.length,
+        version: cloudBookmarks?.version || 0,
+        checksum: cloudBookmarks?.checksum || null,
+        lastModified: cloudBookmarks?.last_modified || null,
+      },
+      { headers }
+    );
   } catch (error) {
     console.error('Bookmarks GET error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }
 
@@ -249,10 +245,10 @@ export async function GET(request) {
  */
 function extractBookmarksFromNested(data) {
   if (!data) return [];
-  
+
   // If it's already an array, return it
   if (Array.isArray(data)) return data;
-  
+
   // If it has a 'roots' property, extract from nested format
   if (data.roots) {
     const items = [];
@@ -260,10 +256,10 @@ function extractBookmarksFromNested(data) {
     const seenFolders = new Set();
     // Track seen bookmarks to prevent duplicates (key = url)
     const seenBookmarks = new Set();
-    
+
     function extractFromNode(node, path = '', nodeIndex = 0) {
       if (!node) return;
-      
+
       // If it's a bookmark (has url)
       if (node.url) {
         // Deduplicate bookmarks by URL
@@ -271,7 +267,7 @@ function extractBookmarksFromNested(data) {
           return; // Skip duplicate bookmark
         }
         seenBookmarks.add(node.url);
-        
+
         items.push({
           type: 'bookmark',
           url: node.url,
@@ -282,11 +278,11 @@ function extractBookmarksFromNested(data) {
         });
         return;
       }
-      
+
       // If it has children, it's a folder - add folder entry AND recurse
       if (node.children && Array.isArray(node.children)) {
         const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
-        
+
         // Add folder entry (only if it has a title and is not a root folder)
         // Root folders are identified by being direct children of roots object
         if (node.title && path) {
@@ -303,7 +299,7 @@ function extractBookmarksFromNested(data) {
             });
           }
         }
-        
+
         // Recurse into children with their index
         for (let i = 0; i < node.children.length; i++) {
           const child = node.children[i];
@@ -311,7 +307,7 @@ function extractBookmarksFromNested(data) {
         }
       }
     }
-    
+
     // Extract from each root
     for (const [rootKey, rootNode] of Object.entries(data.roots)) {
       if (rootNode && rootNode.children) {
@@ -322,10 +318,10 @@ function extractBookmarksFromNested(data) {
         }
       }
     }
-    
+
     return items;
   }
-  
+
   return [];
 }
 
@@ -364,11 +360,11 @@ function mergeTombstones(existingTombstones, incomingTombstones) {
   const tombstoneMap = new Map();
   const now = Date.now();
   const cutoffTime = now - TOMBSTONE_MAX_AGE_MS;
-  
+
   // Ensure arrays
   const existingArray = Array.isArray(existingTombstones) ? existingTombstones : [];
   const incomingArray = Array.isArray(incomingTombstones) ? incomingTombstones : [];
-  
+
   // Add existing tombstones (skip old ones)
   let cleanedUp = 0;
   for (const tombstone of existingArray) {
@@ -381,27 +377,27 @@ function mergeTombstones(existingTombstones, incomingTombstones) {
       tombstoneMap.set(tombstone.url, tombstone);
     }
   }
-  
+
   // Merge incoming tombstones (newer wins, skip old ones)
   for (const incoming of incomingArray) {
     if (!incoming || !incoming.url) continue;
-    
+
     // Skip tombstones older than the cutoff
     if (incoming.deletedAt && incoming.deletedAt < cutoffTime) {
       cleanedUp++;
       continue;
     }
-    
+
     const existing = tombstoneMap.get(incoming.url);
-    if (!existing || (incoming.deletedAt > existing.deletedAt)) {
+    if (!existing || incoming.deletedAt > existing.deletedAt) {
       tombstoneMap.set(incoming.url, incoming);
     }
   }
-  
+
   if (cleanedUp > 0) {
     console.log(`[Bookmarks API] Cleaned up ${cleanedUp} old tombstones (older than 30 days)`);
   }
-  
+
   return Array.from(tombstoneMap.values());
 }
 
@@ -413,7 +409,7 @@ function applyTombstones(bookmarks, tombstones) {
   if (!tombstones || tombstones.length === 0) {
     return bookmarks;
   }
-  
+
   // Create a map of tombstones by URL for quick lookup
   const tombstoneMap = new Map();
   for (const tombstone of tombstones) {
@@ -421,18 +417,18 @@ function applyTombstones(bookmarks, tombstones) {
       tombstoneMap.set(tombstone.url, tombstone);
     }
   }
-  
+
   // Filter out bookmarks that have been deleted
-  return bookmarks.filter(bookmark => {
+  return bookmarks.filter((bookmark) => {
     const tombstone = tombstoneMap.get(bookmark.url);
     if (!tombstone) {
       return true; // No tombstone, keep the bookmark
     }
-    
+
     // If tombstone is newer than bookmark, the bookmark was deleted
     const bookmarkDate = bookmark.dateAdded || 0;
     const tombstoneDate = tombstone.deletedAt || 0;
-    
+
     return bookmarkDate > tombstoneDate; // Keep if bookmark is newer (re-added after deletion)
   });
 }
@@ -451,22 +447,22 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
   // Create separate maps for bookmarks (by URL) and folders (by path+title)
   const bookmarkMap = new Map();
   const folderMap = new Map();
-  
+
   // Extract bookmarks from nested format if needed
   const existingArray = extractBookmarksFromNested(existingBookmarks);
-  
+
   // Ensure incomingBookmarks is an array
   const incomingArray = Array.isArray(incomingBookmarks) ? incomingBookmarks : [];
-  
+
   console.log(`[Bookmarks API] Extracted ${existingArray.length} items from existing data`);
-  
+
   // Helper to generate folder key
   const getFolderKey = (item) => `${item.folderPath || ''}::${item.title || ''}`;
-  
+
   // Add existing items to maps
   for (const item of existingArray) {
     if (!item) continue;
-    
+
     if (item.type === 'folder') {
       // It's a folder - use folderPath + title as key
       const key = getFolderKey(item);
@@ -476,19 +472,19 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
       bookmarkMap.set(item.url, item);
     }
   }
-  
+
   let added = 0;
   let updated = 0;
-  
+
   // Merge incoming items
   for (const incoming of incomingArray) {
     if (!incoming) continue;
-    
+
     if (incoming.type === 'folder') {
       // It's a folder
       const key = getFolderKey(incoming);
       const existing = folderMap.get(key);
-      
+
       if (!existing) {
         // New folder - add it
         folderMap.set(key, incoming);
@@ -505,7 +501,7 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
     } else if (incoming.url) {
       // It's a bookmark
       const existing = bookmarkMap.get(incoming.url);
-      
+
       if (!existing) {
         // New bookmark - add it
         bookmarkMap.set(incoming.url, incoming);
@@ -514,7 +510,7 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
         // Existing bookmark - check if incoming is newer
         const existingDate = existing.dateAdded || 0;
         const incomingDate = incoming.dateAdded || 0;
-        
+
         if (incomingDate > existingDate) {
           // Incoming is newer - update
           bookmarkMap.set(incoming.url, {
@@ -528,16 +524,13 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
     }
     // Skip items that are neither folders nor valid bookmarks
   }
-  
+
   // Combine bookmarks and folders into a single array
   // IMPORTANT: We must NOT put all bookmarks before all folders, as this
   // would break the interleaved order when items have the same folderPath.
   // Instead, we combine them and sort purely by folderPath and index.
-  const allItems = [
-    ...Array.from(bookmarkMap.values()),
-    ...Array.from(folderMap.values()),
-  ];
-  
+  const allItems = [...Array.from(bookmarkMap.values()), ...Array.from(folderMap.values())];
+
   // Sort by folderPath first, then by index within each folder
   // This ensures folders and bookmarks are interleaved correctly based on their index
   const merged = allItems.sort((a, b) => {
@@ -551,7 +544,7 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
     // regardless of whether they are bookmarks or folders
     return (a.index ?? 0) - (b.index ?? 0);
   });
-  
+
   return {
     merged,
     added,
@@ -697,29 +690,29 @@ async function syncToDropbox(source, bookmarks, tombstones, checksum) {
 
 export async function POST(request) {
   const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
-    const { bookmarks, tombstones: incomingTombstones = [], source = 'browser' } = await request.json();
+    const {
+      bookmarks,
+      tombstones: incomingTombstones = [],
+      source = 'browser',
+    } = await request.json();
 
     if (!Array.isArray(bookmarks)) {
-      return NextResponse.json(
-        { error: 'Bookmarks array is required' },
-        { status: 400, headers }
-      );
+      return NextResponse.json({ error: 'Bookmarks array is required' }, { status: 400, headers });
     }
 
     // Validate incoming bookmark count to prevent abuse
     if (bookmarks.length > MAX_BOOKMARKS_PER_REQUEST) {
-      console.error(`[Bookmarks API] Request rejected: ${bookmarks.length} bookmarks exceeds limit of ${MAX_BOOKMARKS_PER_REQUEST}`);
+      console.error(
+        `[Bookmarks API] Request rejected: ${bookmarks.length} bookmarks exceeds limit of ${MAX_BOOKMARKS_PER_REQUEST}`
+      );
       return NextResponse.json(
         {
           error: `Too many bookmarks in request. Maximum allowed: ${MAX_BOOKMARKS_PER_REQUEST}`,
@@ -733,16 +726,13 @@ export async function POST(request) {
     // Ensure user exists in public.users table (required for foreign key)
     const userCreated = await ensureUserExists(supabase, user);
     if (!userCreated) {
-      return NextResponse.json(
-        { error: 'Failed to create user record' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to create user record' }, { status: 500, headers });
     }
 
     // Normalize bookmarks structure
     // Preserve empty titles - don't replace with URL
     // IMPORTANT: Preserve type and index fields for proper checksum comparison
-    const normalizedBookmarks = bookmarks.map(bookmark => ({
+    const normalizedBookmarks = bookmarks.map((bookmark) => ({
       id: bookmark.id,
       type: bookmark.type || 'bookmark', // Preserve type (bookmark or folder)
       url: bookmark.url,
@@ -770,8 +760,11 @@ export async function POST(request) {
     }
 
     // Debug: log the raw existingData to see what's in the database
-    console.log(`[Bookmarks API] Raw existingData:`, JSON.stringify(existingData, null, 2)?.substring(0, 500));
-    
+    console.log(
+      `[Bookmarks API] Raw existingData:`,
+      JSON.stringify(existingData, null, 2)?.substring(0, 500)
+    );
+
     const existingBookmarks = existingData?.bookmark_data || [];
     const existingTombstones = existingData?.tombstones || [];
     const existingVersion = existingData?.version || 0;
@@ -780,25 +773,33 @@ export async function POST(request) {
     console.log(`[Bookmarks API] Source: ${source}`);
     console.log(`[Bookmarks API] Incoming bookmarks: ${normalizedBookmarks.length}`);
     console.log(`[Bookmarks API] Incoming tombstones: ${incomingTombstones.length}`);
-    console.log(`[Bookmarks API] Existing cloud bookmarks: ${Array.isArray(existingBookmarks) ? existingBookmarks.length : 'NOT AN ARRAY: ' + typeof existingBookmarks}`);
+    console.log(
+      `[Bookmarks API] Existing cloud bookmarks: ${Array.isArray(existingBookmarks) ? existingBookmarks.length : 'NOT AN ARRAY: ' + typeof existingBookmarks}`
+    );
     console.log(`[Bookmarks API] Existing tombstones: ${existingTombstones.length}`);
     console.log(`[Bookmarks API] Existing version: ${existingVersion}`);
 
     // Merge tombstones first
     const mergedTombstones = mergeTombstones(existingTombstones, incomingTombstones);
     console.log(`[Bookmarks API] Merged tombstones: ${mergedTombstones.length}`);
-    
+
     // Debug: Log sample incoming and merged tombstones
     if (incomingTombstones.length > 0) {
-      console.log(`[Bookmarks API] Sample incoming tombstones:`, JSON.stringify(incomingTombstones.slice(0, 3)));
+      console.log(
+        `[Bookmarks API] Sample incoming tombstones:`,
+        JSON.stringify(incomingTombstones.slice(0, 3))
+      );
     }
     if (mergedTombstones.length > 0) {
-      console.log(`[Bookmarks API] Sample merged tombstones:`, JSON.stringify(mergedTombstones.slice(0, 3)));
+      console.log(
+        `[Bookmarks API] Sample merged tombstones:`,
+        JSON.stringify(mergedTombstones.slice(0, 3))
+      );
     }
 
     // Merge incoming bookmarks with existing
     const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
-    
+
     // IMPORTANT: Do NOT apply tombstones on the server side!
     // The server should store ALL bookmarks and tombstones.
     // Each browser extension applies tombstones locally when it receives them.
@@ -813,13 +814,19 @@ export async function POST(request) {
     // when it receives tombstones from the cloud.
     const finalBookmarks = merged;
     const deleted = 0; // Server doesn't delete, extensions do
-    
-    console.log(`[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`);
-    console.log(`[Bookmarks API] Tombstones stored: ${mergedTombstones.length} (applied by extensions, not server)`);
+
+    console.log(
+      `[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`
+    );
+    console.log(
+      `[Bookmarks API] Tombstones stored: ${mergedTombstones.length} (applied by extensions, not server)`
+    );
 
     // Validate total bookmark count after merge to prevent data explosion
     if (finalBookmarks.length > MAX_BOOKMARKS_PER_USER) {
-      console.error(`[Bookmarks API] Merge rejected: ${finalBookmarks.length} total bookmarks exceeds limit of ${MAX_BOOKMARKS_PER_USER}`);
+      console.error(
+        `[Bookmarks API] Merge rejected: ${finalBookmarks.length} total bookmarks exceeds limit of ${MAX_BOOKMARKS_PER_USER}`
+      );
       return NextResponse.json(
         {
           error: `Total bookmark count would exceed limit. Maximum allowed: ${MAX_BOOKMARKS_PER_USER}`,
@@ -838,10 +845,14 @@ export async function POST(request) {
 
     // Check if there are any actual changes by comparing checksums
     // Also check if tombstones have changed
-    const existingTombstonesJson = JSON.stringify(existingTombstones.sort((a, b) => a.url.localeCompare(b.url)));
-    const mergedTombstonesJson = JSON.stringify(mergedTombstones.sort((a, b) => a.url.localeCompare(b.url)));
+    const existingTombstonesJson = JSON.stringify(
+      existingTombstones.sort((a, b) => a.url.localeCompare(b.url))
+    );
+    const mergedTombstonesJson = JSON.stringify(
+      mergedTombstones.sort((a, b) => a.url.localeCompare(b.url))
+    );
     const tombstonesChanged = existingTombstonesJson !== mergedTombstonesJson;
-    
+
     const checksumMatches = existingChecksum && checksum === existingChecksum;
     const noChanges = checksumMatches && !tombstonesChanged;
 
@@ -854,19 +865,22 @@ export async function POST(request) {
     // If no changes, skip the database write and return early
     if (noChanges) {
       console.log(`[Bookmarks API] Skipping database write - no changes detected`);
-      return NextResponse.json({
-        synced: normalizedBookmarks.length,
-        merged: finalBookmarks.length,
-        added: 0,
-        updated: 0,
-        deleted: 0,
-        tombstones: mergedTombstones.length,
-        total: finalBookmarks.length,
-        version: existingVersion,
-        checksum: existingChecksum,
-        skipped: true,
-        message: 'No changes detected - sync skipped',
-      }, { headers });
+      return NextResponse.json(
+        {
+          synced: normalizedBookmarks.length,
+          merged: finalBookmarks.length,
+          added: 0,
+          updated: 0,
+          deleted: 0,
+          tombstones: mergedTombstones.length,
+          total: finalBookmarks.length,
+          version: existingVersion,
+          checksum: existingChecksum,
+          skipped: true,
+          message: 'No changes detected - sync skipped',
+        },
+        { headers }
+      );
     }
 
     const newVersion = existingVersion + 1;
@@ -874,73 +888,68 @@ export async function POST(request) {
     // Upsert merged bookmarks and tombstones (single row per user with JSONB data)
     const { data, error: upsertError } = await supabase
       .from('cloud_bookmarks')
-      .upsert({
-        user_id: user.id,
-        bookmark_data: finalBookmarks,
-        tombstones: mergedTombstones,
-        checksum,
-        version: newVersion,
-        last_modified: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      })
+      .upsert(
+        {
+          user_id: user.id,
+          bookmark_data: finalBookmarks,
+          tombstones: mergedTombstones,
+          checksum,
+          version: newVersion,
+          last_modified: new Date().toISOString(),
+        },
+        {
+          onConflict: 'user_id',
+        }
+      )
       .select()
       .single();
 
     if (upsertError) {
       console.error('Bookmarks upsert error:', upsertError);
-      return NextResponse.json(
-        { error: 'Failed to sync bookmarks' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to sync bookmarks' }, { status: 500, headers });
     }
 
     // Sync to external sources (GitHub, Dropbox, etc.) asynchronously
     // This runs in the background and doesn't block the response
-    syncToExternalSources(supabase, user.id, finalBookmarks, mergedTombstones, checksum)
-      .catch(err => console.error('[External Sync] Background sync failed:', err));
+    syncToExternalSources(supabase, user.id, finalBookmarks, mergedTombstones, checksum).catch(
+      (err) => console.error('[External Sync] Background sync failed:', err)
+    );
 
-    return NextResponse.json({
-      synced: normalizedBookmarks.length,
-      merged: finalBookmarks.length,
-      added,
-      updated,
-      deleted,
-      tombstones: mergedTombstones.length,
-      total: finalBookmarks.length,
-      version: data.version,
-      checksum: data.checksum,
-      message: 'Bookmarks synced successfully',
-    }, { headers });
+    return NextResponse.json(
+      {
+        synced: normalizedBookmarks.length,
+        merged: finalBookmarks.length,
+        added,
+        updated,
+        deleted,
+        tombstones: mergedTombstones.length,
+        total: finalBookmarks.length,
+        version: data.version,
+        checksum: data.checksum,
+        message: 'Bookmarks synced successfully',
+      },
+      { headers }
+    );
   } catch (error) {
     console.error('Bookmarks POST error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }
 
 export async function DELETE(request) {
   const headers = corsHeaders(request, ['GET', 'POST', 'DELETE', 'OPTIONS']);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     const { url, id } = await request.json();
 
     if (!url && !id) {
-      return NextResponse.json(
-        { error: 'URL or ID is required' },
-        { status: 400, headers }
-      );
+      return NextResponse.json({ error: 'URL or ID is required' }, { status: 400, headers });
     }
 
     // Get current bookmarks
@@ -952,32 +961,23 @@ export async function DELETE(request) {
 
     if (fetchError) {
       console.error('Bookmark fetch error:', fetchError);
-      return NextResponse.json(
-        { error: 'Failed to fetch bookmarks' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to fetch bookmarks' }, { status: 500, headers });
     }
 
     if (!existing || !existing.bookmark_data) {
-      return NextResponse.json(
-        { error: 'No bookmarks found' },
-        { status: 404, headers }
-      );
+      return NextResponse.json({ error: 'No bookmarks found' }, { status: 404, headers });
     }
 
     // Filter out the bookmark to delete
     const bookmarks = existing.bookmark_data;
-    const filteredBookmarks = bookmarks.filter(b => {
+    const filteredBookmarks = bookmarks.filter((b) => {
       if (id) return b.id !== id;
       if (url) return b.url !== url;
       return true;
     });
 
     if (filteredBookmarks.length === bookmarks.length) {
-      return NextResponse.json(
-        { error: 'Bookmark not found' },
-        { status: 404, headers }
-      );
+      return NextResponse.json({ error: 'Bookmark not found' }, { status: 404, headers });
     }
 
     // Update with filtered bookmarks
@@ -994,20 +994,17 @@ export async function DELETE(request) {
 
     if (updateError) {
       console.error('Bookmark delete error:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to delete bookmark' },
-        { status: 500, headers }
-      );
+      return NextResponse.json({ error: 'Failed to delete bookmark' }, { status: 500, headers });
     }
 
-    return NextResponse.json({
-      message: 'Bookmark deleted successfully',
-    }, { headers });
+    return NextResponse.json(
+      {
+        message: 'Bookmark deleted successfully',
+      },
+      { headers }
+    );
   } catch (error) {
     console.error('Bookmarks DELETE error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }

@@ -33,38 +33,40 @@ import crypto from 'crypto';
  */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
-  
-  return items.map(item => {
-    if (item.type === 'folder') {
-      // Folder entry
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      // Bookmark entry (default for backwards compatibility)
-      // NOTE: dateAdded is intentionally excluded
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    // Sort by type first (folders before bookmarks for consistent ordering)
-    if (a.type !== b.type) {
-      return a.type === 'folder' ? -1 : 1;
-    }
-    // Then by folderPath
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        // Folder entry
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        // Bookmark entry (default for backwards compatibility)
+        // NOTE: dateAdded is intentionally excluded
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      // Sort by type first (folders before bookmarks for consistent ordering)
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      // Then by folderPath
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      // Then by index within the folder
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -120,10 +122,34 @@ describe('Checksum Normalization', () => {
 
     it('should sort bookmarks by folderPath then index for consistent ordering', () => {
       const bookmarks = [
-        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder A', dateAdded: 1, index: 2 },
-        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 2, index: 0 },
-        { url: 'https://mango.com', title: 'Mango', folderPath: 'Folder A', dateAdded: 3, index: 1 },
-        { url: 'https://banana.com', title: 'Banana', folderPath: 'Folder B', dateAdded: 4, index: 0 },
+        {
+          url: 'https://zebra.com',
+          title: 'Zebra',
+          folderPath: 'Folder A',
+          dateAdded: 1,
+          index: 2,
+        },
+        {
+          url: 'https://apple.com',
+          title: 'Apple',
+          folderPath: 'Folder A',
+          dateAdded: 2,
+          index: 0,
+        },
+        {
+          url: 'https://mango.com',
+          title: 'Mango',
+          folderPath: 'Folder A',
+          dateAdded: 3,
+          index: 1,
+        },
+        {
+          url: 'https://banana.com',
+          title: 'Banana',
+          folderPath: 'Folder B',
+          dateAdded: 4,
+          index: 0,
+        },
       ];
 
       const normalized = normalizeBookmarksForChecksum(bookmarks);
@@ -165,9 +191,7 @@ describe('Checksum Normalization', () => {
     });
 
     it('should not include dateAdded in normalized output', () => {
-      const bookmarks = [
-        { url: 'https://example.com', title: 'Test', dateAdded: 1700000000000 },
-      ];
+      const bookmarks = [{ url: 'https://example.com', title: 'Test', dateAdded: 1700000000000 }];
 
       const normalized = normalizeBookmarksForChecksum(bookmarks);
 
@@ -203,13 +227,37 @@ describe('Checksum Normalization', () => {
       // Bookmarks in different folders with same index should produce same checksum
       // regardless of input array order (sorted by folderPath then index)
       const bookmarks1 = [
-        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder B', dateAdded: 1, index: 0 },
-        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 2, index: 0 },
+        {
+          url: 'https://zebra.com',
+          title: 'Zebra',
+          folderPath: 'Folder B',
+          dateAdded: 1,
+          index: 0,
+        },
+        {
+          url: 'https://apple.com',
+          title: 'Apple',
+          folderPath: 'Folder A',
+          dateAdded: 2,
+          index: 0,
+        },
       ];
 
       const bookmarks2 = [
-        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 2, index: 0 },
-        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder B', dateAdded: 1, index: 0 },
+        {
+          url: 'https://apple.com',
+          title: 'Apple',
+          folderPath: 'Folder A',
+          dateAdded: 2,
+          index: 0,
+        },
+        {
+          url: 'https://zebra.com',
+          title: 'Zebra',
+          folderPath: 'Folder B',
+          dateAdded: 1,
+          index: 0,
+        },
       ];
 
       const checksum1 = generateChecksum(bookmarks1);
@@ -221,13 +269,37 @@ describe('Checksum Normalization', () => {
     it('should generate different checksum when bookmark order changes within folder', () => {
       // Same bookmarks but different order within the same folder
       const bookmarks1 = [
-        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 1, index: 0 },
-        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder A', dateAdded: 2, index: 1 },
+        {
+          url: 'https://apple.com',
+          title: 'Apple',
+          folderPath: 'Folder A',
+          dateAdded: 1,
+          index: 0,
+        },
+        {
+          url: 'https://zebra.com',
+          title: 'Zebra',
+          folderPath: 'Folder A',
+          dateAdded: 2,
+          index: 1,
+        },
       ];
 
       const bookmarks2 = [
-        { url: 'https://zebra.com', title: 'Zebra', folderPath: 'Folder A', dateAdded: 2, index: 0 },
-        { url: 'https://apple.com', title: 'Apple', folderPath: 'Folder A', dateAdded: 1, index: 1 },
+        {
+          url: 'https://zebra.com',
+          title: 'Zebra',
+          folderPath: 'Folder A',
+          dateAdded: 2,
+          index: 0,
+        },
+        {
+          url: 'https://apple.com',
+          title: 'Apple',
+          folderPath: 'Folder A',
+          dateAdded: 1,
+          index: 1,
+        },
       ];
 
       const checksum1 = generateChecksum(bookmarks1);
@@ -267,13 +339,9 @@ describe('Checksum Normalization', () => {
     });
 
     it('should generate different checksum for different data', () => {
-      const bookmarks1 = [
-        { url: 'https://example.com', title: 'Example', dateAdded: 1 },
-      ];
+      const bookmarks1 = [{ url: 'https://example.com', title: 'Example', dateAdded: 1 }];
 
-      const bookmarks2 = [
-        { url: 'https://different.com', title: 'Different', dateAdded: 1 },
-      ];
+      const bookmarks2 = [{ url: 'https://different.com', title: 'Different', dateAdded: 1 }];
 
       const checksum1 = generateChecksum(bookmarks1);
       const checksum2 = generateChecksum(bookmarks2);
@@ -282,13 +350,9 @@ describe('Checksum Normalization', () => {
     });
 
     it('should generate different checksum when title changes', () => {
-      const bookmarks1 = [
-        { url: 'https://example.com', title: 'Original', dateAdded: 1 },
-      ];
+      const bookmarks1 = [{ url: 'https://example.com', title: 'Original', dateAdded: 1 }];
 
-      const bookmarks2 = [
-        { url: 'https://example.com', title: 'Changed', dateAdded: 1 },
-      ];
+      const bookmarks2 = [{ url: 'https://example.com', title: 'Changed', dateAdded: 1 }];
 
       const checksum1 = generateChecksum(bookmarks1);
       const checksum2 = generateChecksum(bookmarks2);
@@ -317,13 +381,9 @@ describe('Checksum Normalization', () => {
       // 2. We can't set dateAdded via browser.bookmarks.create API
       // 3. So synced bookmarks always have different dateAdded than cloud
       // 4. This would cause checksums to never match, triggering unnecessary syncs
-      const bookmarks1 = [
-        { url: 'https://example.com', title: 'Test', dateAdded: 1000 },
-      ];
+      const bookmarks1 = [{ url: 'https://example.com', title: 'Test', dateAdded: 1000 }];
 
-      const bookmarks2 = [
-        { url: 'https://example.com', title: 'Test', dateAdded: 2000 },
-      ];
+      const bookmarks2 = [{ url: 'https://example.com', title: 'Test', dateAdded: 2000 }];
 
       const checksum1 = generateChecksum(bookmarks1);
       const checksum2 = generateChecksum(bookmarks2);
@@ -333,9 +393,7 @@ describe('Checksum Normalization', () => {
     });
 
     it('should return valid SHA-256 hex string', () => {
-      const bookmarks = [
-        { url: 'https://example.com', title: 'Test', dateAdded: 1 },
-      ];
+      const bookmarks = [{ url: 'https://example.com', title: 'Test', dateAdded: 1 }];
 
       const checksum = generateChecksum(bookmarks);
 
@@ -475,9 +533,7 @@ describe('Checksum Normalization', () => {
     });
 
     it('should handle bookmarks with unicode in title', () => {
-      const bookmarks = [
-        { url: 'https://example.com', title: '日本語タイトル 🎉', dateAdded: 1 },
-      ];
+      const bookmarks = [{ url: 'https://example.com', title: '日本語タイトル 🎉', dateAdded: 1 }];
 
       const checksum = generateChecksum(bookmarks);
       expect(checksum).toMatch(/^[a-f0-9]{64}$/);
@@ -485,9 +541,7 @@ describe('Checksum Normalization', () => {
 
     it('should handle bookmarks with very long URLs', () => {
       const longUrl = 'https://example.com/' + 'a'.repeat(2000);
-      const bookmarks = [
-        { url: longUrl, title: 'Long URL', dateAdded: 1 },
-      ];
+      const bookmarks = [{ url: longUrl, title: 'Long URL', dateAdded: 1 }];
 
       const checksum = generateChecksum(bookmarks);
       expect(checksum).toMatch(/^[a-f0-9]{64}$/);

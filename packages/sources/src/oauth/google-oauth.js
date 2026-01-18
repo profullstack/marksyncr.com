@@ -14,7 +14,8 @@ const GOOGLE_CONFIG = {
   revokeEndpoint: 'https://oauth2.googleapis.com/revoke',
   userInfoEndpoint: 'https://www.googleapis.com/oauth2/v2/userinfo',
   // Scope for Google Drive file access (only files created by the app)
-  scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+  scope:
+    'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
 };
 
 /**

@@ -157,7 +157,11 @@ export function ProUpgradeBanner() {
  */
 export function ProFeaturesList() {
   const features = [
-    { icon: SparklesIcon, name: 'Tags & Notes', description: 'Organize with custom tags and notes' },
+    {
+      icon: SparklesIcon,
+      name: 'Tags & Notes',
+      description: 'Organize with custom tags and notes',
+    },
     { icon: SearchIcon, name: 'Smart Search', description: 'Full-text search with filters' },
     { icon: LinkIcon, name: 'Link Health', description: 'Find and fix broken links' },
     { icon: DuplicateIcon, name: 'Duplicates', description: 'Find and merge duplicates' },
@@ -171,10 +175,7 @@ export function ProFeaturesList() {
       </h3>
       <div className="grid grid-cols-2 gap-2">
         {features.map((feature) => (
-          <div
-            key={feature.name}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-          >
+          <div key={feature.name} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <feature.icon className="h-5 w-5 text-primary-600 mb-2" />
             <h4 className="text-sm font-medium text-slate-900">{feature.name}</h4>
             <p className="text-xs text-slate-500 mt-0.5">{feature.description}</p>
@@ -367,9 +368,7 @@ export function ProFeaturesPanel({
                     <h4 className="text-sm font-medium text-slate-700 mb-1">
                       {selectedBookmark.title}
                     </h4>
-                    <p className="text-xs text-slate-500 truncate">
-                      {selectedBookmark.url}
-                    </p>
+                    <p className="text-xs text-slate-500 truncate">{selectedBookmark.url}</p>
                   </div>
 
                   <TagSelector
@@ -395,9 +394,7 @@ export function ProFeaturesPanel({
           <div className="text-center py-8 text-slate-500">
             <SparklesIcon className="h-12 w-12 mx-auto mb-3 text-slate-300" />
             <p className="text-sm">Select a feature above to get started</p>
-            <p className="text-xs mt-1">
-              {bookmarks.length} bookmarks loaded
-            </p>
+            <p className="text-xs mt-1">{bookmarks.length} bookmarks loaded</p>
           </div>
         )}
       </div>

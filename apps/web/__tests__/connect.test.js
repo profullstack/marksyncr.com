@@ -60,9 +60,7 @@ describe('OAuth State Generation', () => {
 
 describe('OAuth URL Building', () => {
   it('should build GitHub authorization URL correctly', async () => {
-    const { buildAuthorizationUrl } = await import(
-      '@marksyncr/sources/oauth/github-oauth'
-    );
+    const { buildAuthorizationUrl } = await import('@marksyncr/sources/oauth/github-oauth');
 
     const url = buildAuthorizationUrl(
       'test-client-id',
@@ -78,9 +76,7 @@ describe('OAuth URL Building', () => {
   });
 
   it('should build Dropbox authorization URL correctly', async () => {
-    const { buildAuthorizationUrl } = await import(
-      '@marksyncr/sources/oauth/dropbox-oauth'
-    );
+    const { buildAuthorizationUrl } = await import('@marksyncr/sources/oauth/dropbox-oauth');
 
     const url = buildAuthorizationUrl(
       'test-client-id',
@@ -95,9 +91,7 @@ describe('OAuth URL Building', () => {
   });
 
   it('should build Google authorization URL correctly', async () => {
-    const { buildAuthorizationUrl } = await import(
-      '@marksyncr/sources/oauth/google-oauth'
-    );
+    const { buildAuthorizationUrl } = await import('@marksyncr/sources/oauth/google-oauth');
 
     const url = buildAuthorizationUrl(
       'test-client-id',
@@ -115,28 +109,18 @@ describe('OAuth URL Building', () => {
 describe('OAuth Handler Classes', () => {
   describe('GitHubOAuthHandler', () => {
     it('should create handler with client ID and redirect URI', async () => {
-      const { GitHubOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/github-oauth'
-      );
+      const { GitHubOAuthHandler } = await import('@marksyncr/sources/oauth/github-oauth');
 
-      const handler = new GitHubOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GitHubOAuthHandler('test-client-id', 'https://example.com/callback');
 
       expect(handler.clientId).toBe('test-client-id');
       expect(handler.redirectUri).toBe('https://example.com/callback');
     });
 
     it('should start auth flow and return auth URL with state', async () => {
-      const { GitHubOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/github-oauth'
-      );
+      const { GitHubOAuthHandler } = await import('@marksyncr/sources/oauth/github-oauth');
 
-      const handler = new GitHubOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GitHubOAuthHandler('test-client-id', 'https://example.com/callback');
 
       const { authUrl, state } = await handler.startAuth();
 
@@ -147,14 +131,9 @@ describe('OAuth Handler Classes', () => {
     });
 
     it('should handle callback and extract code', async () => {
-      const { GitHubOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/github-oauth'
-      );
+      const { GitHubOAuthHandler } = await import('@marksyncr/sources/oauth/github-oauth');
 
-      const handler = new GitHubOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GitHubOAuthHandler('test-client-id', 'https://example.com/callback');
 
       // Start auth to set pending state
       const { state } = await handler.startAuth();
@@ -168,14 +147,9 @@ describe('OAuth Handler Classes', () => {
     });
 
     it('should throw error on state mismatch', async () => {
-      const { GitHubOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/github-oauth'
-      );
+      const { GitHubOAuthHandler } = await import('@marksyncr/sources/oauth/github-oauth');
 
-      const handler = new GitHubOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GitHubOAuthHandler('test-client-id', 'https://example.com/callback');
 
       // Start auth to set pending state
       await handler.startAuth();
@@ -187,14 +161,9 @@ describe('OAuth Handler Classes', () => {
     });
 
     it('should throw error when OAuth error is returned', async () => {
-      const { GitHubOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/github-oauth'
-      );
+      const { GitHubOAuthHandler } = await import('@marksyncr/sources/oauth/github-oauth');
 
-      const handler = new GitHubOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GitHubOAuthHandler('test-client-id', 'https://example.com/callback');
 
       const callbackUrl =
         'https://example.com/callback?error=access_denied&error_description=User%20denied%20access';
@@ -205,28 +174,18 @@ describe('OAuth Handler Classes', () => {
 
   describe('DropboxOAuthHandler', () => {
     it('should create handler with client ID and redirect URI', async () => {
-      const { DropboxOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/dropbox-oauth'
-      );
+      const { DropboxOAuthHandler } = await import('@marksyncr/sources/oauth/dropbox-oauth');
 
-      const handler = new DropboxOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new DropboxOAuthHandler('test-client-id', 'https://example.com/callback');
 
       expect(handler.clientId).toBe('test-client-id');
       expect(handler.redirectUri).toBe('https://example.com/callback');
     });
 
     it('should start auth flow and return auth URL with state', async () => {
-      const { DropboxOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/dropbox-oauth'
-      );
+      const { DropboxOAuthHandler } = await import('@marksyncr/sources/oauth/dropbox-oauth');
 
-      const handler = new DropboxOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new DropboxOAuthHandler('test-client-id', 'https://example.com/callback');
 
       const { authUrl, state } = await handler.startAuth();
 
@@ -239,28 +198,18 @@ describe('OAuth Handler Classes', () => {
 
   describe('GoogleOAuthHandler', () => {
     it('should create handler with client ID and redirect URI', async () => {
-      const { GoogleOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/google-oauth'
-      );
+      const { GoogleOAuthHandler } = await import('@marksyncr/sources/oauth/google-oauth');
 
-      const handler = new GoogleOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GoogleOAuthHandler('test-client-id', 'https://example.com/callback');
 
       expect(handler.clientId).toBe('test-client-id');
       expect(handler.redirectUri).toBe('https://example.com/callback');
     });
 
     it('should start auth flow and return auth URL with state', async () => {
-      const { GoogleOAuthHandler } = await import(
-        '@marksyncr/sources/oauth/google-oauth'
-      );
+      const { GoogleOAuthHandler } = await import('@marksyncr/sources/oauth/google-oauth');
 
-      const handler = new GoogleOAuthHandler(
-        'test-client-id',
-        'https://example.com/callback'
-      );
+      const handler = new GoogleOAuthHandler('test-client-id', 'https://example.com/callback');
 
       const { authUrl, state } = await handler.startAuth();
 
@@ -296,23 +245,17 @@ describe('Token Validation Functions', () => {
 
 describe('Token Exchange Functions', () => {
   it('should export exchangeCodeForToken for GitHub', async () => {
-    const { exchangeCodeForToken } = await import(
-      '@marksyncr/sources/oauth/github-oauth'
-    );
+    const { exchangeCodeForToken } = await import('@marksyncr/sources/oauth/github-oauth');
     expect(typeof exchangeCodeForToken).toBe('function');
   });
 
   it('should export exchangeCodeForToken for Dropbox', async () => {
-    const { exchangeCodeForToken } = await import(
-      '@marksyncr/sources/oauth/dropbox-oauth'
-    );
+    const { exchangeCodeForToken } = await import('@marksyncr/sources/oauth/dropbox-oauth');
     expect(typeof exchangeCodeForToken).toBe('function');
   });
 
   it('should export exchangeCodeForToken for Google', async () => {
-    const { exchangeCodeForToken } = await import(
-      '@marksyncr/sources/oauth/google-oauth'
-    );
+    const { exchangeCodeForToken } = await import('@marksyncr/sources/oauth/google-oauth');
     expect(typeof exchangeCodeForToken).toBe('function');
   });
 });
@@ -336,16 +279,12 @@ describe('Token Revocation Functions', () => {
 
 describe('Token Refresh Functions', () => {
   it('should export refreshAccessToken for Dropbox', async () => {
-    const { refreshAccessToken } = await import(
-      '@marksyncr/sources/oauth/dropbox-oauth'
-    );
+    const { refreshAccessToken } = await import('@marksyncr/sources/oauth/dropbox-oauth');
     expect(typeof refreshAccessToken).toBe('function');
   });
 
   it('should export refreshAccessToken for Google', async () => {
-    const { refreshAccessToken } = await import(
-      '@marksyncr/sources/oauth/google-oauth'
-    );
+    const { refreshAccessToken } = await import('@marksyncr/sources/oauth/google-oauth');
     expect(typeof refreshAccessToken).toBe('function');
   });
 });

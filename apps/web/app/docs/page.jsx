@@ -100,13 +100,13 @@ export default function DocsPage() {
           <p className="mb-6 text-slate-600">
             MarkSyncr supports multiple storage backends. Choose the one that works best for you.
           </p>
-          
+
           <div className="space-y-6">
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <h3 className="mb-2 text-lg font-medium text-slate-900">GitHub</h3>
               <p className="mb-4 text-slate-600">
-                Store your bookmarks in a GitHub repository. Great for developers who want 
-                version control and the ability to view bookmark history.
+                Store your bookmarks in a GitHub repository. Great for developers who want version
+                control and the ability to view bookmark history.
               </p>
               <ul className="list-disc pl-6 text-sm text-slate-600">
                 <li>Free with any GitHub account</li>
@@ -118,8 +118,8 @@ export default function DocsPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <h3 className="mb-2 text-lg font-medium text-slate-900">Dropbox</h3>
               <p className="mb-4 text-slate-600">
-                Sync bookmarks through your Dropbox account. Simple setup with automatic 
-                cloud backup.
+                Sync bookmarks through your Dropbox account. Simple setup with automatic cloud
+                backup.
               </p>
               <ul className="list-disc pl-6 text-sm text-slate-600">
                 <li>Works with free Dropbox accounts</li>
@@ -131,8 +131,8 @@ export default function DocsPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <h3 className="mb-2 text-lg font-medium text-slate-900">Google Drive</h3>
               <p className="mb-4 text-slate-600">
-                Use your Google Drive storage for bookmark sync. Integrates seamlessly 
-                with your Google account.
+                Use your Google Drive storage for bookmark sync. Integrates seamlessly with your
+                Google account.
               </p>
               <ul className="list-disc pl-6 text-sm text-slate-600">
                 <li>15GB free storage with Google account</li>
@@ -144,8 +144,8 @@ export default function DocsPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <h3 className="mb-2 text-lg font-medium text-slate-900">Local File</h3>
               <p className="mb-4 text-slate-600">
-                Export and import bookmarks to a local JSON file. Perfect for manual 
-                backups or offline use.
+                Export and import bookmarks to a local JSON file. Perfect for manual backups or
+                offline use.
               </p>
               <ul className="list-disc pl-6 text-sm text-slate-600">
                 <li>No account required</li>
@@ -160,8 +160,8 @@ export default function DocsPage() {
                 Free
               </span>
               <p className="mb-4 text-slate-600">
-                Our managed cloud storage. The easiest option with no setup required -
-                just sign in and start syncing.
+                Our managed cloud storage. The easiest option with no setup required - just sign in
+                and start syncing.
               </p>
               <ul className="list-disc pl-6 text-sm text-slate-600">
                 <li>Fast sync speeds</li>
@@ -178,34 +178,34 @@ export default function DocsPage() {
             <div>
               <h3 className="mb-2 text-lg font-medium text-slate-900">Two-Way Sync</h3>
               <p className="text-slate-600">
-                Changes made on any device are automatically synced to all other devices. 
-                Add a bookmark on your phone, and it appears on your desktop within seconds.
+                Changes made on any device are automatically synced to all other devices. Add a
+                bookmark on your phone, and it appears on your desktop within seconds.
               </p>
             </div>
 
             <div>
               <h3 className="mb-2 text-lg font-medium text-slate-900">Conflict Resolution</h3>
               <p className="text-slate-600">
-                When the same bookmark is modified on multiple devices, MarkSyncr intelligently 
-                merges changes. In rare cases of true conflicts, the most recent change wins, 
-                but no data is ever lost.
+                When the same bookmark is modified on multiple devices, MarkSyncr intelligently
+                merges changes. In rare cases of true conflicts, the most recent change wins, but no
+                data is ever lost.
               </p>
             </div>
 
             <div>
               <h3 className="mb-2 text-lg font-medium text-slate-900">Version History</h3>
               <p className="text-slate-600">
-                All users get access to version history, allowing you to restore your bookmarks
-                to any previous state. Free users get 5 days of history, Pro users get 30 days,
-                and Team users get 1 year.
+                All users get access to version history, allowing you to restore your bookmarks to
+                any previous state. Free users get 5 days of history, Pro users get 30 days, and
+                Team users get 1 year.
               </p>
             </div>
 
             <div>
               <h3 className="mb-2 text-lg font-medium text-slate-900">Folder Structure</h3>
               <p className="text-slate-600">
-                Your bookmark folder structure is preserved exactly as you organize it. 
-                Toolbar bookmarks, menu bookmarks, and other folders all sync correctly.
+                Your bookmark folder structure is preserved exactly as you organize it. Toolbar
+                bookmarks, menu bookmarks, and other folders all sync correctly.
               </p>
             </div>
           </div>
@@ -214,13 +214,11 @@ export default function DocsPage() {
         <DocSection id="faq" title="Frequently Asked Questions">
           <div className="space-y-6">
             <div>
-              <h3 className="mb-2 font-medium text-slate-900">
-                Is my data secure?
-              </h3>
+              <h3 className="mb-2 font-medium text-slate-900">Is my data secure?</h3>
               <p className="text-slate-600">
-                Yes. When using third-party storage (GitHub, Dropbox, Google Drive), your 
-                bookmarks are stored in your own accounts and we never see them. For MarkSyncr 
-                Cloud, all data is encrypted at rest and in transit.
+                Yes. When using third-party storage (GitHub, Dropbox, Google Drive), your bookmarks
+                are stored in your own accounts and we never see them. For MarkSyncr Cloud, all data
+                is encrypted at rest and in transit.
               </p>
             </div>
 
@@ -229,8 +227,9 @@ export default function DocsPage() {
                 Can I use MarkSyncr on multiple browsers?
               </h3>
               <p className="text-slate-600">
-                Absolutely! That&apos;s the main purpose of MarkSyncr. Install the extension on 
-                Chrome, Firefox, and Safari, and your bookmarks will stay in sync across all of them.
+                Absolutely! That&apos;s the main purpose of MarkSyncr. Install the extension on
+                Chrome, Firefox, and Safari, and your bookmarks will stay in sync across all of
+                them.
               </p>
             </div>
 
@@ -239,31 +238,26 @@ export default function DocsPage() {
                 What happens if I cancel my Pro subscription?
               </h3>
               <p className="text-slate-600">
-                You&apos;ll retain access to Pro features until the end of your billing period. 
-                After that, you can continue using the free tier with your own storage providers. 
+                You&apos;ll retain access to Pro features until the end of your billing period.
+                After that, you can continue using the free tier with your own storage providers.
                 Your bookmarks stored in MarkSyncr Cloud will be available for export for 30 days.
               </p>
             </div>
 
             <div>
-              <h3 className="mb-2 font-medium text-slate-900">
-                How often does sync happen?
-              </h3>
+              <h3 className="mb-2 font-medium text-slate-900">How often does sync happen?</h3>
               <p className="text-slate-600">
-                By default, MarkSyncr syncs every 5 minutes when automatic sync is enabled. 
-                You can also trigger a manual sync at any time by clicking the sync button 
-                in the extension popup.
+                By default, MarkSyncr syncs every 5 minutes when automatic sync is enabled. You can
+                also trigger a manual sync at any time by clicking the sync button in the extension
+                popup.
               </p>
             </div>
 
             <div>
-              <h3 className="mb-2 font-medium text-slate-900">
-                Does MarkSyncr work offline?
-              </h3>
+              <h3 className="mb-2 font-medium text-slate-900">Does MarkSyncr work offline?</h3>
               <p className="text-slate-600">
-                Yes. Your bookmarks are always available locally in your browser. When you 
-                come back online, MarkSyncr will automatically sync any changes you made 
-                while offline.
+                Yes. Your bookmarks are always available locally in your browser. When you come back
+                online, MarkSyncr will automatically sync any changes you made while offline.
               </p>
             </div>
           </div>
@@ -271,9 +265,7 @@ export default function DocsPage() {
 
         {/* CTA */}
         <div className="rounded-lg bg-primary-50 p-8 text-center">
-          <h2 className="mb-2 text-xl font-semibold text-slate-900">
-            Ready to get started?
-          </h2>
+          <h2 className="mb-2 text-xl font-semibold text-slate-900">Ready to get started?</h2>
           <p className="mb-6 text-slate-600">
             Join thousands of users who keep their bookmarks in sync.
           </p>

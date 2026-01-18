@@ -44,7 +44,7 @@ export async function signUpWithEmail(formData) {
 
   const supabase = await createClient();
   const headersList = await headers();
-  
+
   // Use NEXT_PUBLIC_APP_URL if available, otherwise construct from headers
   const origin =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -85,7 +85,7 @@ export async function signUpWithEmail(formData) {
 export async function signInWithOAuth(provider) {
   const supabase = await createClient();
   const headersList = await headers();
-  
+
   // Use NEXT_PUBLIC_APP_URL if available, otherwise construct from headers
   const origin =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -139,7 +139,7 @@ export async function resetPassword(formData) {
 
   const supabase = await createClient();
   const headersList = await headers();
-  
+
   // Use NEXT_PUBLIC_APP_URL if available, otherwise construct from headers
   const origin =
     process.env.NEXT_PUBLIC_APP_URL ||

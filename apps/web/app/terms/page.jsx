@@ -19,18 +19,21 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">1. Acceptance of Terms</h2>
             <p className="mb-4 text-slate-600">
-              By accessing or using MarkSyncr (&quot;the Service&quot;), you agree to be bound by these 
-              Terms of Service. If you do not agree to these terms, please do not use the Service.
+              By accessing or using MarkSyncr (&quot;the Service&quot;), you agree to be bound by
+              these Terms of Service. If you do not agree to these terms, please do not use the
+              Service.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="mb-4 text-2xl font-semibold text-slate-900">2. Description of Service</h2>
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">
+              2. Description of Service
+            </h2>
             <p className="mb-4 text-slate-600">
-              MarkSyncr is a browser extension and web service that allows you to synchronize 
-              your bookmarks across multiple browsers and devices. The Service supports various 
-              storage options including GitHub, Dropbox, Google Drive, local files, and our 
-              managed cloud storage.
+              MarkSyncr is a browser extension and web service that allows you to synchronize your
+              bookmarks across multiple browsers and devices. The Service supports various storage
+              options including GitHub, Dropbox, Google Drive, local files, and our managed cloud
+              storage.
             </p>
           </section>
 
@@ -49,28 +52,28 @@ export default function TermsPage() {
 
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">4. Subscription Plans</h2>
-            
+
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.1 Free Plan</h3>
             <p className="mb-4 text-slate-600">
-              The free plan allows you to sync bookmarks using your own storage providers 
-              (GitHub, Dropbox, Google Drive, or local files) at no cost.
+              The free plan allows you to sync bookmarks using your own storage providers (GitHub,
+              Dropbox, Google Drive, or local files) at no cost.
             </p>
 
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.2 Paid Plans</h3>
             <p className="mb-4 text-slate-600">
-              Paid plans (Pro and Team) provide access to MarkSyncr Cloud storage and additional 
+              Paid plans (Pro and Team) provide access to MarkSyncr Cloud storage and additional
               features. Subscription fees are billed monthly or annually as selected at signup.
             </p>
 
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.3 Billing</h3>
             <p className="mb-4 text-slate-600">
-              Payments are processed through Stripe. By subscribing to a paid plan, you authorize 
-              us to charge your payment method on a recurring basis until you cancel.
+              Payments are processed through Stripe. By subscribing to a paid plan, you authorize us
+              to charge your payment method on a recurring basis until you cancel.
             </p>
 
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.4 Cancellation</h3>
             <p className="mb-4 text-slate-600">
-              You may cancel your subscription at any time. Upon cancellation, you will retain 
+              You may cancel your subscription at any time. Upon cancellation, you will retain
               access to paid features until the end of your current billing period.
             </p>
           </section>
@@ -91,78 +94,80 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">6. Intellectual Property</h2>
             <p className="mb-4 text-slate-600">
-              The Service, including its original content, features, and functionality, is owned 
-              by MarkSyncr and is protected by international copyright, trademark, and other 
+              The Service, including its original content, features, and functionality, is owned by
+              MarkSyncr and is protected by international copyright, trademark, and other
               intellectual property laws.
             </p>
             <p className="mb-4 text-slate-600">
-              You retain ownership of your bookmark data. By using the Service, you grant us a 
-              limited license to store and process your data solely for the purpose of providing 
-              the Service.
+              You retain ownership of your bookmark data. By using the Service, you grant us a
+              limited license to store and process your data solely for the purpose of providing the
+              Service.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">7. Third-Party Services</h2>
             <p className="mb-4 text-slate-600">
-              The Service integrates with third-party services (GitHub, Dropbox, Google Drive, 
-              Stripe). Your use of these services is subject to their respective terms of service 
+              The Service integrates with third-party services (GitHub, Dropbox, Google Drive,
+              Stripe). Your use of these services is subject to their respective terms of service
               and privacy policies.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="mb-4 text-2xl font-semibold text-slate-900">8. Disclaimer of Warranties</h2>
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">
+              8. Disclaimer of Warranties
+            </h2>
             <p className="mb-4 text-slate-600">
-              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, 
-              EITHER EXPRESS OR IMPLIED. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, 
-              SECURE, OR ERROR-FREE.
+              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT
+              WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. WE DO NOT WARRANT THAT THE SERVICE
+              WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="mb-4 text-2xl font-semibold text-slate-900">9. Limitation of Liability</h2>
+            <h2 className="mb-4 text-2xl font-semibold text-slate-900">
+              9. Limitation of Liability
+            </h2>
             <p className="mb-4 text-slate-600">
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, MARKSYNCR SHALL NOT BE LIABLE FOR ANY 
-              INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING 
-              LOSS OF DATA, PROFITS, OR GOODWILL.
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, MARKSYNCR SHALL NOT BE LIABLE FOR ANY
+              INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF
+              DATA, PROFITS, OR GOODWILL.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">10. Indemnification</h2>
             <p className="mb-4 text-slate-600">
-              You agree to indemnify and hold harmless MarkSyncr and its officers, directors, 
-              employees, and agents from any claims, damages, or expenses arising from your 
-              use of the Service or violation of these Terms.
+              You agree to indemnify and hold harmless MarkSyncr and its officers, directors,
+              employees, and agents from any claims, damages, or expenses arising from your use of
+              the Service or violation of these Terms.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">11. Termination</h2>
             <p className="mb-4 text-slate-600">
-              We may terminate or suspend your account and access to the Service immediately, 
-              without prior notice, for conduct that we believe violates these Terms or is 
-              harmful to other users, us, or third parties.
+              We may terminate or suspend your account and access to the Service immediately,
+              without prior notice, for conduct that we believe violates these Terms or is harmful
+              to other users, us, or third parties.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">12. Changes to Terms</h2>
             <p className="mb-4 text-slate-600">
-              We reserve the right to modify these Terms at any time. We will notify you of 
-              significant changes by posting a notice on our website or sending you an email. 
-              Your continued use of the Service after changes constitutes acceptance of the 
-              new Terms.
+              We reserve the right to modify these Terms at any time. We will notify you of
+              significant changes by posting a notice on our website or sending you an email. Your
+              continued use of the Service after changes constitutes acceptance of the new Terms.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">13. Governing Law</h2>
             <p className="mb-4 text-slate-600">
-              These Terms shall be governed by and construed in accordance with the laws of 
-              the State of Delaware, United States, without regard to its conflict of law 
-              provisions.
+              These Terms shall be governed by and construed in accordance with the laws of the
+              State of Delaware, United States, without regard to its conflict of law provisions.
             </p>
           </section>
 

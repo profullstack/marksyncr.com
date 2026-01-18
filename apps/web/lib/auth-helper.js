@@ -22,9 +22,9 @@ export const ALLOWED_ORIGINS = [
 export function getCorsOrigin(request) {
   const origin = request.headers.get('origin');
   if (!origin) return null;
-  
+
   // Check if origin matches allowed patterns
-  if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
+  if (ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed))) {
     return origin;
   }
   return null;
@@ -47,11 +47,11 @@ export function corsHeaders(request, methods = ['GET', 'POST', 'OPTIONS']) {
 
 /**
  * Get authenticated user from Bearer token or session cookie
- * 
+ *
  * This function supports two authentication methods:
  * 1. Bearer token (for browser extensions) - sent in Authorization header
  * 2. Session cookie (for web app) - handled by Supabase SSR
- * 
+ *
  * @param {Request} request - The incoming request
  * @returns {Promise<{user: object|null, supabase: object|null}>}
  */
@@ -60,7 +60,7 @@ export async function getAuthenticatedUser(request) {
   const authHeader = request.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
-    
+
     // Create a Supabase client with the user's token
     const supabase = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -73,20 +73,26 @@ export async function getAuthenticatedUser(request) {
         },
       }
     );
-    
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
     if (!error && user) {
       return { user, supabase };
     }
   }
-  
+
   // Fall back to session cookie authentication (for web app)
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
   if (!error && user) {
     return { user, supabase };
   }
-  
+
   return { user: null, supabase: null };
 }

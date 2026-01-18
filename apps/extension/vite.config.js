@@ -39,7 +39,7 @@ function moveHtmlPlugin() {
         // Clean up the src directory
         rmSync(srcDir, { recursive: true, force: true });
       }
-    }
+    },
   };
 }
 
@@ -78,8 +78,12 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.BROWSER': JSON.stringify(browser),
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_URL || ''),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''),
-      'import.meta.env.VITE_APP_URL': JSON.stringify(env.NEXT_PUBLIC_APP_URL || 'https://marksyncr.com'),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
+        env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      ),
+      'import.meta.env.VITE_APP_URL': JSON.stringify(
+        env.NEXT_PUBLIC_APP_URL || 'https://marksyncr.com'
+      ),
     },
   };
 });

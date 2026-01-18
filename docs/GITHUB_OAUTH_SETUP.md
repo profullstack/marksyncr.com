@@ -5,6 +5,7 @@ This guide covers how to set up your MarkSyncr app on GitHub.com and implement t
 ## Overview
 
 The GitHub integration allows users to:
+
 1. Authorize the app via OAuth 2.0
 2. Auto-create a `marksyncr-bookmarks` repository
 3. Store bookmarks as a JSON file in the repository
@@ -25,11 +26,11 @@ Or: GitHub → Settings → Developer settings → OAuth Apps
 1. Click **"New OAuth App"**
 2. Fill in the application details:
 
-| Field | Value |
-|-------|-------|
-| **Application name** | `MarkSyncr` (or your preferred name) |
-| **Homepage URL** | `https://marksyncr.com` |
-| **Application description** | Bookmark sync across browsers |
+| Field                          | Value                                               |
+| ------------------------------ | --------------------------------------------------- |
+| **Application name**           | `MarkSyncr` (or your preferred name)                |
+| **Homepage URL**               | `https://marksyncr.com`                             |
+| **Application description**    | Bookmark sync across browsers                       |
 | **Authorization callback URL** | `https://marksyncr.com/api/connect/github/callback` |
 
 3. Click **"Register application"**
@@ -56,6 +57,7 @@ GITHUB_CLIENT_SECRET=your_client_secret_here
 ```
 
 For development, add a second OAuth App with:
+
 - **Authorization callback URL**: `http://localhost:3000/api/connect/github/callback`
 
 ---
@@ -109,10 +111,12 @@ const authUrl = buildAuthorizationUrl(
 ### 3.3 OAuth Scope
 
 The app requests the `repo` scope which provides:
+
 - Full control of private repositories
 - Read/write access to code, commit statuses, repository invitations, collaborators, and deployment statuses
 
 This is required to:
+
 - Create the `marksyncr-bookmarks` repository
 - Read and write the `bookmarks.json` file
 
@@ -246,20 +250,22 @@ CREATE TABLE sync_sources (
 
 ### Common Errors
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `state_mismatch` | CSRF protection triggered | User should try connecting again |
-| `invalid_token` | Token validation failed | Re-authorize the app |
-| `repo_setup_failed` | Couldn't create repository | Check GitHub permissions |
-| `db_error` | Database save failed | Check Supabase connection |
+| Error               | Cause                      | Solution                         |
+| ------------------- | -------------------------- | -------------------------------- |
+| `state_mismatch`    | CSRF protection triggered  | User should try connecting again |
+| `invalid_token`     | Token validation failed    | Re-authorize the app             |
+| `repo_setup_failed` | Couldn't create repository | Check GitHub permissions         |
+| `db_error`          | Database save failed       | Check Supabase connection        |
 
 ### Rate Limits
 
 GitHub API has rate limits:
+
 - **Authenticated requests**: 5,000 per hour
 - **Search API**: 30 per minute
 
 The sync implementation respects these limits by:
+
 - Only syncing when checksums differ
 - Batching operations where possible
 
@@ -292,39 +298,43 @@ Before deploying, verify:
 
 ## Comparison: GitHub vs Dropbox
 
-| Feature | GitHub | Dropbox |
-|---------|--------|---------|
-| File storage | Repository | App folder |
-| Version control | Git commits | Revisions |
-| Checksum field | `metadata.checksum` | `metadata.checksum` |
-| Update mode | SHA-based | Revision-based |
-| Rate limits | 5000/hour | Varies by endpoint |
-| Token expiry | No expiry | 4 hours |
-| Refresh token | No | Yes |
-| Auto-create storage | Yes (repo) | Yes (folder) |
+| Feature             | GitHub              | Dropbox             |
+| ------------------- | ------------------- | ------------------- |
+| File storage        | Repository          | App folder          |
+| Version control     | Git commits         | Revisions           |
+| Checksum field      | `metadata.checksum` | `metadata.checksum` |
+| Update mode         | SHA-based           | Revision-based      |
+| Rate limits         | 5000/hour           | Varies by endpoint  |
+| Token expiry        | No expiry           | 4 hours             |
+| Refresh token       | No                  | Yes                 |
+| Auto-create storage | Yes (repo)          | Yes (folder)        |
 
 ---
 
 ## API Routes
 
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/api/connect/github` | GET | Initiates OAuth flow |
-| `/api/connect/github/callback` | GET | Handles OAuth callback |
-| `/api/connect/github/disconnect` | POST | Disconnects GitHub |
+| Route                            | Method | Description            |
+| -------------------------------- | ------ | ---------------------- |
+| `/api/connect/github`            | GET    | Initiates OAuth flow   |
+| `/api/connect/github/callback`   | GET    | Handles OAuth callback |
+| `/api/connect/github/disconnect` | POST   | Disconnects GitHub     |
 
 ---
 
 ## Troubleshooting
 
 ### "Application suspended"
+
 Your OAuth app may have been suspended by GitHub. Check your email for notifications.
 
 ### "Redirect URI mismatch"
+
 The callback URL in your OAuth app settings must exactly match the one used in the code.
 
 ### "Bad credentials"
+
 The access token may have been revoked. User needs to reconnect.
 
 ### "Repository not found"
+
 The repository may have been deleted. Reconnecting will create a new one.

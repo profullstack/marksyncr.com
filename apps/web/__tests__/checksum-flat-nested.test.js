@@ -1,10 +1,10 @@
 /**
  * Tests to verify checksum consistency between flat array and nested format
- * 
+ *
  * The extension sends bookmarks in two formats:
  * 1. Flat array to /api/bookmarks (via flattenBookmarkTree)
  * 2. Nested format to /api/versions (via convertBrowserBookmarks)
- * 
+ *
  * Both APIs compute checksums, and they MUST match for deduplication to work.
  * If they don't match, the versions API will create duplicate entries.
  */
@@ -17,32 +17,34 @@ import crypto from 'crypto';
  */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
-  
-  return items.map(item => {
-    if (item.type === 'folder') {
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'folder' ? -1 : 1;
-    }
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -59,13 +61,13 @@ function generateChecksumFromFlat(items) {
 function extractBookmarksFromNested(data) {
   if (!data) return [];
   if (Array.isArray(data)) return data;
-  
+
   if (data.roots) {
     const bookmarks = [];
-    
+
     function extractFromNode(node, path = '', index = 0) {
       if (!node) return;
-      
+
       if (node.url) {
         bookmarks.push({
           type: 'bookmark',
@@ -76,10 +78,10 @@ function extractBookmarksFromNested(data) {
         });
         return;
       }
-      
+
       if (node.children && Array.isArray(node.children)) {
         const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
-        
+
         // Add folder entry if it has a title and is not a root
         if (node.title && path) {
           bookmarks.push({
@@ -89,13 +91,13 @@ function extractBookmarksFromNested(data) {
             index: node.index ?? index,
           });
         }
-        
+
         for (let i = 0; i < node.children.length; i++) {
           extractFromNode(node.children[i], newPath, i);
         }
       }
     }
-    
+
     for (const [rootKey, rootNode] of Object.entries(data.roots)) {
       if (rootNode && rootNode.children) {
         const rootPath = rootNode.title || rootKey;
@@ -104,10 +106,10 @@ function extractBookmarksFromNested(data) {
         }
       }
     }
-    
+
     return bookmarks;
   }
-  
+
   return [];
 }
 
@@ -130,7 +132,7 @@ function flattenBookmarkTree(tree) {
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       const nodeIndex = node.index ?? i;
-      
+
       if (node.url) {
         items.push({
           type: 'bookmark',
@@ -142,8 +144,12 @@ function flattenBookmarkTree(tree) {
           index: nodeIndex,
         });
       } else if (node.children) {
-        const folderPath = node.title ? (parentPath ? `${parentPath}/${node.title}` : node.title) : parentPath;
-        
+        const folderPath = node.title
+          ? parentPath
+            ? `${parentPath}/${node.title}`
+            : node.title
+          : parentPath;
+
         // Only add folder entry if it has a title and is not a root
         if (node.title && parentPath) {
           items.push({
@@ -155,7 +161,7 @@ function flattenBookmarkTree(tree) {
             index: nodeIndex,
           });
         }
-        
+
         traverse(node.children, folderPath);
       }
     }
@@ -221,27 +227,41 @@ function convertBrowserBookmarks(tree) {
 describe('Checksum Consistency: Flat vs Nested Format', () => {
   it('should produce same checksum from flat array and nested format for simple bookmarks', () => {
     // Simulate browser bookmark tree
-    const browserTree = [{
-      children: [
-        {
-          id: '1',
-          title: 'Bookmarks Toolbar',
-          children: [
-            { id: 'b1', url: 'https://example.com', title: 'Example', dateAdded: 1700000000000, index: 0 },
-            { id: 'b2', url: 'https://test.com', title: 'Test', dateAdded: 1700000001000, index: 1 },
-          ],
-        },
-        {
-          id: '2',
-          title: 'Other Bookmarks',
-          children: [],
-        },
-      ],
-    }];
+    const browserTree = [
+      {
+        children: [
+          {
+            id: '1',
+            title: 'Bookmarks Toolbar',
+            children: [
+              {
+                id: 'b1',
+                url: 'https://example.com',
+                title: 'Example',
+                dateAdded: 1700000000000,
+                index: 0,
+              },
+              {
+                id: 'b2',
+                url: 'https://test.com',
+                title: 'Test',
+                dateAdded: 1700000001000,
+                index: 1,
+              },
+            ],
+          },
+          {
+            id: '2',
+            title: 'Other Bookmarks',
+            children: [],
+          },
+        ],
+      },
+    ];
 
     // Get flat array (like extension's flattenBookmarkTree)
     const flatArray = flattenBookmarkTree(browserTree);
-    
+
     // Get nested format (like extension's convertBrowserBookmarks)
     const nestedFormat = convertBrowserBookmarks(browserTree);
 
@@ -251,7 +271,10 @@ describe('Checksum Consistency: Flat vs Nested Format', () => {
 
     console.log('Flat array:', JSON.stringify(flatArray, null, 2));
     console.log('Nested format:', JSON.stringify(nestedFormat, null, 2));
-    console.log('Extracted from nested:', JSON.stringify(extractBookmarksFromNested(nestedFormat), null, 2));
+    console.log(
+      'Extracted from nested:',
+      JSON.stringify(extractBookmarksFromNested(nestedFormat), null, 2)
+    );
     console.log('Flat checksum:', flatChecksum);
     console.log('Nested checksum:', nestedChecksum);
 
@@ -259,27 +282,47 @@ describe('Checksum Consistency: Flat vs Nested Format', () => {
   });
 
   it('should produce same checksum with folders', () => {
-    const browserTree = [{
-      children: [
-        {
-          id: '1',
-          title: 'Bookmarks Toolbar',
-          children: [
-            { id: 'b1', url: 'https://example.com', title: 'Example', dateAdded: 1700000000000, index: 0 },
-            {
-              id: 'f1',
-              title: 'Work',
-              dateAdded: 1700000002000,
-              index: 1,
-              children: [
-                { id: 'b3', url: 'https://work.com', title: 'Work Site', dateAdded: 1700000003000, index: 0 },
-              ],
-            },
-            { id: 'b2', url: 'https://test.com', title: 'Test', dateAdded: 1700000001000, index: 2 },
-          ],
-        },
-      ],
-    }];
+    const browserTree = [
+      {
+        children: [
+          {
+            id: '1',
+            title: 'Bookmarks Toolbar',
+            children: [
+              {
+                id: 'b1',
+                url: 'https://example.com',
+                title: 'Example',
+                dateAdded: 1700000000000,
+                index: 0,
+              },
+              {
+                id: 'f1',
+                title: 'Work',
+                dateAdded: 1700000002000,
+                index: 1,
+                children: [
+                  {
+                    id: 'b3',
+                    url: 'https://work.com',
+                    title: 'Work Site',
+                    dateAdded: 1700000003000,
+                    index: 0,
+                  },
+                ],
+              },
+              {
+                id: 'b2',
+                url: 'https://test.com',
+                title: 'Test',
+                dateAdded: 1700000001000,
+                index: 2,
+              },
+            ],
+          },
+        ],
+      },
+    ];
 
     const flatArray = flattenBookmarkTree(browserTree);
     const nestedFormat = convertBrowserBookmarks(browserTree);
@@ -288,7 +331,10 @@ describe('Checksum Consistency: Flat vs Nested Format', () => {
     const nestedChecksum = generateChecksumFromNested(nestedFormat);
 
     console.log('Flat array with folders:', JSON.stringify(flatArray, null, 2));
-    console.log('Extracted from nested with folders:', JSON.stringify(extractBookmarksFromNested(nestedFormat), null, 2));
+    console.log(
+      'Extracted from nested with folders:',
+      JSON.stringify(extractBookmarksFromNested(nestedFormat), null, 2)
+    );
     console.log('Flat checksum:', flatChecksum);
     console.log('Nested checksum:', nestedChecksum);
 
@@ -296,29 +342,45 @@ describe('Checksum Consistency: Flat vs Nested Format', () => {
   });
 
   it('should produce same checksum regardless of dateAdded differences', () => {
-    const browserTree1 = [{
-      children: [
-        {
-          id: '1',
-          title: 'Bookmarks Toolbar',
-          children: [
-            { id: 'b1', url: 'https://example.com', title: 'Example', dateAdded: 1700000000000, index: 0 },
-          ],
-        },
-      ],
-    }];
+    const browserTree1 = [
+      {
+        children: [
+          {
+            id: '1',
+            title: 'Bookmarks Toolbar',
+            children: [
+              {
+                id: 'b1',
+                url: 'https://example.com',
+                title: 'Example',
+                dateAdded: 1700000000000,
+                index: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ];
 
-    const browserTree2 = [{
-      children: [
-        {
-          id: '1',
-          title: 'Bookmarks Toolbar',
-          children: [
-            { id: 'b1', url: 'https://example.com', title: 'Example', dateAdded: 9999999999999, index: 0 },
-          ],
-        },
-      ],
-    }];
+    const browserTree2 = [
+      {
+        children: [
+          {
+            id: '1',
+            title: 'Bookmarks Toolbar',
+            children: [
+              {
+                id: 'b1',
+                url: 'https://example.com',
+                title: 'Example',
+                dateAdded: 9999999999999,
+                index: 0,
+              },
+            ],
+          },
+        ],
+      },
+    ];
 
     const flatChecksum1 = generateChecksumFromFlat(flattenBookmarkTree(browserTree1));
     const flatChecksum2 = generateChecksumFromFlat(flattenBookmarkTree(browserTree2));
@@ -327,31 +389,35 @@ describe('Checksum Consistency: Flat vs Nested Format', () => {
   });
 
   it('should detect order changes via index', () => {
-    const browserTree1 = [{
-      children: [
-        {
-          id: '1',
-          title: 'Bookmarks Toolbar',
-          children: [
-            { id: 'b1', url: 'https://example.com', title: 'Example', index: 0 },
-            { id: 'b2', url: 'https://test.com', title: 'Test', index: 1 },
-          ],
-        },
-      ],
-    }];
+    const browserTree1 = [
+      {
+        children: [
+          {
+            id: '1',
+            title: 'Bookmarks Toolbar',
+            children: [
+              { id: 'b1', url: 'https://example.com', title: 'Example', index: 0 },
+              { id: 'b2', url: 'https://test.com', title: 'Test', index: 1 },
+            ],
+          },
+        ],
+      },
+    ];
 
-    const browserTree2 = [{
-      children: [
-        {
-          id: '1',
-          title: 'Bookmarks Toolbar',
-          children: [
-            { id: 'b2', url: 'https://test.com', title: 'Test', index: 0 },
-            { id: 'b1', url: 'https://example.com', title: 'Example', index: 1 },
-          ],
-        },
-      ],
-    }];
+    const browserTree2 = [
+      {
+        children: [
+          {
+            id: '1',
+            title: 'Bookmarks Toolbar',
+            children: [
+              { id: 'b2', url: 'https://test.com', title: 'Test', index: 0 },
+              { id: 'b1', url: 'https://example.com', title: 'Example', index: 1 },
+            ],
+          },
+        ],
+      },
+    ];
 
     const flatChecksum1 = generateChecksumFromFlat(flattenBookmarkTree(browserTree1));
     const flatChecksum2 = generateChecksumFromFlat(flattenBookmarkTree(browserTree2));
@@ -366,9 +432,7 @@ describe('extractBookmarksFromNested', () => {
       roots: {
         toolbar: {
           title: 'Bookmarks Toolbar',
-          children: [
-            { type: 'bookmark', url: 'https://example.com', title: 'Example', index: 0 },
-          ],
+          children: [{ type: 'bookmark', url: 'https://example.com', title: 'Example', index: 0 }],
         },
       },
     };
@@ -389,9 +453,7 @@ describe('extractBookmarksFromNested', () => {
               type: 'folder',
               title: 'Work',
               index: 0,
-              children: [
-                { type: 'bookmark', url: 'https://work.com', title: 'Work', index: 0 },
-              ],
+              children: [{ type: 'bookmark', url: 'https://work.com', title: 'Work', index: 0 }],
             },
           ],
         },
@@ -402,14 +464,14 @@ describe('extractBookmarksFromNested', () => {
 
     // Should have folder and bookmark
     expect(extracted).toHaveLength(2);
-    
+
     // Folder should have folderPath = 'Bookmarks Toolbar' (its parent)
-    const folder = extracted.find(i => i.type === 'folder');
+    const folder = extracted.find((i) => i.type === 'folder');
     expect(folder.folderPath).toBe('Bookmarks Toolbar');
     expect(folder.title).toBe('Work');
-    
+
     // Bookmark should have folderPath = 'Bookmarks Toolbar/Work'
-    const bookmark = extracted.find(i => i.type === 'bookmark');
+    const bookmark = extracted.find((i) => i.type === 'bookmark');
     expect(bookmark.folderPath).toBe('Bookmarks Toolbar/Work');
   });
 
@@ -417,9 +479,7 @@ describe('extractBookmarksFromNested', () => {
     const nested = {
       roots: {
         toolbar: {
-          children: [
-            { type: 'bookmark', url: 'https://example.com', title: 'Example', index: 0 },
-          ],
+          children: [{ type: 'bookmark', url: 'https://example.com', title: 'Example', index: 0 }],
         },
       },
     };

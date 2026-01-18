@@ -10,28 +10,16 @@ export default function Header() {
           <img src="/logo.svg" alt="MarkSyncr" className="h-8 w-auto" />
         </Link>
         <div className="hidden items-center space-x-8 md:flex">
-          <Link
-            href="/#features"
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
+          <Link href="/#features" className="text-sm text-slate-600 hover:text-slate-900">
             Features
           </Link>
-          <Link
-            href="/#pricing"
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
+          <Link href="/#pricing" className="text-sm text-slate-600 hover:text-slate-900">
             Pricing
           </Link>
-          <Link
-            href="/docs"
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
+          <Link href="/docs" className="text-sm text-slate-600 hover:text-slate-900">
             Docs
           </Link>
-          <Link
-            href="/login"
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
+          <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900">
             Log in
           </Link>
           <Link href="/signup" className="btn-primary">

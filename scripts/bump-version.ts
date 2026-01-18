@@ -45,7 +45,7 @@ function parseVersion(version: string): VersionParts {
 
 function bumpVersion(current: string, type: BumpType): string {
   const parts = parseVersion(current);
-  
+
   switch (type) {
     case 'major':
       return `${parts.major + 1}.0.0`;
@@ -70,11 +70,11 @@ function updateFile(filePath: string, newVersion: string, dryRun: boolean): void
   const content = readFileSync(fullPath, 'utf-8');
   const json = JSON.parse(content) as { version: string };
   const oldVersion = json.version;
-  
+
   json.version = newVersion;
-  
+
   const updatedContent = JSON.stringify(json, null, 2) + '\n';
-  
+
   if (dryRun) {
     console.log(`  [DRY RUN] ${filePath}: ${oldVersion} → ${newVersion}`);
   } else {
@@ -86,8 +86,10 @@ function updateFile(filePath: string, newVersion: string, dryRun: boolean): void
 function main(): void {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
-  const bumpType = args.find((arg) => ['major', 'minor', 'patch'].includes(arg)) as BumpType | undefined;
-  
+  const bumpType = args.find((arg) => ['major', 'minor', 'patch'].includes(arg)) as
+    | BumpType
+    | undefined;
+
   if (!bumpType) {
     console.error('Usage: pnpm version:bump <major|minor|patch> [--dry-run]');
     console.error('');
@@ -98,16 +100,16 @@ function main(): void {
     console.error('  pnpm version:bump patch --dry-run  # Preview changes');
     process.exit(1);
   }
-  
+
   const currentVersion = getCurrentVersion();
   const newVersion = bumpVersion(currentVersion, bumpType);
-  
+
   console.log(`\nBumping version: ${currentVersion} → ${newVersion} (${bumpType})\n`);
-  
+
   if (dryRun) {
     console.log('DRY RUN - No files will be modified\n');
   }
-  
+
   for (const file of FILES_TO_UPDATE) {
     try {
       updateFile(file, newVersion, dryRun);
@@ -115,9 +117,9 @@ function main(): void {
       console.error(`  ✗ ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
-  
+
   console.log('');
-  
+
   if (!dryRun) {
     console.log(`✓ All files updated to version ${newVersion}`);
     console.log('\nNext steps:');

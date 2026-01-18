@@ -9,7 +9,7 @@
  *
  * Security model:
  * - Authenticates user with email/password via Supabase
- * - Creates a long-lived extension session (1 year by default)
+ * - Creates a long-lived extension session (2 years by default)
  * - Returns an extension_token that the extension stores
  * - The extension uses this token to get fresh access tokens
  *
@@ -23,8 +23,9 @@ import { NextResponse } from 'next/server';
 import { createStatelessClient, createAdminClient } from '@/lib/supabase/server';
 import { randomBytes, createHash } from 'crypto';
 
-// Extension session duration: 1 year in milliseconds
-const EXTENSION_SESSION_DURATION_MS = 365 * 24 * 60 * 60 * 1000;
+// Extension session duration: 2 years in milliseconds
+// Extensions need long-lived sessions to avoid frequent re-authentication
+const EXTENSION_SESSION_DURATION_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
 /**
  * Generate a cryptographically secure token
@@ -62,28 +63,19 @@ export async function POST(request) {
     // Validate environment variables
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       console.error('Extension login error: Missing Supabase environment variables');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error('Extension login error: Missing service role key');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
     const body = await request.json();
     const { email, password, device_id, device_name, browser } = body || {};
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
     // Step 1: Authenticate user with Supabase
@@ -102,10 +94,7 @@ export async function POST(request) {
           { status: 503 }
         );
       }
-      return NextResponse.json(
-        { error: authError.message },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: authError.message }, { status: 401 });
     }
 
     const { user, session } = authData;
@@ -119,7 +108,7 @@ export async function POST(request) {
 
     // Step 4: Store extension session in database using admin client
     const adminClient = createAdminClient();
-    
+
     const { data: sessionData, error: dbError } = await adminClient
       .from('extension_sessions')
       .insert({
@@ -137,10 +126,7 @@ export async function POST(request) {
 
     if (dbError) {
       console.error('Extension login error: Failed to create session:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to create extension session' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to create extension session' }, { status: 500 });
     }
 
     // Step 5: Return user info and extension session
@@ -166,7 +152,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Extension login error:', error);
-    
+
     // Don't expose internal error details
     if (error.message && error.message.includes('Unexpected token')) {
       return NextResponse.json(
@@ -174,10 +160,7 @@ export async function POST(request) {
         { status: 503 }
       );
     }
-    
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

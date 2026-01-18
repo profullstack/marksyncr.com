@@ -54,11 +54,41 @@ global.chrome = {
 
 // Default sources (same as in store/index.js)
 const DEFAULT_SOURCES = [
-  { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true, description: 'Sync your browser bookmarks' },
-  { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false, description: 'Sync to cloud (requires login)' },
-  { id: 'github', name: 'GitHub', type: 'github', connected: false, description: 'Sync to GitHub repository' },
-  { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false, description: 'Sync to Dropbox' },
-  { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false, description: 'Sync to Google Drive' },
+  {
+    id: 'browser-bookmarks',
+    name: 'Browser Bookmarks',
+    type: 'browser-bookmarks',
+    connected: true,
+    description: 'Sync your browser bookmarks',
+  },
+  {
+    id: 'supabase-cloud',
+    name: 'MarkSyncr Cloud',
+    type: 'supabase-cloud',
+    connected: false,
+    description: 'Sync to cloud (requires login)',
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    type: 'github',
+    connected: false,
+    description: 'Sync to GitHub repository',
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    type: 'dropbox',
+    connected: false,
+    description: 'Sync to Dropbox',
+  },
+  {
+    id: 'google-drive',
+    name: 'Google Drive',
+    type: 'google-drive',
+    connected: false,
+    description: 'Sync to Google Drive',
+  },
 ];
 
 // Mock bookmark tree
@@ -70,9 +100,7 @@ const MOCK_BOOKMARK_TREE = [
       {
         id: '1',
         title: 'Bookmarks Bar',
-        children: [
-          { id: '2', title: 'Test', url: 'https://test.com' },
-        ],
+        children: [{ id: '2', title: 'Test', url: 'https://test.com' }],
       },
     ],
   },
@@ -119,9 +147,15 @@ describe('Sources initialization race condition', () => {
       mockRuntime.sendMessage.mockImplementation(async (message) => {
         if (message.type === 'REFRESH_SOURCES') {
           // Simulate server returning connected sources
-          const updatedSources = DEFAULT_SOURCES.map(s => {
+          const updatedSources = DEFAULT_SOURCES.map((s) => {
             if (s.id === 'supabase-cloud') return { ...s, connected: true };
-            if (s.id === 'github') return { ...s, connected: true, providerUsername: 'testuser', repository: 'bookmarks' };
+            if (s.id === 'github')
+              return {
+                ...s,
+                connected: true,
+                providerUsername: 'testuser',
+                repository: 'bookmarks',
+              };
             return s;
           });
           return { success: true, sources: updatedSources };
@@ -132,7 +166,10 @@ describe('Sources initialization race condition', () => {
       // Mock API calls for checkAuth
       mockFetch.mockImplementation(async (url) => {
         if (url.includes('/api/auth/session')) {
-          return { ok: true, json: async () => ({ user: { id: 'user-1', email: 'test@test.com' } }) };
+          return {
+            ok: true,
+            json: async () => ({ user: { id: 'user-1', email: 'test@test.com' } }),
+          };
         }
         if (url.includes('/api/subscription')) {
           return { ok: true, json: async () => ({ plan: 'free', status: 'active' }) };
@@ -151,7 +188,12 @@ describe('Sources initialization race condition', () => {
       let finalSources = [...DEFAULT_SOURCES];
 
       // Simulate initialize()
-      const storedData = await mockStorage.local.get(['selectedSource', 'settings', 'lastSync', 'sources']);
+      const storedData = await mockStorage.local.get([
+        'selectedSource',
+        'settings',
+        'lastSync',
+        'sources',
+      ]);
       finalSources = storedData.sources || DEFAULT_SOURCES;
 
       // Simulate checkAuth() -> refreshSources()
@@ -161,8 +203,8 @@ describe('Sources initialization race condition', () => {
       }
 
       // ASSERTION: After initialize() returns, sources should be updated
-      const supabaseCloud = finalSources.find(s => s.id === 'supabase-cloud');
-      const github = finalSources.find(s => s.id === 'github');
+      const supabaseCloud = finalSources.find((s) => s.id === 'supabase-cloud');
+      const github = finalSources.find((s) => s.id === 'github');
 
       expect(supabaseCloud.connected).toBe(true);
       expect(github.connected).toBe(true);
@@ -175,7 +217,7 @@ describe('Sources initialization race condition', () => {
       // because refreshSources() hasn't completed yet
 
       // Setup: Stale storage has supabase-cloud disconnected
-      const staleSources = DEFAULT_SOURCES.map(s => ({ ...s })); // All disconnected except browser-bookmarks
+      const staleSources = DEFAULT_SOURCES.map((s) => ({ ...s })); // All disconnected except browser-bookmarks
 
       mockStorage.local.get.mockResolvedValue({
         sources: staleSources,
@@ -185,7 +227,7 @@ describe('Sources initialization race condition', () => {
       // Background returns updated sources with supabase-cloud connected
       mockRuntime.sendMessage.mockResolvedValue({
         success: true,
-        sources: DEFAULT_SOURCES.map(s =>
+        sources: DEFAULT_SOURCES.map((s) =>
           s.id === 'supabase-cloud' ? { ...s, connected: true } : s
         ),
       });
@@ -196,7 +238,7 @@ describe('Sources initialization race condition', () => {
       let sources = storedData.sources;
 
       // At this point, supabase-cloud is disconnected (stale)
-      expect(sources.find(s => s.id === 'supabase-cloud').connected).toBe(false);
+      expect(sources.find((s) => s.id === 'supabase-cloud').connected).toBe(false);
 
       // 2. If authenticated, refresh sources and WAIT for result
       if (storedData.session?.access_token) {
@@ -207,7 +249,7 @@ describe('Sources initialization race condition', () => {
       }
 
       // 3. NOW sources should be updated
-      expect(sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
     });
   });
 
@@ -231,7 +273,7 @@ describe('Sources initialization race condition', () => {
       // Background returns updated sources
       mockRuntime.sendMessage.mockResolvedValue({
         success: true,
-        sources: DEFAULT_SOURCES.map(s =>
+        sources: DEFAULT_SOURCES.map((s) =>
           s.id === 'supabase-cloud' ? { ...s, connected: true } : s
         ),
       });
@@ -244,7 +286,7 @@ describe('Sources initialization race condition', () => {
 
       // Sources should be updated after login
       expect(refreshResult.success).toBe(true);
-      expect(refreshResult.sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(refreshResult.sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
     });
 
     it('should update store state with refreshed sources after login', async () => {
@@ -264,14 +306,14 @@ describe('Sources initialization race condition', () => {
       setState({ isAuthenticated: true });
 
       // Simulate refreshSources updating the store
-      const updatedSources = DEFAULT_SOURCES.map(s =>
+      const updatedSources = DEFAULT_SOURCES.map((s) =>
         s.id === 'supabase-cloud' ? { ...s, connected: true } : s
       );
       setState({ sources: updatedSources });
 
       // Verify store state is updated
       expect(storeState.isAuthenticated).toBe(true);
-      expect(storeState.sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(storeState.sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
     });
   });
 
@@ -281,7 +323,7 @@ describe('Sources initialization race condition', () => {
       // Sources should show as connected immediately
 
       // Storage has session and sources (from previous refreshSources call)
-      const connectedSources = DEFAULT_SOURCES.map(s =>
+      const connectedSources = DEFAULT_SOURCES.map((s) =>
         s.id === 'supabase-cloud' ? { ...s, connected: true } : s
       );
 
@@ -302,7 +344,7 @@ describe('Sources initialization race condition', () => {
 
       // Even before refreshSources completes, sources should be correct
       // because they were persisted from the last refresh
-      expect(sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
 
       // After refresh, should still be correct
       const result = await mockRuntime.sendMessage({ type: 'REFRESH_SOURCES' });
@@ -310,13 +352,13 @@ describe('Sources initialization race condition', () => {
         sources = result.sources;
       }
 
-      expect(sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
     });
 
     it('should handle refreshSources failure gracefully', async () => {
       // If refreshSources fails, should keep existing sources from storage
 
-      const existingSources = DEFAULT_SOURCES.map(s =>
+      const existingSources = DEFAULT_SOURCES.map((s) =>
         s.id === 'supabase-cloud' ? { ...s, connected: true } : s
       );
 
@@ -343,7 +385,7 @@ describe('Sources initialization race condition', () => {
       // If refresh fails, keep existing sources
 
       // Should still show connected (from storage)
-      expect(sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
     });
   });
 
@@ -366,16 +408,16 @@ describe('Sources initialization race condition', () => {
       expect(storeState.isSourcesLoading).toBe(true);
 
       // Simulate async refresh
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Complete refresh
-      const updatedSources = DEFAULT_SOURCES.map(s =>
+      const updatedSources = DEFAULT_SOURCES.map((s) =>
         s.id === 'supabase-cloud' ? { ...s, connected: true } : s
       );
       setState({ sources: updatedSources, isSourcesLoading: false });
 
       expect(storeState.isSourcesLoading).toBe(false);
-      expect(storeState.sources.find(s => s.id === 'supabase-cloud').connected).toBe(true);
+      expect(storeState.sources.find((s) => s.id === 'supabase-cloud').connected).toBe(true);
     });
   });
 });

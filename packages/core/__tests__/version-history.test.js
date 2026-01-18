@@ -187,9 +187,7 @@ describe('VersionHistoryManager', () => {
     it('should throw if version not found', async () => {
       mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
 
-      await expect(manager.getVersion('user-1', 999)).rejects.toThrow(
-        'Version 999 not found'
-      );
+      await expect(manager.getVersion('user-1', 999)).rejects.toThrow('Version 999 not found');
     });
   });
 

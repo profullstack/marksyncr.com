@@ -4,11 +4,11 @@
  *
  * Authentication: Long-lived extension tokens
  * The extension stores an extension_token in browser.storage.local after login.
- * This token is valid for 1 year and is used to obtain short-lived access tokens.
+ * This token is valid for 2 years and is used to obtain short-lived access tokens.
  *
  * Session Flow:
  * 1. User logs in via /api/auth/extension/login
- * 2. Server returns extension_token (valid 1 year) + initial access_token
+ * 2. Server returns extension_token (valid 2 years) + initial access_token
  * 3. Extension stores extension_token and access_token
  * 4. When access_token expires, extension calls /api/auth/extension/refresh
  * 5. Server validates extension_token and returns new access_token
@@ -35,7 +35,7 @@ const getBrowserAPI = () => {
 async function getAccessToken() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return null;
-  
+
   const { session } = await browserAPI.storage.local.get('session');
   return session?.access_token || null;
 }
@@ -46,7 +46,7 @@ async function getAccessToken() {
 async function getExtensionToken() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return null;
-  
+
   const { session } = await browserAPI.storage.local.get('session');
   return session?.extension_token || null;
 }
@@ -58,7 +58,7 @@ async function getExtensionToken() {
 async function storeSession(session) {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return;
-  
+
   await browserAPI.storage.local.set({ session });
 }
 
@@ -68,7 +68,7 @@ async function storeSession(session) {
 async function clearUserData() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return;
-  
+
   await browserAPI.storage.local.remove(['user', 'isLoggedIn', 'session']);
 }
 
@@ -78,7 +78,7 @@ async function clearUserData() {
 async function storeUserData(user) {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return;
-  
+
   await browserAPI.storage.local.set({
     user,
     isLoggedIn: true,
@@ -91,22 +91,22 @@ async function storeUserData(user) {
  */
 async function apiRequest(endpoint, options = {}) {
   const token = await getAccessToken();
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
-  
+
   // Add Authorization header if we have a token
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(`${APP_URL}${endpoint}`, {
     ...options,
     headers,
   });
-  
+
   // Handle 401 - session expired, try to refresh or clear local data
   if (response.status === 401) {
     const refreshed = await tryRefreshToken();
@@ -121,7 +121,7 @@ async function apiRequest(endpoint, options = {}) {
     }
     await clearUserData();
   }
-  
+
   return response;
 }
 
@@ -129,15 +129,15 @@ async function apiRequest(endpoint, options = {}) {
  * Try to refresh the access token using the long-lived extension token
  * This is the key to maintaining persistent sessions in the extension.
  *
- * The extension_token is valid for 1 year, so users rarely need to re-login.
+ * The extension_token is valid for 2 years, so users rarely need to re-login.
  * When the access_token expires (1 hour), we use the extension_token to get a new one.
  */
 async function tryRefreshToken() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return false;
-  
+
   const { session } = await browserAPI.storage.local.get('session');
-  
+
   // First try extension token refresh (preferred for long-lived sessions)
   if (session?.extension_token) {
     try {
@@ -148,7 +148,7 @@ async function tryRefreshToken() {
         },
         body: JSON.stringify({ extension_token: session.extension_token }),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.session?.access_token) {
@@ -162,7 +162,7 @@ async function tryRefreshToken() {
           return true;
         }
       }
-      
+
       // If extension token refresh failed with 401, the session is truly expired
       // Clear data and require re-login
       if (response.status === 401) {
@@ -174,7 +174,7 @@ async function tryRefreshToken() {
       console.warn('[MarkSyncr] Extension token refresh failed:', err);
     }
   }
-  
+
   // Fallback to legacy refresh token if available (for backwards compatibility during migration)
   if (session?.refresh_token) {
     try {
@@ -185,9 +185,9 @@ async function tryRefreshToken() {
         },
         body: JSON.stringify({ refresh_token: session.refresh_token }),
       });
-      
+
       if (!response.ok) return false;
-      
+
       const data = await response.json();
       if (data.session) {
         await storeSession(data.session);
@@ -197,7 +197,7 @@ async function tryRefreshToken() {
       // Ignore legacy refresh errors
     }
   }
-  
+
   return false;
 }
 
@@ -207,13 +207,13 @@ async function tryRefreshToken() {
 function getDeviceInfo() {
   const ua = navigator.userAgent;
   let browser = 'unknown';
-  
+
   if (ua.includes('Firefox/')) browser = 'firefox';
   else if (ua.includes('Edg/')) browser = 'edge';
   else if (ua.includes('OPR/') || ua.includes('Opera/')) browser = 'opera';
   else if (ua.includes('Chrome/')) browser = 'chrome';
   else if (ua.includes('Safari/')) browser = 'safari';
-  
+
   return {
     browser,
     device_name: `${browser.charAt(0).toUpperCase() + browser.slice(1)} Extension`,
@@ -227,7 +227,7 @@ function getDeviceInfo() {
  */
 export async function signInWithEmail(email, password) {
   const deviceInfo = getDeviceInfo();
-  
+
   // Get or generate device ID for this browser instance
   const browserAPI = getBrowserAPI();
   let deviceId = null;
@@ -240,7 +240,7 @@ export async function signInWithEmail(email, password) {
       await browserAPI.storage.local.set({ deviceId });
     }
   }
-  
+
   // Use extension-specific login endpoint for long-lived sessions
   const response = await fetch(`${APP_URL}/api/auth/extension/login`, {
     method: 'POST',
@@ -255,33 +255,35 @@ export async function signInWithEmail(email, password) {
       browser: deviceInfo.browser,
     }),
   });
-  
+
   // Check if response is JSON before parsing
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
     const text = await response.text();
     console.error('Login API returned non-JSON response:', text.substring(0, 200));
-    throw new Error(`Server error: Expected JSON response but got ${contentType || 'unknown content type'}. The API may be unavailable.`);
+    throw new Error(
+      `Server error: Expected JSON response but got ${contentType || 'unknown content type'}. The API may be unavailable.`
+    );
   }
-  
+
   const data = await response.json();
-  
+
   if (!response.ok) {
     throw new Error(data.error || 'Login failed');
   }
-  
+
   // Store session tokens for authenticated requests
   // Extension sessions include both extension_token (long-lived) and access_token (short-lived)
   if (data.session) {
     await storeSession(data.session);
     console.log('[MarkSyncr] Extension session stored, expires:', data.session.expires_at);
   }
-  
+
   // Store user info locally for quick access
   if (data.user) {
     await storeUserData(data.user);
   }
-  
+
   return data;
 }
 
@@ -296,31 +298,33 @@ export async function signUpWithEmail(email, password) {
     },
     body: JSON.stringify({ email, password }),
   });
-  
+
   // Check if response is JSON before parsing
   const contentType = response.headers.get('content-type');
   if (!contentType || !contentType.includes('application/json')) {
     const text = await response.text();
     console.error('Signup API returned non-JSON response:', text.substring(0, 200));
-    throw new Error(`Server error: Expected JSON response but got ${contentType || 'unknown content type'}. The API may be unavailable.`);
+    throw new Error(
+      `Server error: Expected JSON response but got ${contentType || 'unknown content type'}. The API may be unavailable.`
+    );
   }
-  
+
   const data = await response.json();
-  
+
   if (!response.ok) {
     throw new Error(data.error || 'Signup failed');
   }
-  
+
   // Store session tokens if returned
   if (data.session) {
     await storeSession(data.session);
   }
-  
+
   // Store user info locally
   if (data.user) {
     await storeUserData(data.user);
   }
-  
+
   return data;
 }
 
@@ -334,7 +338,7 @@ export async function signOut() {
   } catch (err) {
     console.warn('Logout API call failed:', err);
   }
-  
+
   // Always clear local user data
   await clearUserData();
 }
@@ -347,11 +351,11 @@ export async function signOut() {
 export async function getSession() {
   try {
     const response = await apiRequest('/api/auth/session');
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     const data = await response.json();
     // The session endpoint returns { user: {...} } if authenticated
     // Return the user object as a truthy session indicator
@@ -368,26 +372,26 @@ export async function getSession() {
 export async function getUser() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return null;
-  
+
   // First check local storage for cached user
   const { user, isLoggedIn } = await browserAPI.storage.local.get(['user', 'isLoggedIn']);
   if (user && isLoggedIn) return user;
-  
+
   // Fetch from API (will use session cookie)
   try {
     const response = await apiRequest('/api/auth/session');
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     const data = await response.json();
-    
+
     // Cache user info
     if (data.user) {
       await storeUserData(data.user);
     }
-    
+
     return data.user;
   } catch (err) {
     console.error('Failed to get user:', err);
@@ -401,10 +405,10 @@ export async function getUser() {
 export async function isLoggedIn() {
   const browserAPI = getBrowserAPI();
   if (!browserAPI) return false;
-  
+
   const { isLoggedIn } = await browserAPI.storage.local.get('isLoggedIn');
   if (!isLoggedIn) return false;
-  
+
   // Verify with server
   try {
     const response = await apiRequest('/api/auth/session');
@@ -420,11 +424,11 @@ export async function isLoggedIn() {
 export async function fetchSubscription() {
   try {
     const response = await apiRequest('/api/subscription');
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to fetch subscription:', err);
@@ -438,11 +442,11 @@ export async function fetchSubscription() {
 export async function fetchCloudSettings() {
   try {
     const response = await apiRequest('/api/settings');
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to fetch cloud settings:', err);
@@ -459,7 +463,7 @@ export async function saveCloudSettings(settings) {
       method: 'PUT',
       body: JSON.stringify(settings),
     });
-    
+
     return response.ok;
   } catch (err) {
     console.error('Failed to save cloud settings:', err);
@@ -480,12 +484,12 @@ export async function saveBookmarkVersion(bookmarkData, sourceType, deviceName) 
         deviceName,
       }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to save version');
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to save bookmark version:', err);
@@ -499,11 +503,11 @@ export async function saveBookmarkVersion(bookmarkData, sourceType, deviceName) 
 export async function fetchVersionHistory(limit = 20, offset = 0) {
   try {
     const response = await apiRequest(`/api/versions?limit=${limit}&offset=${offset}`);
-    
+
     if (!response.ok) {
       return { versions: [], retentionLimit: 5 };
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to fetch version history:', err);
@@ -517,11 +521,11 @@ export async function fetchVersionHistory(limit = 20, offset = 0) {
 export async function fetchSyncSources() {
   try {
     const response = await apiRequest('/api/sources');
-    
+
     if (!response.ok) {
       return [];
     }
-    
+
     const data = await response.json();
     return data.sources || [];
   } catch (err) {
@@ -537,16 +541,16 @@ export async function fetchSyncSources() {
  */
 export function getOAuthConnectUrl(provider) {
   const providerMap = {
-    'github': '/api/connect/github',
-    'dropbox': '/api/connect/dropbox',
+    github: '/api/connect/github',
+    dropbox: '/api/connect/dropbox',
     'google-drive': '/api/connect/google',
   };
-  
+
   const endpoint = providerMap[provider];
   if (!endpoint) {
     throw new Error(`Unknown provider: ${provider}`);
   }
-  
+
   return `${APP_URL}${endpoint}`;
 }
 
@@ -556,11 +560,11 @@ export function getOAuthConnectUrl(provider) {
 export async function fetchTags() {
   try {
     const response = await apiRequest('/api/tags');
-    
+
     if (!response.ok) {
       return [];
     }
-    
+
     const data = await response.json();
     return data.tags || [];
   } catch (err) {
@@ -575,11 +579,11 @@ export async function fetchTags() {
 export async function fetchBookmarks() {
   try {
     const response = await apiRequest('/api/bookmarks');
-    
+
     if (!response.ok) {
       return { bookmarks: [], count: 0 };
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to fetch bookmarks:', err);
@@ -596,12 +600,12 @@ export async function syncBookmarks(bookmarks, source = 'browser') {
       method: 'POST',
       body: JSON.stringify({ bookmarks, source }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to sync bookmarks');
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to sync bookmarks:', err);
@@ -614,15 +618,16 @@ export async function syncBookmarks(bookmarks, source = 'browser') {
  */
 export async function deleteBookmark(urlOrId) {
   try {
-    const body = typeof urlOrId === 'string' && urlOrId.startsWith('http')
-      ? { url: urlOrId }
-      : { id: urlOrId };
-    
+    const body =
+      typeof urlOrId === 'string' && urlOrId.startsWith('http')
+        ? { url: urlOrId }
+        : { id: urlOrId };
+
     const response = await apiRequest('/api/bookmarks', {
       method: 'DELETE',
       body: JSON.stringify(body),
     });
-    
+
     return response.ok;
   } catch (err) {
     console.error('Failed to delete bookmark:', err);
@@ -641,12 +646,12 @@ export async function deleteCloudData() {
     const response = await apiRequest('/api/bookmarks/all', {
       method: 'DELETE',
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to delete cloud data');
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('Failed to delete cloud data:', err);
@@ -663,11 +668,11 @@ export async function getBrowserBookmarks() {
     console.warn('Browser bookmarks API not available');
     return [];
   }
-  
+
   try {
     const tree = await browserAPI.bookmarks.getTree();
     const bookmarks = [];
-    
+
     function processNode(node, path = '') {
       if (node.url) {
         bookmarks.push({
@@ -678,7 +683,7 @@ export async function getBrowserBookmarks() {
           dateAdded: node.dateAdded,
         });
       }
-      
+
       if (node.children) {
         const newPath = node.title ? (path ? `${path}/${node.title}` : node.title) : path;
         for (const child of node.children) {
@@ -686,11 +691,11 @@ export async function getBrowserBookmarks() {
         }
       }
     }
-    
+
     for (const root of tree) {
       processNode(root);
     }
-    
+
     return bookmarks;
   } catch (err) {
     console.error('Failed to get browser bookmarks:', err);

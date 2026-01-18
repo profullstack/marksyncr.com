@@ -37,7 +37,7 @@ export default function HistoryPage() {
         setLoading(true);
         setOffset(0);
       }
-      
+
       const currentOffset = loadMore ? offset : 0;
       const response = await fetch(`/api/versions?limit=${PAGE_SIZE}&offset=${currentOffset}`);
       const data = await response.json();
@@ -47,11 +47,11 @@ export default function HistoryPage() {
       }
 
       if (loadMore) {
-        setVersions(prev => [...prev, ...data.versions]);
+        setVersions((prev) => [...prev, ...data.versions]);
       } else {
         setVersions(data.versions);
       }
-      
+
       setRetentionLimit(data.retentionLimit);
       setHasMore(data.versions.length === PAGE_SIZE);
       setOffset(currentOffset + data.versions.length);
@@ -87,18 +87,25 @@ export default function HistoryPage() {
     }
   }, []);
 
-  const handleViewDetails = useCallback((version) => {
-    if (selectedVersion === version) {
-      setSelectedVersion(null);
-      setVersionData(null);
-    } else {
-      setSelectedVersion(version);
-      fetchVersionData(version);
-    }
-  }, [selectedVersion, fetchVersionData]);
+  const handleViewDetails = useCallback(
+    (version) => {
+      if (selectedVersion === version) {
+        setSelectedVersion(null);
+        setVersionData(null);
+      } else {
+        setSelectedVersion(version);
+        fetchVersionData(version);
+      }
+    },
+    [selectedVersion, fetchVersionData]
+  );
 
   const handleRollback = async (version) => {
-    if (!confirm(`Are you sure you want to rollback to version ${version}? This will create a new version with the old data.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to rollback to version ${version}? This will create a new version with the old data.`
+      )
+    ) {
       return;
     }
 
@@ -116,8 +123,10 @@ export default function HistoryPage() {
         throw new Error(data.error || 'Failed to rollback');
       }
 
-      setRollbackSuccess(`Successfully rolled back to version ${version}. New version: ${data.newVersion.version}`);
-      
+      setRollbackSuccess(
+        `Successfully rolled back to version ${version}. New version: ${data.newVersion.version}`
+      );
+
       // Refresh the version list
       await fetchVersionHistory();
     } catch (err) {
@@ -128,7 +137,7 @@ export default function HistoryPage() {
   };
 
   const toggleFolder = (folderId) => {
-    setExpandedFolders(prev => {
+    setExpandedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(folderId)) {
         next.delete(folderId);
@@ -165,7 +174,7 @@ export default function HistoryPage() {
 
   const getBrowserIcon = (sourceType) => {
     const type = sourceType?.toLowerCase();
-    
+
     // Browser types use Image component with SVG files
     if (['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave'].includes(type)) {
       return (
@@ -178,7 +187,7 @@ export default function HistoryPage() {
         />
       );
     }
-    
+
     // Non-browser types use emojis
     switch (type) {
       case 'vivaldi':
@@ -228,13 +237,15 @@ export default function HistoryPage() {
   // Filter bookmarks based on search query
   const filterBookmarks = (items, query) => {
     if (!query || !items) return items;
-    
+
     const lowerQuery = query.toLowerCase();
-    
-    return items.filter(item => {
+
+    return items.filter((item) => {
       if (item.type === 'bookmark') {
-        return item.title?.toLowerCase().includes(lowerQuery) || 
-               item.url?.toLowerCase().includes(lowerQuery);
+        return (
+          item.title?.toLowerCase().includes(lowerQuery) ||
+          item.url?.toLowerCase().includes(lowerQuery)
+        );
       }
       if (item.type === 'folder' && item.children) {
         const filteredChildren = filterBookmarks(item.children, query);
@@ -268,9 +279,7 @@ export default function HistoryPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Version History</h1>
-            <p className="text-gray-600 mt-1">
-              View and restore previous bookmark versions
-            </p>
+            <p className="text-gray-600 mt-1">View and restore previous bookmark versions</p>
           </div>
           <Link
             href="/dashboard"
@@ -287,7 +296,7 @@ export default function HistoryPage() {
             <div>
               <p className="text-blue-800 font-medium">Version Retention</p>
               <p className="text-blue-700 text-sm">
-                Your plan keeps the last {retentionLimit} versions. 
+                Your plan keeps the last {retentionLimit} versions.
                 {retentionLimit < 30 && (
                   <Link href="/pricing" className="underline ml-1">
                     Upgrade to Pro for 30 days of history
@@ -314,7 +323,7 @@ export default function HistoryPage() {
             <div className="flex items-center gap-3">
               <span className="text-red-500 text-xl">⚠️</span>
               <p className="text-red-800">{error}</p>
-              <button 
+              <button
                 onClick={() => setError(null)}
                 className="ml-auto text-red-600 hover:text-red-800"
               >
@@ -367,9 +376,7 @@ export default function HistoryPage() {
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                           <span>📚 {version.bookmarkCount} bookmarks</span>
                           <span>📁 {version.folderCount} folders</span>
-                          {version.deviceName && (
-                            <span>💻 {version.deviceName}</span>
-                          )}
+                          {version.deviceName && <span>💻 {version.deviceName}</span>}
                         </div>
                         <p className="text-sm text-gray-600 mt-2">
                           {getChangeSummaryText(version.changeSummary)}
@@ -431,10 +438,11 @@ export default function HistoryPage() {
                             {versionData.bookmarkData.roots && (
                               <>
                                 <BookmarkFolder
-                                  folder={{ 
-                                    type: 'folder', 
-                                    title: 'Bookmarks Toolbar', 
-                                    children: versionData.bookmarkData.roots.toolbar?.children || []
+                                  folder={{
+                                    type: 'folder',
+                                    title: 'Bookmarks Toolbar',
+                                    children:
+                                      versionData.bookmarkData.roots.toolbar?.children || [],
                                   }}
                                   folderId="toolbar"
                                   expandedFolders={expandedFolders}
@@ -444,10 +452,10 @@ export default function HistoryPage() {
                                   level={0}
                                 />
                                 <BookmarkFolder
-                                  folder={{ 
-                                    type: 'folder', 
-                                    title: 'Bookmarks Menu', 
-                                    children: versionData.bookmarkData.roots.menu?.children || []
+                                  folder={{
+                                    type: 'folder',
+                                    title: 'Bookmarks Menu',
+                                    children: versionData.bookmarkData.roots.menu?.children || [],
                                   }}
                                   folderId="menu"
                                   expandedFolders={expandedFolders}
@@ -457,10 +465,10 @@ export default function HistoryPage() {
                                   level={0}
                                 />
                                 <BookmarkFolder
-                                  folder={{ 
-                                    type: 'folder', 
-                                    title: 'Other Bookmarks', 
-                                    children: versionData.bookmarkData.roots.other?.children || []
+                                  folder={{
+                                    type: 'folder',
+                                    title: 'Other Bookmarks',
+                                    children: versionData.bookmarkData.roots.other?.children || [],
                                   }}
                                   folderId="other"
                                   expandedFolders={expandedFolders}
@@ -529,14 +537,22 @@ export default function HistoryPage() {
 /**
  * Bookmark Folder Component
  */
-function BookmarkFolder({ folder, folderId, expandedFolders, toggleFolder, searchQuery, filterBookmarks, level }) {
+function BookmarkFolder({
+  folder,
+  folderId,
+  expandedFolders,
+  toggleFolder,
+  searchQuery,
+  filterBookmarks,
+  level,
+}) {
   const isExpanded = expandedFolders.has(folderId);
-  const filteredChildren = searchQuery 
-    ? filterBookmarks(folder.children, searchQuery) 
+  const filteredChildren = searchQuery
+    ? filterBookmarks(folder.children, searchQuery)
     : folder.children;
-  
+
   const hasChildren = filteredChildren && filteredChildren.length > 0;
-  
+
   return (
     <div className={level > 0 ? 'border-l border-gray-200 ml-4' : ''}>
       <button
@@ -544,21 +560,17 @@ function BookmarkFolder({ folder, folderId, expandedFolders, toggleFolder, searc
         className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-50 text-left"
         style={{ paddingLeft: `${level * 16 + 16}px` }}
       >
-        <span className="text-gray-400">
-          {hasChildren ? (isExpanded ? '▼' : '▶') : '•'}
-        </span>
+        <span className="text-gray-400">{hasChildren ? (isExpanded ? '▼' : '▶') : '•'}</span>
         <span className="text-yellow-500">📁</span>
         <span className="font-medium text-gray-900">{folder.title || 'Untitled Folder'}</span>
-        <span className="text-gray-400 text-sm ml-auto">
-          {filteredChildren?.length || 0} items
-        </span>
+        <span className="text-gray-400 text-sm ml-auto">{filteredChildren?.length || 0} items</span>
       </button>
-      
+
       {isExpanded && hasChildren && (
         <div>
           {filteredChildren.map((item, index) => {
             const itemId = `${folderId}-${index}`;
-            
+
             if (item.type === 'folder') {
               return (
                 <BookmarkFolder
@@ -573,14 +585,8 @@ function BookmarkFolder({ folder, folderId, expandedFolders, toggleFolder, searc
                 />
               );
             }
-            
-            return (
-              <BookmarkItem
-                key={itemId}
-                bookmark={item}
-                level={level + 1}
-              />
-            );
+
+            return <BookmarkItem key={itemId} bookmark={item} level={level + 1} />;
           })}
         </div>
       )}
@@ -612,11 +618,13 @@ function BookmarkItem({ bookmark, level }) {
       style={{ paddingLeft: `${level * 16 + 32}px` }}
     >
       {faviconUrl ? (
-        <img 
-          src={faviconUrl} 
-          alt="" 
+        <img
+          src={faviconUrl}
+          alt=""
           className="w-4 h-4"
-          onError={(e) => { e.target.style.display = 'none'; }}
+          onError={(e) => {
+            e.target.style.display = 'none';
+          }}
         />
       ) : (
         <span className="text-blue-500">🔗</span>

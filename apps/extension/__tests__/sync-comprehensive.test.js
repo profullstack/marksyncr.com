@@ -83,28 +83,30 @@ Object.defineProperty(global, 'navigator', {
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
 
-  return items.map(item => {
-    if (item.type === 'folder') {
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -134,7 +136,8 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
   const localFolder = normalizeFolderPath(localBm.folderPath);
   if (cloudFolder !== localFolder) return true;
 
-  if (cloudBm.index !== undefined && localBm.index !== undefined && cloudBm.index !== localBm.index) return true;
+  if (cloudBm.index !== undefined && localBm.index !== undefined && cloudBm.index !== localBm.index)
+    return true;
 
   return false;
 }
@@ -143,7 +146,7 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
  * Categorize cloud bookmarks into those to add vs update
  */
 function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
-  const localByUrl = new Map(localBookmarks.filter(b => b.url).map(b => [b.url, b]));
+  const localByUrl = new Map(localBookmarks.filter((b) => b.url).map((b) => [b.url, b]));
 
   const toAdd = [];
   const toUpdate = [];
@@ -151,7 +154,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
   for (const cloudBm of cloudBookmarks) {
     if (!cloudBm.url) continue;
 
-    const tombstone = tombstones.find(t => t.url === cloudBm.url);
+    const tombstone = tombstones.find((t) => t.url === cloudBm.url);
     if (tombstone) {
       const bookmarkDate = cloudBm.dateAdded || 0;
       const tombstoneDate = tombstone.deletedAt || 0;
@@ -183,9 +186,9 @@ function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime)
     return [];
   }
 
-  const localTombstoneUrls = new Set(localTombstones.map(t => t.url));
+  const localTombstoneUrls = new Set(localTombstones.map((t) => t.url));
 
-  return cloudTombstones.filter(tombstone => {
+  return cloudTombstones.filter((tombstone) => {
     if (localTombstoneUrls.has(tombstone.url)) {
       return true;
     }
@@ -238,7 +241,11 @@ function flattenBookmarkTree(tree) {
           index: nodeIndex,
         });
       } else if (node.children) {
-        const folderPath = node.title ? (parentPath ? `${parentPath}/${node.title}` : node.title) : parentPath;
+        const folderPath = node.title
+          ? parentPath
+            ? `${parentPath}/${node.title}`
+            : node.title
+          : parentPath;
 
         if (node.title && parentPath) {
           items.push({
@@ -280,7 +287,14 @@ describe('Sync Comprehensive Tests', () => {
   describe('normalizeItemsForChecksum', () => {
     it('should normalize bookmarks with consistent field extraction', () => {
       const items = [
-        { url: 'https://a.com', title: 'A', folderPath: 'Work', index: 0, dateAdded: 123, extra: 'ignore' },
+        {
+          url: 'https://a.com',
+          title: 'A',
+          folderPath: 'Work',
+          index: 0,
+          dateAdded: 123,
+          extra: 'ignore',
+        },
         { url: 'https://b.com', title: 'B', folderPath: 'Work', index: 1, randomField: true },
       ];
 
@@ -343,9 +357,7 @@ describe('Sync Comprehensive Tests', () => {
     });
 
     it('should handle folder_path alias (snake_case)', () => {
-      const items = [
-        { url: 'https://a.com', title: 'A', folder_path: 'Work', index: 0 },
-      ];
+      const items = [{ url: 'https://a.com', title: 'A', folder_path: 'Work', index: 0 }];
 
       const normalized = normalizeItemsForChecksum(items);
 
@@ -363,9 +375,7 @@ describe('Sync Comprehensive Tests', () => {
     });
 
     it('should default missing index to 0', () => {
-      const items = [
-        { url: 'https://a.com', title: 'A', folderPath: 'Work' },
-      ];
+      const items = [{ url: 'https://a.com', title: 'A', folderPath: 'Work' }];
 
       const normalized = normalizeItemsForChecksum(items);
 
@@ -441,7 +451,9 @@ describe('Sync Comprehensive Tests', () => {
     });
 
     it('should handle deeply nested paths', () => {
-      expect(normalizeFolderPath('Bookmarks Bar/Work/Projects/Active/2024')).toBe('toolbar/Work/Projects/Active/2024');
+      expect(normalizeFolderPath('Bookmarks Bar/Work/Projects/Active/2024')).toBe(
+        'toolbar/Work/Projects/Active/2024'
+      );
     });
 
     it('should handle empty/null/undefined', () => {
@@ -465,36 +477,76 @@ describe('Sync Comprehensive Tests', () => {
   // ==========================================================================
   describe('bookmarkNeedsUpdate', () => {
     it('should detect title change', () => {
-      const cloud = { url: 'https://a.com', title: 'New Title', folderPath: 'toolbar/Work', index: 0 };
-      const local = { url: 'https://a.com', title: 'Old Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
+      const cloud = {
+        url: 'https://a.com',
+        title: 'New Title',
+        folderPath: 'toolbar/Work',
+        index: 0,
+      };
+      const local = {
+        url: 'https://a.com',
+        title: 'Old Title',
+        folderPath: 'Bookmarks Bar/Work',
+        index: 0,
+      };
 
       expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
     });
 
     it('should detect folder change (after normalization)', () => {
-      const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'toolbar/Personal', index: 0 };
-      const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
+      const cloud = {
+        url: 'https://a.com',
+        title: 'Title',
+        folderPath: 'toolbar/Personal',
+        index: 0,
+      };
+      const local = {
+        url: 'https://a.com',
+        title: 'Title',
+        folderPath: 'Bookmarks Bar/Work',
+        index: 0,
+      };
 
       expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
     });
 
     it('should detect index change', () => {
       const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'toolbar/Work', index: 5 };
-      const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
+      const local = {
+        url: 'https://a.com',
+        title: 'Title',
+        folderPath: 'Bookmarks Bar/Work',
+        index: 0,
+      };
 
       expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
     });
 
     it('should NOT detect change when only root folder name differs', () => {
-      const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Toolbar/Work', index: 0 };
-      const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
+      const cloud = {
+        url: 'https://a.com',
+        title: 'Title',
+        folderPath: 'Bookmarks Toolbar/Work',
+        index: 0,
+      };
+      const local = {
+        url: 'https://a.com',
+        title: 'Title',
+        folderPath: 'Bookmarks Bar/Work',
+        index: 0,
+      };
 
       expect(bookmarkNeedsUpdate(cloud, local)).toBe(false);
     });
 
     it('should NOT detect change when everything matches', () => {
       const cloud = { url: 'https://a.com', title: 'Title', folderPath: 'toolbar/Work', index: 0 };
-      const local = { url: 'https://a.com', title: 'Title', folderPath: 'Bookmarks Bar/Work', index: 0 };
+      const local = {
+        url: 'https://a.com',
+        title: 'Title',
+        folderPath: 'Bookmarks Bar/Work',
+        index: 0,
+      };
 
       expect(bookmarkNeedsUpdate(cloud, local)).toBe(false);
     });
@@ -508,7 +560,12 @@ describe('Sync Comprehensive Tests', () => {
 
     it('should treat null/undefined titles as empty', () => {
       const cloud = { url: 'https://a.com', title: null, folderPath: 'toolbar', index: 0 };
-      const local = { url: 'https://a.com', title: undefined, folderPath: 'Bookmarks Bar', index: 0 };
+      const local = {
+        url: 'https://a.com',
+        title: undefined,
+        folderPath: 'Bookmarks Bar',
+        index: 0,
+      };
 
       expect(bookmarkNeedsUpdate(cloud, local)).toBe(false);
     });
@@ -519,15 +576,17 @@ describe('Sync Comprehensive Tests', () => {
   // ==========================================================================
   describe('categorizeCloudBookmarks', () => {
     it('should categorize new bookmarks to add', () => {
-      const cloudBookmarks = [
-        { url: 'https://new.com', title: 'New', folderPath: 'Work' },
-      ];
+      const cloudBookmarks = [{ url: 'https://new.com', title: 'New', folderPath: 'Work' }];
       const localBookmarks = [
         { url: 'https://existing.com', title: 'Existing', folderPath: 'Work' },
       ];
       const tombstones = [];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(1);
       expect(toAdd[0].url).toBe('https://new.com');
@@ -543,7 +602,11 @@ describe('Sync Comprehensive Tests', () => {
       ];
       const tombstones = [];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(0);
       expect(toUpdate).toHaveLength(1);
@@ -560,7 +623,11 @@ describe('Sync Comprehensive Tests', () => {
       ];
       const tombstones = [];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(0);
       expect(toUpdate).toHaveLength(0);
@@ -575,7 +642,11 @@ describe('Sync Comprehensive Tests', () => {
         { url: 'https://deleted.com', deletedAt: 2000 }, // Tombstone is newer
       ];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(0);
       expect(toUpdate).toHaveLength(0);
@@ -590,7 +661,11 @@ describe('Sync Comprehensive Tests', () => {
         { url: 'https://readded.com', deletedAt: 1000 }, // Bookmark is newer
       ];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(1);
       expect(toAdd[0].url).toBe('https://readded.com');
@@ -604,7 +679,11 @@ describe('Sync Comprehensive Tests', () => {
       const localBookmarks = [];
       const tombstones = [];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(1);
       expect(toAdd[0].url).toBe('https://a.com');
@@ -619,7 +698,11 @@ describe('Sync Comprehensive Tests', () => {
         { url: 'https://no-date.com', deletedAt: 1 }, // Tombstone is newer than 0
       ];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(0);
     });
@@ -633,7 +716,11 @@ describe('Sync Comprehensive Tests', () => {
         { url: 'https://a.com' }, // No deletedAt, treated as 0
       ];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(1); // Bookmark dateAdded (1) > tombstone deletedAt (0)
     });
@@ -646,14 +733,21 @@ describe('Sync Comprehensive Tests', () => {
         { url: 'https://tombstoned.com', title: 'Tombstoned', folderPath: 'Work', dateAdded: 1000 },
       ];
       const localBookmarks = [
-        { url: 'https://update.com', title: 'Local Update', folderPath: 'Bookmarks Bar/Work', index: 0 },
+        {
+          url: 'https://update.com',
+          title: 'Local Update',
+          folderPath: 'Bookmarks Bar/Work',
+          index: 0,
+        },
         { url: 'https://same.com', title: 'Same', folderPath: 'Bookmarks Bar/Work', index: 0 },
       ];
-      const tombstones = [
-        { url: 'https://tombstoned.com', deletedAt: 2000 },
-      ];
+      const tombstones = [{ url: 'https://tombstoned.com', deletedAt: 2000 }];
 
-      const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+      const { toAdd, toUpdate } = categorizeCloudBookmarks(
+        cloudBookmarks,
+        localBookmarks,
+        tombstones
+      );
 
       expect(toAdd).toHaveLength(1);
       expect(toAdd[0].url).toBe('https://new.com');
@@ -718,17 +812,15 @@ describe('Sync Comprehensive Tests', () => {
         { url: 'https://new-delete.com', deletedAt: 2000 }, // After last sync
         { url: 'https://stale.com', deletedAt: 300 }, // Stale, before sync, no local
       ];
-      const localTombstones = [
-        { url: 'https://local-known.com', deletedAt: 400 },
-      ];
+      const localTombstones = [{ url: 'https://local-known.com', deletedAt: 400 }];
       const lastSyncTime = 1000;
 
       const result = filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime);
 
       expect(result).toHaveLength(2);
-      expect(result.map(t => t.url)).toContain('https://local-known.com');
-      expect(result.map(t => t.url)).toContain('https://new-delete.com');
-      expect(result.map(t => t.url)).not.toContain('https://stale.com');
+      expect(result.map((t) => t.url)).toContain('https://local-known.com');
+      expect(result.map((t) => t.url)).toContain('https://new-delete.com');
+      expect(result.map((t) => t.url)).not.toContain('https://stale.com');
     });
 
     it('should handle edge case: deletedAt exactly equals lastSyncTime', () => {
@@ -754,8 +846,8 @@ describe('Sync Comprehensive Tests', () => {
       const merged = mergeTombstones(local, cloud);
 
       expect(merged).toHaveLength(2);
-      expect(merged.find(t => t.url === 'https://local.com')).toBeDefined();
-      expect(merged.find(t => t.url === 'https://cloud.com')).toBeDefined();
+      expect(merged.find((t) => t.url === 'https://local.com')).toBeDefined();
+      expect(merged.find((t) => t.url === 'https://cloud.com')).toBeDefined();
     });
 
     it('should keep newest deletedAt for same URL', () => {
@@ -832,9 +924,7 @@ describe('Sync Comprehensive Tests', () => {
             {
               id: 'folder1',
               title: 'Work',
-              children: [
-                { id: 'b1', url: 'https://a.com', title: 'A', index: 0 },
-              ],
+              children: [{ id: 'b1', url: 'https://a.com', title: 'A', index: 0 }],
             },
           ],
         },
@@ -859,9 +949,7 @@ describe('Sync Comprehensive Tests', () => {
                   id: 'folder1',
                   title: 'Work',
                   index: 0,
-                  children: [
-                    { id: 'b1', url: 'https://a.com', title: 'A', index: 0 },
-                  ],
+                  children: [{ id: 'b1', url: 'https://a.com', title: 'A', index: 0 }],
                 },
               ],
             },
@@ -871,7 +959,7 @@ describe('Sync Comprehensive Tests', () => {
 
       const flat = flattenBookmarkTree(tree);
 
-      const folderEntry = flat.find(i => i.type === 'folder');
+      const folderEntry = flat.find((i) => i.type === 'folder');
       expect(folderEntry).toBeDefined();
       expect(folderEntry.title).toBe('Work');
       expect(folderEntry.folderPath).toBe('Bookmarks Toolbar');
@@ -927,9 +1015,7 @@ describe('Sync Comprehensive Tests', () => {
                     {
                       id: 'f3',
                       title: 'Level3',
-                      children: [
-                        { id: 'b1', url: 'https://deep.com', title: 'Deep', index: 0 },
-                      ],
+                      children: [{ id: 'b1', url: 'https://deep.com', title: 'Deep', index: 0 }],
                     },
                   ],
                 },
@@ -941,7 +1027,7 @@ describe('Sync Comprehensive Tests', () => {
 
       const flat = flattenBookmarkTree(tree);
 
-      const bookmark = flat.find(i => i.url === 'https://deep.com');
+      const bookmark = flat.find((i) => i.url === 'https://deep.com');
       expect(bookmark.folderPath).toBe('Level1/Level2/Level3');
     });
 
@@ -995,12 +1081,8 @@ describe('Sync Comprehensive Tests', () => {
 
     describe('URL edge cases', () => {
       it('should treat URLs with different protocols as different', () => {
-        const cloudBookmarks = [
-          { url: 'https://example.com', title: 'HTTPS', folderPath: 'Work' },
-        ];
-        const localBookmarks = [
-          { url: 'http://example.com', title: 'HTTP', folderPath: 'Work' },
-        ];
+        const cloudBookmarks = [{ url: 'https://example.com', title: 'HTTPS', folderPath: 'Work' }];
+        const localBookmarks = [{ url: 'http://example.com', title: 'HTTP', folderPath: 'Work' }];
         const tombstones = [];
 
         const { toAdd } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
@@ -1025,8 +1107,18 @@ describe('Sync Comprehensive Tests', () => {
 
       it('should handle special characters in URLs', () => {
         const items = [
-          { url: 'https://example.com/path?query=value&other=123#hash', title: 'Complex', folderPath: 'Work', index: 0 },
-          { url: 'https://example.com/path with spaces', title: 'Spaces', folderPath: 'Work', index: 1 },
+          {
+            url: 'https://example.com/path?query=value&other=123#hash',
+            title: 'Complex',
+            folderPath: 'Work',
+            index: 0,
+          },
+          {
+            url: 'https://example.com/path with spaces',
+            title: 'Spaces',
+            folderPath: 'Work',
+            index: 1,
+          },
         ];
 
         const normalized = normalizeItemsForChecksum(items);
@@ -1074,7 +1166,11 @@ describe('Sync Comprehensive Tests', () => {
         const tombstones = [];
 
         const start = Date.now();
-        const { toAdd, toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
+        const { toAdd, toUpdate } = categorizeCloudBookmarks(
+          cloudBookmarks,
+          localBookmarks,
+          tombstones
+        );
         const duration = Date.now() - start;
 
         expect(toAdd).toHaveLength(500); // 1000 - 500 existing
@@ -1096,9 +1192,7 @@ describe('Sync Comprehensive Tests', () => {
 
     describe('Boundary conditions', () => {
       it('should handle bookmarks at index 0', () => {
-        const items = [
-          { url: 'https://a.com', title: 'A', folderPath: 'Work', index: 0 },
-        ];
+        const items = [{ url: 'https://a.com', title: 'A', folderPath: 'Work', index: 0 }];
 
         const normalized = normalizeItemsForChecksum(items);
 
@@ -1106,9 +1200,7 @@ describe('Sync Comprehensive Tests', () => {
       });
 
       it('should handle very large index values', () => {
-        const items = [
-          { url: 'https://a.com', title: 'A', folderPath: 'Work', index: 999999 },
-        ];
+        const items = [{ url: 'https://a.com', title: 'A', folderPath: 'Work', index: 999999 }];
 
         const normalized = normalizeItemsForChecksum(items);
 
@@ -1119,9 +1211,7 @@ describe('Sync Comprehensive Tests', () => {
         const cloudBookmarks = [
           { url: 'https://old.com', title: 'Old', folderPath: 'Work', dateAdded: 0 },
         ];
-        const tombstones = [
-          { url: 'https://old.com', deletedAt: 0 },
-        ];
+        const tombstones = [{ url: 'https://old.com', deletedAt: 0 }];
 
         const { toAdd } = categorizeCloudBookmarks(cloudBookmarks, [], tombstones);
 
@@ -1131,9 +1221,7 @@ describe('Sync Comprehensive Tests', () => {
 
       it('should handle very long titles', () => {
         const longTitle = 'A'.repeat(10000);
-        const items = [
-          { url: 'https://a.com', title: longTitle, folderPath: 'Work', index: 0 },
-        ];
+        const items = [{ url: 'https://a.com', title: longTitle, folderPath: 'Work', index: 0 }];
 
         const normalized = normalizeItemsForChecksum(items);
 
@@ -1141,7 +1229,8 @@ describe('Sync Comprehensive Tests', () => {
       });
 
       it('should handle very long folder paths', () => {
-        const longPath = 'Bookmarks Bar/' + Array.from({ length: 50 }, (_, i) => `Folder${i}`).join('/');
+        const longPath =
+          'Bookmarks Bar/' + Array.from({ length: 50 }, (_, i) => `Folder${i}`).join('/');
         const normalized = normalizeFolderPath(longPath);
 
         expect(normalized.startsWith('toolbar/')).toBe(true);
@@ -1162,8 +1251,18 @@ describe('Sync Comprehensive Tests', () => {
       });
 
       it('should detect folder changes despite root name differences', () => {
-        const cloud = { url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Toolbar/Personal', index: 0 };
-        const local = { url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Bar/Work', index: 0 };
+        const cloud = {
+          url: 'https://a.com',
+          title: 'A',
+          folderPath: 'Bookmarks Toolbar/Personal',
+          index: 0,
+        };
+        const local = {
+          url: 'https://a.com',
+          title: 'A',
+          folderPath: 'Bookmarks Bar/Work',
+          index: 0,
+        };
 
         expect(bookmarkNeedsUpdate(cloud, local)).toBe(true);
       });
@@ -1189,10 +1288,20 @@ describe('Sync Comprehensive Tests', () => {
     describe('Sync after force push from another browser', () => {
       it('should categorize all cloud bookmarks as updates when local differs', () => {
         const cloudBookmarks = [
-          { url: 'https://a.com', title: 'Firefox Title', folderPath: 'toolbar/Work', dateAdded: 2000 },
+          {
+            url: 'https://a.com',
+            title: 'Firefox Title',
+            folderPath: 'toolbar/Work',
+            dateAdded: 2000,
+          },
         ];
         const localBookmarks = [
-          { url: 'https://a.com', title: 'Chrome Title', folderPath: 'Bookmarks Bar/Old', dateAdded: 1000 },
+          {
+            url: 'https://a.com',
+            title: 'Chrome Title',
+            folderPath: 'Bookmarks Bar/Old',
+            dateAdded: 1000,
+          },
         ];
 
         const { toUpdate } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, []);
@@ -1210,8 +1319,8 @@ describe('Sync Comprehensive Tests', () => {
           { url: 'https://local-only.com', title: 'Local Only', folderPath: 'Work' },
         ];
 
-        const cloudUrls = new Set(cloudBookmarks.map(b => b.url));
-        const localAdditions = localBookmarks.filter(b => !cloudUrls.has(b.url));
+        const cloudUrls = new Set(cloudBookmarks.map((b) => b.url));
+        const localAdditions = localBookmarks.filter((b) => !cloudUrls.has(b.url));
 
         expect(localAdditions).toHaveLength(1);
         expect(localAdditions[0].url).toBe('https://local-only.com');
@@ -1228,9 +1337,7 @@ describe('Sync Comprehensive Tests', () => {
       const cloudBookmarks = [
         { url: 'https://readded.com', title: 'Re-added', folderPath: 'Work', dateAdded: 3000 },
       ];
-      const tombstones = [
-        { url: 'https://readded.com', deletedAt: 2000 },
-      ];
+      const tombstones = [{ url: 'https://readded.com', deletedAt: 2000 }];
       const localBookmarks = [];
 
       const { toAdd } = categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones);
@@ -1251,9 +1358,7 @@ describe('Sync Comprehensive Tests', () => {
     it('should handle cleared local storage scenario', () => {
       // Scenario: User cleared extension storage, local tombstones are gone
       // Cloud has old tombstones that shouldn't be applied
-      const cloudTombstones = [
-        { url: 'https://old-delete.com', deletedAt: 500 },
-      ];
+      const cloudTombstones = [{ url: 'https://old-delete.com', deletedAt: 500 }];
       const localTombstones = []; // Cleared
       const lastSyncTime = 1000; // Last sync was after tombstone creation
 
@@ -1271,7 +1376,7 @@ describe('Sync Comprehensive Tests', () => {
       merged = mergeTombstones(merged, session3);
 
       expect(merged).toHaveLength(2);
-      expect(merged.find(t => t.url === 'https://a.com').deletedAt).toBe(3000);
+      expect(merged.find((t) => t.url === 'https://a.com').deletedAt).toBe(3000);
     });
   });
 
@@ -1296,9 +1401,7 @@ describe('Sync Comprehensive Tests', () => {
     });
 
     it('should produce consistent output for same data', () => {
-      const items = [
-        { url: 'https://a.com', title: 'A', folderPath: 'Work', index: 0 },
-      ];
+      const items = [{ url: 'https://a.com', title: 'A', folderPath: 'Work', index: 0 }];
 
       const run1 = normalizeItemsForChecksum(items);
       const run2 = normalizeItemsForChecksum(items);

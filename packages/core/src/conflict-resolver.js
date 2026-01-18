@@ -231,11 +231,16 @@ export const createConflictSummary = (conflict) => {
 
   return {
     id: conflict.id,
-    title: resolvedValue?.title ?? localChange.after?.title ?? remoteChange.after?.title ?? 'Unknown',
+    title:
+      resolvedValue?.title ?? localChange.after?.title ?? remoteChange.after?.title ?? 'Unknown',
     localAction: localChange.type,
     remoteAction: remoteChange.type,
     resolution,
-    resolvedTo: resolution === CONFLICT_RESOLUTION.LOCAL ? 'local version' : 
-                resolution === CONFLICT_RESOLUTION.REMOTE ? 'remote version' : 'merged version',
+    resolvedTo:
+      resolution === CONFLICT_RESOLUTION.LOCAL
+        ? 'local version'
+        : resolution === CONFLICT_RESOLUTION.REMOTE
+          ? 'remote version'
+          : 'merged version',
   };
 };

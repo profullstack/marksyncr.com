@@ -7,6 +7,7 @@ MarkSyncr is a cross-browser extension that enables two-way bookmark synchroniza
 ## Business Model
 
 ### Free Tier - BYOS (Bring Your Own Storage)
+
 - Local file sync
 - GitHub sync (OAuth)
 - Dropbox sync (OAuth)
@@ -15,6 +16,7 @@ MarkSyncr is a cross-browser extension that enables two-way bookmark synchroniza
 - No account required
 
 ### Paid Tier - Managed Cloud
+
 - Supabase Cloud storage (we host bookmarks)
 - Simple email/password or social login
 - Cross-device sync built-in
@@ -44,32 +46,32 @@ flowchart TB
         SE[Sync Engine]
         BA[Browser Adapter]
     end
-    
+
     subgraph Free Tier Sources
         LF[Local File System]
         GH[GitHub API]
         DB[Dropbox API]
         GD[Google Drive API]
     end
-    
+
     subgraph Supabase Backend
         AUTH[Auth Service]
         TOKENS[OAuth Token Storage]
         CLOUD[Cloud Bookmark Storage]
         SUBS[Subscription Management]
     end
-    
+
     UI --> BG
     BG --> SE
     SE --> BP
     BP --> BA
     BA --> BrowserBookmarks[(Browser Bookmarks API)]
-    
+
     SE -->|Free Tier| LF
     SE -->|Free Tier| GH
     SE -->|Free Tier| DB
     SE -->|Free Tier| GD
-    
+
     SE -->|Paid Tier| CLOUD
     BG --> AUTH
     AUTH --> TOKENS
@@ -92,25 +94,25 @@ sequenceDiagram
     User->>Extension: Trigger Sync or Auto-Schedule
     Extension->>Supabase: Get last sync state
     Supabase-->>Extension: Return sync metadata
-    
+
     Extension->>BrowserAPI: Read current bookmarks
     BrowserAPI-->>Extension: Return bookmark tree
     Extension->>SyncEngine: Convert to JSON format
-    
+
     Extension->>Source: Fetch remote bookmarks
     Source-->>Extension: Return remote JSON
-    
+
     SyncEngine->>SyncEngine: Compare and detect changes
     SyncEngine->>SyncEngine: Resolve conflicts
-    
+
     alt Changes to push
         Extension->>Source: Update remote file
     end
-    
+
     alt Changes to pull
         Extension->>BrowserAPI: Update local bookmarks
     end
-    
+
     Extension->>Supabase: Update sync state
     Extension->>User: Show sync result
 ```
@@ -155,7 +157,7 @@ sequenceDiagram
       "children": []
     },
     "other": {
-      "id": "other_root", 
+      "id": "other_root",
       "title": "Other Bookmarks",
       "children": []
     }
@@ -177,7 +179,7 @@ erDiagram
         boolean is_paid
         timestamp subscription_expires_at
     }
-    
+
     oauth_tokens {
         uuid id PK
         uuid user_id FK
@@ -187,7 +189,7 @@ erDiagram
         timestamp expires_at
         timestamp created_at
     }
-    
+
     cloud_bookmarks {
         uuid id PK
         uuid user_id FK
@@ -196,7 +198,7 @@ erDiagram
         timestamp last_modified
         integer version
     }
-    
+
     sync_state {
         uuid id PK
         uuid user_id FK
@@ -207,7 +209,7 @@ erDiagram
         timestamp last_sync_at
         jsonb sync_metadata
     }
-    
+
     users ||--o{ oauth_tokens : has
     users ||--o{ sync_state : has
     users ||--o| cloud_bookmarks : has
@@ -341,11 +343,11 @@ flowchart TD
     H --> I{URL conflict?}
     I -->|Yes| J[Prefer most recent URL change]
     I -->|No| K[Merge complete]
-    
+
     L[Deleted remotely] --> M{Modified locally?}
     M -->|Yes| N[Keep local - user intent unclear]
     M -->|No| O[Delete locally]
-    
+
     P[Deleted locally] --> Q{Modified remotely?}
     Q -->|Yes| R[Restore with remote changes]
     Q -->|No| S[Delete remotely]
@@ -357,12 +359,12 @@ flowchart TD
 
 The extension uses an adapter pattern to handle differences between Chrome and Firefox bookmark APIs:
 
-| Feature | Chrome | Firefox |
-|---------|--------|---------|
-| Manifest Version | V3 | V2 or V3 |
-| Service Worker | Required | Optional |
-| Bookmark Root IDs | 0, 1, 2 | toolbar_____, menu_____, unfiled_____ |
-| Promises | Native | webextension-polyfill |
+| Feature           | Chrome   | Firefox                                  |
+| ----------------- | -------- | ---------------------------------------- |
+| Manifest Version  | V3       | V2 or V3                                 |
+| Service Worker    | Required | Optional                                 |
+| Bookmark Root IDs | 0, 1, 2  | toolbar**\_**, menu**\_**, unfiled**\_** |
+| Promises          | Native   | webextension-polyfill                    |
 
 ---
 
@@ -417,21 +419,25 @@ sequenceDiagram
 ## Key Technical Decisions
 
 ### 1. Build Tool: Vite
+
 - Fast HMR for development
 - Excellent TypeScript support
 - Easy to configure for extension builds
 
 ### 2. State Management: Zustand
+
 - Lightweight
 - Works well with React
 - Easy persistence to extension storage
 
 ### 3. Supabase Edge Functions
+
 - Handle OAuth token exchange securely
 - Keep client secrets server-side
 - Provide webhook endpoints if needed
 
 ### 4. Bookmark ID Mapping
+
 - Browser bookmark IDs are not portable
 - Use content-based hashing for stable IDs
 - Map browser IDs to stable IDs during sync
@@ -450,6 +456,7 @@ sequenceDiagram
 ## Future Considerations (Safari)
 
 Safari Web Extensions require:
+
 - Xcode project wrapper
 - Different manifest format
 - App Store distribution

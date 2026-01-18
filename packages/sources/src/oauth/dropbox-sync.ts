@@ -109,9 +109,12 @@ export async function getBookmarkFile(
     // Try to get error details from response
     const errorText = await response.text().catch(() => '');
     let errorSummary = `HTTP ${response.status}`;
-    
+
     try {
-      const errorJson = JSON.parse(errorText) as { error_summary?: string; error?: { '.tag'?: string } };
+      const errorJson = JSON.parse(errorText) as {
+        error_summary?: string;
+        error?: { '.tag'?: string };
+      };
       if (errorJson.error_summary) {
         errorSummary = errorJson.error_summary;
       }
@@ -125,19 +128,19 @@ export async function getBookmarkFile(
         errorSummary = errorText.substring(0, 200);
       }
     }
-    
+
     // 409 Conflict often means path not found
     if (response.status === 409) {
       return null;
     }
-    
+
     throw new Error(`Failed to get bookmark file: ${errorSummary}`);
   }
 
   // Get metadata from response header
   const apiResultHeader = response.headers.get('dropbox-api-result');
-  const metadata: DropboxApiResult = apiResultHeader 
-    ? JSON.parse(apiResultHeader) as DropboxApiResult
+  const metadata: DropboxApiResult = apiResultHeader
+    ? (JSON.parse(apiResultHeader) as DropboxApiResult)
     : { rev: '', content_hash: '' };
 
   const contentString = await response.text();
@@ -222,11 +225,13 @@ export async function updateBookmarkFile(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error_summary: 'Unknown error' })) as { error_summary: string };
+    const error = (await response.json().catch(() => ({ error_summary: 'Unknown error' }))) as {
+      error_summary: string;
+    };
     throw new Error(`Failed to update bookmark file: ${error.error_summary}`);
   }
 
-  const result = await response.json() as { rev: string };
+  const result = (await response.json()) as { rev: string };
 
   return {
     success: true,

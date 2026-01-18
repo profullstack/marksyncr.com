@@ -46,8 +46,13 @@ const { getAuthenticatedUser } = await import('@/lib/auth-helper');
  * Helper to create a mock request
  */
 function createMockRequest(options = {}) {
-  const { method = 'GET', body = null, headers = {}, url = 'http://localhost:3000/api/versions' } = options;
-  
+  const {
+    method = 'GET',
+    body = null,
+    headers = {},
+    url = 'http://localhost:3000/api/versions',
+  } = options;
+
   return {
     method,
     url,
@@ -61,7 +66,7 @@ function createMockRequest(options = {}) {
 describe('Versions API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Set up the from().select() chain for POST deduplication check
     // Default: no existing versions (so new version will be created)
     mockSelect.mockReturnValue({
@@ -83,13 +88,15 @@ describe('Versions API', () => {
         method: 'OPTIONS',
         headers: { origin: 'http://localhost:3000' },
       });
-      
+
       const response = await OPTIONS(request);
-      
+
       expect(response.status).toBe(204);
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
       expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET, POST, OPTIONS');
-      expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization');
+      expect(response.headers.get('Access-Control-Allow-Headers')).toBe(
+        'Content-Type, Authorization'
+      );
       expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     });
   });
@@ -539,18 +546,20 @@ describe('Versions API', () => {
       // The checksum for { roots: {} } is computed by generateNormalizedChecksum
       // We need to mock the from().select() chain to return a version with matching checksum
       const existingChecksum = '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945';
-      
+
       // Mock the deduplication check to return an existing version with matching checksum
       mockSelect.mockReturnValue({
         eq: vi.fn().mockReturnValue({
           order: vi.fn().mockReturnValue({
             limit: vi.fn().mockResolvedValue({
-              data: [{
-                id: 'existing-v1',
-                version: 5,
-                checksum: existingChecksum,
-                created_at: '2024-01-01T00:00:00Z',
-              }],
+              data: [
+                {
+                  id: 'existing-v1',
+                  version: 5,
+                  checksum: existingChecksum,
+                  created_at: '2024-01-01T00:00:00Z',
+                },
+              ],
               error: null,
             }),
           }),
@@ -580,7 +589,7 @@ describe('Versions API', () => {
         checksum: existingChecksum,
         createdAt: '2024-01-01T00:00:00Z',
       });
-      
+
       // Should NOT call save_bookmark_version when skipping
       expect(mockRpc).not.toHaveBeenCalled();
     });
@@ -591,12 +600,14 @@ describe('Versions API', () => {
         eq: vi.fn().mockReturnValue({
           order: vi.fn().mockReturnValue({
             limit: vi.fn().mockResolvedValue({
-              data: [{
-                id: 'existing-v1',
-                version: 5,
-                checksum: 'different-checksum-xyz',
-                created_at: '2024-01-01T00:00:00Z',
-              }],
+              data: [
+                {
+                  id: 'existing-v1',
+                  version: 5,
+                  checksum: 'different-checksum-xyz',
+                  created_at: '2024-01-01T00:00:00Z',
+                },
+              ],
               error: null,
             }),
           }),
@@ -637,7 +648,7 @@ describe('Versions API', () => {
         checksum: 'new-checksum',
         createdAt: '2024-01-02T00:00:00Z',
       });
-      
+
       // Should call save_bookmark_version when checksums differ
       expect(mockRpc).toHaveBeenCalledWith('save_bookmark_version', expect.any(Object));
     });

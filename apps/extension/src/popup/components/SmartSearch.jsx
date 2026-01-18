@@ -114,10 +114,7 @@ export function SearchInput({
                    dark:bg-gray-700 dark:border-gray-600 dark:text-white"
       />
       {value && (
-        <button
-          onClick={onClear}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-        >
+        <button onClick={onClear} className="absolute inset-y-0 right-0 pr-3 flex items-center">
           <svg
             className="h-4 w-4 text-gray-400 hover:text-gray-600"
             fill="none"
@@ -172,7 +169,13 @@ export function FilterDropdown({
 /**
  * Date range filter component
  */
-export function DateRangeFilter({ startDate, endDate, onStartChange, onEndChange, className = '' }) {
+export function DateRangeFilter({
+  startDate,
+  endDate,
+  onStartChange,
+  onEndChange,
+  className = '',
+}) {
   return (
     <div className={`flex flex-col ${className}`}>
       <label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Date Range</label>
@@ -592,9 +595,7 @@ export function SmartSearch({
               d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
             />
           </svg>
-          {hasActiveFilters && (
-            <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-          )}
+          {hasActiveFilters && <span className="w-2 h-2 bg-blue-600 rounded-full"></span>}
         </button>
       </div>
 
@@ -616,11 +617,7 @@ export function SmartSearch({
         <span>
           {results.length} {results.length === 1 ? 'bookmark' : 'bookmarks'} found
         </span>
-        {query && (
-          <span className="text-gray-400">
-            Searching for &quot;{query}&quot;
-          </span>
-        )}
+        {query && <span className="text-gray-400">Searching for &quot;{query}&quot;</span>}
       </div>
 
       {/* Results */}

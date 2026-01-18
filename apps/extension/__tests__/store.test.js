@@ -72,14 +72,19 @@ describe('Extension Store', () => {
     mockStorageSet.mockResolvedValue(undefined);
     mockStorageRemove.mockResolvedValue(undefined);
     mockBookmarksGetTree.mockResolvedValue([]);
-    
+
     // Reset store state
     useStore.setState({
       status: 'disconnected',
       lastSync: null,
       selectedSource: null,
       sources: [
-        { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true },
+        {
+          id: 'browser-bookmarks',
+          name: 'Browser Bookmarks',
+          type: 'browser-bookmarks',
+          connected: true,
+        },
         { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false },
         { id: 'github', name: 'GitHub', type: 'github', connected: false },
         { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false },
@@ -304,7 +309,7 @@ describe('Extension Store', () => {
         mockSignInWithEmail.mockResolvedValue({ user: { id: 'user-123' }, session: {} });
         mockFetchSubscription.mockResolvedValue({ plan: 'pro', status: 'active' });
         mockFetchCloudSettings.mockResolvedValue(null);
-        
+
         // Mock the fetch call that fetchTags makes internally
         mockStorageGet.mockResolvedValue({ authToken: 'test-token' });
         global.fetch = vi.fn().mockResolvedValue({
@@ -442,7 +447,9 @@ describe('Extension Store', () => {
       it('should set error when no source is selected', async () => {
         await useStore.getState().triggerSync();
 
-        expect(useStore.getState().error).toBe('No sync source selected. Please select a source from the dropdown.');
+        expect(useStore.getState().error).toBe(
+          'No sync source selected. Please select a source from the dropdown.'
+        );
       });
 
       it('should set syncing status during sync', async () => {
@@ -505,9 +512,9 @@ describe('Extension Store', () => {
     describe('disconnectSource', () => {
       it('should update source connection status', async () => {
         useStore.setState({
-          sources: useStore.getState().sources.map((s) =>
-            s.id === 'github' ? { ...s, connected: true } : s
-          ),
+          sources: useStore
+            .getState()
+            .sources.map((s) => (s.id === 'github' ? { ...s, connected: true } : s)),
         });
         mockRuntimeSendMessage.mockResolvedValue(undefined);
 
@@ -601,9 +608,7 @@ describe('Extension Store', () => {
               {
                 id: 'folder1',
                 title: 'Bookmarks',
-                children: [
-                  { id: '1', url: 'https://example.com', title: 'Example' },
-                ],
+                children: [{ id: '1', url: 'https://example.com', title: 'Example' }],
               },
             ],
           },
@@ -799,10 +804,7 @@ describe('Extension Store', () => {
         });
         mockBookmarksRemove.mockResolvedValue(undefined);
 
-        await useStore.getState().deleteMultipleBookmarks([
-          { id: '1' },
-          { id: '2' },
-        ]);
+        await useStore.getState().deleteMultipleBookmarks([{ id: '1' }, { id: '2' }]);
 
         expect(mockBookmarksRemove).toHaveBeenCalledTimes(2);
         expect(useStore.getState().bookmarks).toHaveLength(1);
@@ -842,9 +844,7 @@ describe('Extension Store', () => {
             {
               id: 'folder',
               title: 'Folder',
-              children: [
-                { id: '3', url: 'https://example3.com' },
-              ],
+              children: [{ id: '3', url: 'https://example3.com' }],
             },
           ],
         },

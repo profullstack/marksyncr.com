@@ -2,7 +2,7 @@
  * @fileoverview Tests for bookmarks API routes
  * Tests GET, POST, DELETE /api/bookmarks endpoints
  * Uses Vitest with mocked auth helper
- * 
+ *
  * The cloud_bookmarks table stores ALL bookmarks as a single JSONB blob per user:
  * - bookmark_data: JSONB containing array of bookmarks
  * - checksum: Hash of the bookmark data for change detection
@@ -21,7 +21,7 @@ function createMockSupabase() {
   const mock = {
     from: vi.fn(),
   };
-  
+
   return mock;
 }
 
@@ -109,7 +109,7 @@ const { getAuthenticatedUser } = await import('@/lib/auth-helper');
  */
 function createMockRequest(options = {}) {
   const { method = 'GET', body = null, headers = {} } = options;
-  
+
   const request = {
     method,
     headers: {
@@ -117,7 +117,7 @@ function createMockRequest(options = {}) {
     },
     json: async () => body,
   };
-  
+
   return request;
 }
 
@@ -415,7 +415,7 @@ describe('Bookmarks API Routes', () => {
       });
 
       const response = await POST(request);
-      
+
       expect(response.status).toBe(200);
     });
 
@@ -437,7 +437,10 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should handle empty bookmarks array', async () => {
-      mockSupabase = createPostMockSupabase({ existingVersion: null, upsertData: { version: 1, checksum: 'empty' } });
+      mockSupabase = createPostMockSupabase({
+        existingVersion: null,
+        upsertData: { version: 1, checksum: 'empty' },
+      });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
       const request = createMockRequest({
@@ -623,9 +626,7 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 404 when bookmark not found', async () => {
-      const existingBookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example' },
-      ];
+      const existingBookmarks = [{ id: '1', url: 'https://example.com', title: 'Example' }];
 
       const selectMock = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
@@ -660,9 +661,7 @@ describe('Bookmarks API Routes', () => {
     });
 
     it('should return 500 when update fails', async () => {
-      const existingBookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example' },
-      ];
+      const existingBookmarks = [{ id: '1', url: 'https://example.com', title: 'Example' }];
 
       const selectMock = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
@@ -731,9 +730,7 @@ describe('Bookmarks API Edge Cases', () => {
   });
 
   it('should handle bookmarks with unicode characters in title', async () => {
-    const bookmarksToSync = [
-      { url: 'https://example.com', title: '日本語タイトル 🎉' },
-    ];
+    const bookmarksToSync = [{ url: 'https://example.com', title: '日本語タイトル 🎉' }];
 
     mockSupabase = createPostMockSupabase({ existingVersion: null });
     getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -818,9 +815,7 @@ describe('Empty Title Preservation', () => {
 
   describe('POST /api/bookmarks - Title Handling', () => {
     it('should preserve empty string titles instead of replacing with URL', async () => {
-      const bookmarksToSync = [
-        { id: '1', url: 'https://example.com', title: '' },
-      ];
+      const bookmarksToSync = [{ id: '1', url: 'https://example.com', title: '' }];
 
       mockSupabase = createPostMockSupabase({ existingVersion: null });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -840,9 +835,7 @@ describe('Empty Title Preservation', () => {
     });
 
     it('should preserve null titles as empty string', async () => {
-      const bookmarksToSync = [
-        { id: '1', url: 'https://example.com', title: null },
-      ];
+      const bookmarksToSync = [{ id: '1', url: 'https://example.com', title: null }];
 
       mockSupabase = createPostMockSupabase({ existingVersion: null });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -882,9 +875,7 @@ describe('Empty Title Preservation', () => {
     });
 
     it('should NOT use URL as fallback for missing title', async () => {
-      const bookmarksToSync = [
-        { id: '1', url: 'https://example.com/very/long/path/to/page.html' },
-      ];
+      const bookmarksToSync = [{ id: '1', url: 'https://example.com/very/long/path/to/page.html' }];
 
       mockSupabase = createPostMockSupabase({ existingVersion: null });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -902,9 +893,7 @@ describe('Empty Title Preservation', () => {
     });
 
     it('should preserve normal titles unchanged', async () => {
-      const bookmarksToSync = [
-        { id: '1', url: 'https://example.com', title: 'My Bookmark Title' },
-      ];
+      const bookmarksToSync = [{ id: '1', url: 'https://example.com', title: 'My Bookmark Title' }];
 
       mockSupabase = createPostMockSupabase({ existingVersion: null });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -955,10 +944,8 @@ describe('Empty Title Preservation', () => {
       // The difference:
       // - '' || url => url (empty string is falsy)
       // - '' ?? '' => '' (empty string is not nullish)
-      
-      const bookmarksToSync = [
-        { id: '1', url: 'https://example.com', title: '' },
-      ];
+
+      const bookmarksToSync = [{ id: '1', url: 'https://example.com', title: '' }];
 
       mockSupabase = createPostMockSupabase({ existingVersion: null });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -1019,11 +1006,14 @@ describe('Server-Side Bookmark Merging', () => {
     const bookmarksSelectMock = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: existingBookmarks.length > 0 ? {
-            bookmark_data: existingBookmarks,
-            version: existingVersion,
-            checksum: 'existing-checksum',
-          } : null,
+          data:
+            existingBookmarks.length > 0
+              ? {
+                  bookmark_data: existingBookmarks,
+                  version: existingVersion,
+                  checksum: 'existing-checksum',
+                }
+              : null,
           error: existingBookmarks.length > 0 ? null : { code: 'PGRST116' },
         }),
       }),
@@ -1035,11 +1025,13 @@ describe('Server-Side Bookmark Merging', () => {
       return {
         select: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
-            data: upsertSuccess ? {
-              version: existingVersion + 1,
-              checksum: 'new-checksum',
-              bookmark_data: data.bookmark_data,
-            } : null,
+            data: upsertSuccess
+              ? {
+                  version: existingVersion + 1,
+                  checksum: 'new-checksum',
+                  bookmark_data: data.bookmark_data,
+                }
+              : null,
             error: upsertSuccess ? null : { message: 'Upsert failed' },
           }),
         }),
@@ -1068,7 +1060,13 @@ describe('Server-Side Bookmark Merging', () => {
   describe('POST /api/bookmarks - Merging Behavior', () => {
     it('should merge incoming bookmarks with existing cloud bookmarks', async () => {
       const existingBookmarks = [
-        { id: '1', url: 'https://existing.com', title: 'Existing', folderPath: '/Bookmarks', source: 'firefox' },
+        {
+          id: '1',
+          url: 'https://existing.com',
+          title: 'Existing',
+          folderPath: '/Bookmarks',
+          source: 'firefox',
+        },
       ];
       const incomingBookmarks = [
         { id: '2', url: 'https://new.com', title: 'New', folderPath: '/Bookmarks' },
@@ -1094,7 +1092,13 @@ describe('Server-Side Bookmark Merging', () => {
 
     it('should not duplicate bookmarks with same URL', async () => {
       const existingBookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Old Title', folderPath: '/Bookmarks', source: 'firefox' },
+        {
+          id: '1',
+          url: 'https://example.com',
+          title: 'Old Title',
+          folderPath: '/Bookmarks',
+          source: 'firefox',
+        },
       ];
       const incomingBookmarks = [
         { id: '2', url: 'https://example.com', title: 'New Title', folderPath: '/Bookmarks' },
@@ -1120,10 +1124,23 @@ describe('Server-Side Bookmark Merging', () => {
 
     it('should update existing bookmark when URL matches but data differs', async () => {
       const existingBookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Old Title', folderPath: '/Old', source: 'firefox', dateAdded: 1000 },
+        {
+          id: '1',
+          url: 'https://example.com',
+          title: 'Old Title',
+          folderPath: '/Old',
+          source: 'firefox',
+          dateAdded: 1000,
+        },
       ];
       const incomingBookmarks = [
-        { id: '2', url: 'https://example.com', title: 'New Title', folderPath: '/New', dateAdded: 2000 },
+        {
+          id: '2',
+          url: 'https://example.com',
+          title: 'New Title',
+          folderPath: '/New',
+          dateAdded: 2000,
+        },
       ];
 
       mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
@@ -1173,9 +1190,7 @@ describe('Server-Side Bookmark Merging', () => {
     });
 
     it('should handle first sync when no existing bookmarks', async () => {
-      const incomingBookmarks = [
-        { id: '1', url: 'https://new.com', title: 'New' },
-      ];
+      const incomingBookmarks = [{ id: '1', url: 'https://new.com', title: 'New' }];
 
       mockSupabase = createMergeMockSupabase({ existingBookmarks: [], existingVersion: 0 });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -1276,9 +1291,7 @@ describe('Server-Side Bookmark Merging', () => {
       const existingBookmarks = [
         { id: '1', url: 'https://example.com', title: '', source: 'firefox' },
       ];
-      const incomingBookmarks = [
-        { id: '2', url: 'https://new.com', title: '', source: 'chrome' },
-      ];
+      const incomingBookmarks = [{ id: '2', url: 'https://new.com', title: '', source: 'chrome' }];
 
       mockSupabase = createMergeMockSupabase({ existingBookmarks, existingVersion: 1 });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -1387,13 +1400,19 @@ describe('Tombstone Tracking for Deletion Sync', () => {
     const bookmarksSelectMock = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? {
-            bookmark_data: existingBookmarks,
-            tombstones: existingTombstones,
-            version: existingVersion,
-            checksum: 'existing-checksum',
-          } : null,
-          error: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? null : { code: 'PGRST116' },
+          data:
+            existingBookmarks.length > 0 || existingTombstones.length > 0
+              ? {
+                  bookmark_data: existingBookmarks,
+                  tombstones: existingTombstones,
+                  version: existingVersion,
+                  checksum: 'existing-checksum',
+                }
+              : null,
+          error:
+            existingBookmarks.length > 0 || existingTombstones.length > 0
+              ? null
+              : { code: 'PGRST116' },
         }),
       }),
     });
@@ -1403,12 +1422,14 @@ describe('Tombstone Tracking for Deletion Sync', () => {
       return {
         select: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
-            data: upsertSuccess ? {
-              version: existingVersion + 1,
-              checksum: 'new-checksum',
-              bookmark_data: data.bookmark_data,
-              tombstones: data.tombstones,
-            } : null,
+            data: upsertSuccess
+              ? {
+                  version: existingVersion + 1,
+                  checksum: 'new-checksum',
+                  bookmark_data: data.bookmark_data,
+                  tombstones: data.tombstones,
+                }
+              : null,
             error: upsertSuccess ? null : { message: 'Upsert failed' },
           }),
         }),
@@ -1433,12 +1454,8 @@ describe('Tombstone Tracking for Deletion Sync', () => {
 
   describe('POST /api/bookmarks - Tombstone Handling', () => {
     it('should accept tombstones in the request body', async () => {
-      const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example' },
-      ];
-      const tombstones = [
-        { url: 'https://deleted.com', deletedAt: Date.now() },
-      ];
+      const bookmarks = [{ id: '1', url: 'https://example.com', title: 'Example' }];
+      const tombstones = [{ url: 'https://deleted.com', deletedAt: Date.now() }];
 
       mockSupabase = createTombstoneMockSupabase({ existingVersion: 0 });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -1456,12 +1473,8 @@ describe('Tombstone Tracking for Deletion Sync', () => {
     });
 
     it('should merge incoming tombstones with existing tombstones', async () => {
-      const existingTombstones = [
-        { url: 'https://old-deleted.com', deletedAt: 1000 },
-      ];
-      const incomingTombstones = [
-        { url: 'https://new-deleted.com', deletedAt: 2000 },
-      ];
+      const existingTombstones = [{ url: 'https://old-deleted.com', deletedAt: 1000 }];
+      const incomingTombstones = [{ url: 'https://new-deleted.com', deletedAt: 2000 }];
 
       mockSupabase = createTombstoneMockSupabase({ existingTombstones, existingVersion: 1 });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
@@ -1534,9 +1547,7 @@ describe('Tombstone Tracking for Deletion Sync', () => {
     });
 
     it('should update tombstone timestamp if newer deletion is received', async () => {
-      const existingTombstones = [
-        { url: 'https://deleted.com', deletedAt: 1000 },
-      ];
+      const existingTombstones = [{ url: 'https://deleted.com', deletedAt: 1000 }];
       const incomingTombstones = [
         { url: 'https://deleted.com', deletedAt: 2000 }, // Newer
       ];
@@ -1558,12 +1569,8 @@ describe('Tombstone Tracking for Deletion Sync', () => {
 
   describe('GET /api/bookmarks - Tombstone Handling', () => {
     it('should return tombstones along with bookmarks', async () => {
-      const mockBookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example' },
-      ];
-      const mockTombstones = [
-        { url: 'https://deleted.com', deletedAt: Date.now() },
-      ];
+      const mockBookmarks = [{ id: '1', url: 'https://example.com', title: 'Example' }];
+      const mockTombstones = [{ url: 'https://deleted.com', deletedAt: Date.now() }];
 
       mockSupabase.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
@@ -1598,9 +1605,7 @@ describe('Tombstone Tracking for Deletion Sync', () => {
     });
 
     it('should return empty tombstones array when none exist', async () => {
-      const mockBookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example' },
-      ];
+      const mockBookmarks = [{ id: '1', url: 'https://example.com', title: 'Example' }];
 
       mockSupabase.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
@@ -1678,13 +1683,16 @@ describe('Checksum-Based Skip Write Optimization', () => {
     const bookmarksSelectMock = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: (existingBookmarks.length > 0 || existingChecksum) ? {
-            bookmark_data: existingBookmarks,
-            tombstones: existingTombstones,
-            version: existingVersion,
-            checksum: existingChecksum,
-          } : null,
-          error: (existingBookmarks.length > 0 || existingChecksum) ? null : { code: 'PGRST116' },
+          data:
+            existingBookmarks.length > 0 || existingChecksum
+              ? {
+                  bookmark_data: existingBookmarks,
+                  tombstones: existingTombstones,
+                  version: existingVersion,
+                  checksum: existingChecksum,
+                }
+              : null,
+          error: existingBookmarks.length > 0 || existingChecksum ? null : { code: 'PGRST116' },
         }),
       }),
     });
@@ -1696,12 +1704,14 @@ describe('Checksum-Based Skip Write Optimization', () => {
       return {
         select: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
-            data: upsertSuccess ? {
-              version: existingVersion + 1,
-              checksum: data.checksum || 'new-checksum',
-              bookmark_data: data.bookmark_data,
-              tombstones: data.tombstones,
-            } : null,
+            data: upsertSuccess
+              ? {
+                  version: existingVersion + 1,
+                  checksum: data.checksum || 'new-checksum',
+                  bookmark_data: data.bookmark_data,
+                  tombstones: data.tombstones,
+                }
+              : null,
             error: upsertSuccess ? null : { message: 'Upsert failed' },
           }),
         }),
@@ -1730,7 +1740,14 @@ describe('Checksum-Based Skip Write Optimization', () => {
     it('should skip database write when checksum matches existing data', async () => {
       // Same bookmarks that would produce the same checksum
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
+        {
+          id: '1',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bookmarks',
+          dateAdded: 1700000000000,
+          index: 0,
+        },
       ];
 
       // Pre-calculate the checksum that would be generated
@@ -1738,22 +1755,27 @@ describe('Checksum-Based Skip Write Optimization', () => {
       // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       // because browsers assign new dateAdded when syncing bookmarks
       const crypto = await import('crypto');
-      const normalized = bookmarks.map(b => ({
-        type: 'bookmark',
-        url: b.url,
-        title: b.title ?? '',
-        folderPath: b.folderPath || '',
-        index: b.index ?? 0,
-      })).sort((a, b) => {
-        // Sort by type first (folders before bookmarks)
-        if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
-        }
-        const folderCompare = a.folderPath.localeCompare(b.folderPath);
-        if (folderCompare !== 0) return folderCompare;
-        return (a.index ?? 0) - (b.index ?? 0);
-      });
-      const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+      const normalized = bookmarks
+        .map((b) => ({
+          type: 'bookmark',
+          url: b.url,
+          title: b.title ?? '',
+          folderPath: b.folderPath || '',
+          index: b.index ?? 0,
+        }))
+        .sort((a, b) => {
+          // Sort by type first (folders before bookmarks)
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          const folderCompare = a.folderPath.localeCompare(b.folderPath);
+          if (folderCompare !== 0) return folderCompare;
+          return (a.index ?? 0) - (b.index ?? 0);
+        });
+      const expectedChecksum = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(normalized))
+        .digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
         existingBookmarks: bookmarks,
@@ -1782,10 +1804,22 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should write to database when checksum differs', async () => {
       const existingBookmarks = [
-        { id: '1', url: 'https://old.com', title: 'Old', folderPath: 'Bookmarks', dateAdded: 1700000000000 },
+        {
+          id: '1',
+          url: 'https://old.com',
+          title: 'Old',
+          folderPath: 'Bookmarks',
+          dateAdded: 1700000000000,
+        },
       ];
       const newBookmarks = [
-        { id: '2', url: 'https://new.com', title: 'New', folderPath: 'Bookmarks', dateAdded: 1700000001000 },
+        {
+          id: '2',
+          url: 'https://new.com',
+          title: 'New',
+          folderPath: 'Bookmarks',
+          dateAdded: 1700000001000,
+        },
       ];
 
       mockSupabase = createChecksumMockSupabase({
@@ -1814,9 +1848,7 @@ describe('Checksum-Based Skip Write Optimization', () => {
     });
 
     it('should write to database when no existing data (first sync)', async () => {
-      const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example' },
-      ];
+      const bookmarks = [{ id: '1', url: 'https://example.com', title: 'Example' }];
 
       mockSupabase = createChecksumMockSupabase({
         existingBookmarks: [],
@@ -1843,31 +1875,41 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should write to database when tombstones change even if bookmarks are same', async () => {
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
+        {
+          id: '1',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bookmarks',
+          dateAdded: 1700000000000,
+          index: 0,
+        },
       ];
-      const newTombstones = [
-        { url: 'https://deleted.com', deletedAt: Date.now() },
-      ];
+      const newTombstones = [{ url: 'https://deleted.com', deletedAt: Date.now() }];
 
       // Calculate checksum for bookmarks (including type and index)
       // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
-      const normalized = bookmarks.map(b => ({
-        type: 'bookmark',
-        url: b.url,
-        title: b.title ?? '',
-        folderPath: b.folderPath || '',
-        index: b.index ?? 0,
-      })).sort((a, b) => {
-        // Sort by type first (folders before bookmarks)
-        if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
-        }
-        const folderCompare = a.folderPath.localeCompare(b.folderPath);
-        if (folderCompare !== 0) return folderCompare;
-        return (a.index ?? 0) - (b.index ?? 0);
-      });
-      const bookmarkChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+      const normalized = bookmarks
+        .map((b) => ({
+          type: 'bookmark',
+          url: b.url,
+          title: b.title ?? '',
+          folderPath: b.folderPath || '',
+          index: b.index ?? 0,
+        }))
+        .sort((a, b) => {
+          // Sort by type first (folders before bookmarks)
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          const folderCompare = a.folderPath.localeCompare(b.folderPath);
+          if (folderCompare !== 0) return folderCompare;
+          return (a.index ?? 0) - (b.index ?? 0);
+        });
+      const bookmarkChecksum = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(normalized))
+        .digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
         existingBookmarks: bookmarks,
@@ -1895,27 +1937,39 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should return existing checksum when skipping write', async () => {
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
+        {
+          id: '1',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bookmarks',
+          dateAdded: 1700000000000,
+          index: 0,
+        },
       ];
 
       // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
-      const normalized = bookmarks.map(b => ({
-        type: 'bookmark',
-        url: b.url,
-        title: b.title ?? '',
-        folderPath: b.folderPath || '',
-        index: b.index ?? 0,
-      })).sort((a, b) => {
-        // Sort by type first (folders before bookmarks)
-        if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
-        }
-        const folderCompare = a.folderPath.localeCompare(b.folderPath);
-        if (folderCompare !== 0) return folderCompare;
-        return (a.index ?? 0) - (b.index ?? 0);
-      });
-      const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+      const normalized = bookmarks
+        .map((b) => ({
+          type: 'bookmark',
+          url: b.url,
+          title: b.title ?? '',
+          folderPath: b.folderPath || '',
+          index: b.index ?? 0,
+        }))
+        .sort((a, b) => {
+          // Sort by type first (folders before bookmarks)
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          const folderCompare = a.folderPath.localeCompare(b.folderPath);
+          if (folderCompare !== 0) return folderCompare;
+          return (a.index ?? 0) - (b.index ?? 0);
+        });
+      const expectedChecksum = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(normalized))
+        .digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
         existingBookmarks: bookmarks,
@@ -1940,27 +1994,39 @@ describe('Checksum-Based Skip Write Optimization', () => {
 
     it('should handle repeated syncs with same data without incrementing version', async () => {
       const bookmarks = [
-        { id: '1', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks', dateAdded: 1700000000000, index: 0 },
+        {
+          id: '1',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bookmarks',
+          dateAdded: 1700000000000,
+          index: 0,
+        },
       ];
 
       // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
-      const normalized = bookmarks.map(b => ({
-        type: 'bookmark',
-        url: b.url,
-        title: b.title ?? '',
-        folderPath: b.folderPath || '',
-        index: b.index ?? 0,
-      })).sort((a, b) => {
-        // Sort by type first (folders before bookmarks)
-        if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
-        }
-        const folderCompare = a.folderPath.localeCompare(b.folderPath);
-        if (folderCompare !== 0) return folderCompare;
-        return (a.index ?? 0) - (b.index ?? 0);
-      });
-      const expectedChecksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+      const normalized = bookmarks
+        .map((b) => ({
+          type: 'bookmark',
+          url: b.url,
+          title: b.title ?? '',
+          folderPath: b.folderPath || '',
+          index: b.index ?? 0,
+        }))
+        .sort((a, b) => {
+          // Sort by type first (folders before bookmarks)
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          const folderCompare = a.folderPath.localeCompare(b.folderPath);
+          if (folderCompare !== 0) return folderCompare;
+          return (a.index ?? 0) - (b.index ?? 0);
+        });
+      const expectedChecksum = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(normalized))
+        .digest('hex');
 
       // Simulate multiple syncs with same data
       for (let i = 0; i < 3; i++) {
@@ -1993,32 +2059,65 @@ describe('Checksum-Based Skip Write Optimization', () => {
       // Bookmarks in different folders should produce SAME checksum regardless of input order
       // (sorted by folderPath then index)
       const bookmarksOrder1 = [
-        { id: '1', url: 'https://a.com', title: 'A', folderPath: 'Folder A', dateAdded: 1000, index: 0 },
-        { id: '2', url: 'https://b.com', title: 'B', folderPath: 'Folder B', dateAdded: 2000, index: 0 },
+        {
+          id: '1',
+          url: 'https://a.com',
+          title: 'A',
+          folderPath: 'Folder A',
+          dateAdded: 1000,
+          index: 0,
+        },
+        {
+          id: '2',
+          url: 'https://b.com',
+          title: 'B',
+          folderPath: 'Folder B',
+          dateAdded: 2000,
+          index: 0,
+        },
       ];
       const bookmarksOrder2 = [
-        { id: '2', url: 'https://b.com', title: 'B', folderPath: 'Folder B', dateAdded: 2000, index: 0 },
-        { id: '1', url: 'https://a.com', title: 'A', folderPath: 'Folder A', dateAdded: 1000, index: 0 },
+        {
+          id: '2',
+          url: 'https://b.com',
+          title: 'B',
+          folderPath: 'Folder B',
+          dateAdded: 2000,
+          index: 0,
+        },
+        {
+          id: '1',
+          url: 'https://a.com',
+          title: 'A',
+          folderPath: 'Folder A',
+          dateAdded: 1000,
+          index: 0,
+        },
       ];
 
       // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
-      const normalized1 = bookmarksOrder1.map(b => ({
-        type: 'bookmark',
-        url: b.url,
-        title: b.title ?? '',
-        folderPath: b.folderPath || '',
-        index: b.index ?? 0,
-      })).sort((a, b) => {
-        // Sort by type first (folders before bookmarks)
-        if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
-        }
-        const folderCompare = a.folderPath.localeCompare(b.folderPath);
-        if (folderCompare !== 0) return folderCompare;
-        return (a.index ?? 0) - (b.index ?? 0);
-      });
-      const checksum1 = crypto.createHash('sha256').update(JSON.stringify(normalized1)).digest('hex');
+      const normalized1 = bookmarksOrder1
+        .map((b) => ({
+          type: 'bookmark',
+          url: b.url,
+          title: b.title ?? '',
+          folderPath: b.folderPath || '',
+          index: b.index ?? 0,
+        }))
+        .sort((a, b) => {
+          // Sort by type first (folders before bookmarks)
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          const folderCompare = a.folderPath.localeCompare(b.folderPath);
+          if (folderCompare !== 0) return folderCompare;
+          return (a.index ?? 0) - (b.index ?? 0);
+        });
+      const checksum1 = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(normalized1))
+        .digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
         existingBookmarks: bookmarksOrder1,
@@ -2045,29 +2144,45 @@ describe('Checksum-Based Skip Write Optimization', () => {
       // Extra fields like 'id', 'source', 'dateAdded' should be ignored in checksum
       // Note: 'index' is now part of the checksum, so it must match
       const bookmarksWithExtras = [
-        { id: 'browser-123', url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5, source: 'chrome' },
+        {
+          id: 'browser-123',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bar',
+          dateAdded: 1000,
+          index: 5,
+          source: 'chrome',
+        },
       ];
       const bookmarksMinimal = [
-        { url: 'https://example.com', title: 'Example', folderPath: 'Bar', dateAdded: 1000, index: 5 },
+        {
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bar',
+          dateAdded: 1000,
+          index: 5,
+        },
       ];
 
       // NOTE: dateAdded is intentionally EXCLUDED from checksum calculation
       const crypto = await import('crypto');
-      const normalized = bookmarksMinimal.map(b => ({
-        type: 'bookmark',
-        url: b.url,
-        title: b.title ?? '',
-        folderPath: b.folderPath || '',
-        index: b.index ?? 0,
-      })).sort((a, b) => {
-        // Sort by type first (folders before bookmarks)
-        if (a.type !== b.type) {
-          return a.type === 'folder' ? -1 : 1;
-        }
-        const folderCompare = a.folderPath.localeCompare(b.folderPath);
-        if (folderCompare !== 0) return folderCompare;
-        return (a.index ?? 0) - (b.index ?? 0);
-      });
+      const normalized = bookmarksMinimal
+        .map((b) => ({
+          type: 'bookmark',
+          url: b.url,
+          title: b.title ?? '',
+          folderPath: b.folderPath || '',
+          index: b.index ?? 0,
+        }))
+        .sort((a, b) => {
+          // Sort by type first (folders before bookmarks)
+          if (a.type !== b.type) {
+            return a.type === 'folder' ? -1 : 1;
+          }
+          const folderCompare = a.folderPath.localeCompare(b.folderPath);
+          if (folderCompare !== 0) return folderCompare;
+          return (a.index ?? 0) - (b.index ?? 0);
+        });
       const checksum = crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 
       mockSupabase = createChecksumMockSupabase({
@@ -2103,11 +2218,7 @@ describe('Folder Ordering Preservation', () => {
    * Helper to create a mock that captures the merged data
    */
   function createOrderingMockSupabase(options = {}) {
-    const {
-      userExists = true,
-      existingBookmarks = [],
-      existingVersion = 0,
-    } = options;
+    const { userExists = true, existingBookmarks = [], existingVersion = 0 } = options;
 
     // Track what was upserted for assertions
     let upsertedData = null;
@@ -2132,11 +2243,14 @@ describe('Folder Ordering Preservation', () => {
     const bookmarksSelectMock = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: existingBookmarks.length > 0 ? {
-            bookmark_data: existingBookmarks,
-            version: existingVersion,
-            checksum: 'existing-checksum',
-          } : null,
+          data:
+            existingBookmarks.length > 0
+              ? {
+                  bookmark_data: existingBookmarks,
+                  version: existingVersion,
+                  checksum: 'existing-checksum',
+                }
+              : null,
           error: existingBookmarks.length > 0 ? null : { code: 'PGRST116' },
         }),
       }),
@@ -2185,12 +2299,24 @@ describe('Folder Ordering Preservation', () => {
       // The bug was that mergeBookmarks() was putting all bookmarks first,
       // then all folders, before sorting. This caused folders to appear
       // after bookmarks even when they should be interleaved.
-      
+
       const incomingItems = [
         { type: 'folder', title: 'Folder A', folderPath: 'Bookmarks Bar', index: 0 },
-        { type: 'bookmark', url: 'https://example.com', title: 'Example', folderPath: 'Bookmarks Bar', index: 1 },
+        {
+          type: 'bookmark',
+          url: 'https://example.com',
+          title: 'Example',
+          folderPath: 'Bookmarks Bar',
+          index: 1,
+        },
         { type: 'folder', title: 'Folder B', folderPath: 'Bookmarks Bar', index: 2 },
-        { type: 'bookmark', url: 'https://test.com', title: 'Test', folderPath: 'Bookmarks Bar', index: 3 },
+        {
+          type: 'bookmark',
+          url: 'https://test.com',
+          title: 'Test',
+          folderPath: 'Bookmarks Bar',
+          index: 3,
+        },
       ];
 
       mockSupabase = createOrderingMockSupabase({ existingBookmarks: [], existingVersion: 0 });
@@ -2211,24 +2337,24 @@ describe('Folder Ordering Preservation', () => {
       // Verify the order in the upserted data
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData).not.toBeNull();
-      
+
       const mergedItems = upsertedData.bookmark_data;
       expect(mergedItems).toHaveLength(4);
-      
+
       // Items should be sorted by folderPath, then by index
       // Since all have same folderPath, they should be in index order
       expect(mergedItems[0].index).toBe(0);
       expect(mergedItems[0].type).toBe('folder');
       expect(mergedItems[0].title).toBe('Folder A');
-      
+
       expect(mergedItems[1].index).toBe(1);
       expect(mergedItems[1].type).toBe('bookmark');
       expect(mergedItems[1].url).toBe('https://example.com');
-      
+
       expect(mergedItems[2].index).toBe(2);
       expect(mergedItems[2].type).toBe('folder');
       expect(mergedItems[2].title).toBe('Folder B');
-      
+
       expect(mergedItems[3].index).toBe(3);
       expect(mergedItems[3].type).toBe('bookmark');
       expect(mergedItems[3].url).toBe('https://test.com');
@@ -2238,7 +2364,7 @@ describe('Folder Ordering Preservation', () => {
       // This is the specific bug we're fixing:
       // Before the fix, folders would always appear after bookmarks
       // because the array was constructed as [...bookmarks, ...folders]
-      
+
       const incomingItems = [
         { type: 'bookmark', url: 'https://a.com', title: 'A', folderPath: 'Root', index: 0 },
         { type: 'folder', title: 'My Folder', folderPath: 'Root', index: 1 },
@@ -2259,11 +2385,11 @@ describe('Folder Ordering Preservation', () => {
 
       const upsertedData = mockSupabase.getUpsertedData();
       const mergedItems = upsertedData.bookmark_data;
-      
+
       // The folder should be at index 1, NOT at the end
       expect(mergedItems[1].type).toBe('folder');
       expect(mergedItems[1].title).toBe('My Folder');
-      
+
       // NOT this (the bug):
       // mergedItems[0] = bookmark A
       // mergedItems[1] = bookmark B
@@ -2273,9 +2399,21 @@ describe('Folder Ordering Preservation', () => {
     it('should handle folders and bookmarks in different folderPaths correctly', async () => {
       const incomingItems = [
         { type: 'folder', title: 'Work', folderPath: 'Bookmarks Bar', index: 0 },
-        { type: 'bookmark', url: 'https://work.com', title: 'Work Site', folderPath: 'Bookmarks Bar/Work', index: 0 },
+        {
+          type: 'bookmark',
+          url: 'https://work.com',
+          title: 'Work Site',
+          folderPath: 'Bookmarks Bar/Work',
+          index: 0,
+        },
         { type: 'folder', title: 'Personal', folderPath: 'Bookmarks Bar', index: 1 },
-        { type: 'bookmark', url: 'https://personal.com', title: 'Personal Site', folderPath: 'Bookmarks Bar/Personal', index: 0 },
+        {
+          type: 'bookmark',
+          url: 'https://personal.com',
+          title: 'Personal Site',
+          folderPath: 'Bookmarks Bar/Personal',
+          index: 0,
+        },
       ];
 
       mockSupabase = createOrderingMockSupabase({ existingBookmarks: [], existingVersion: 0 });
@@ -2292,24 +2430,24 @@ describe('Folder Ordering Preservation', () => {
 
       const upsertedData = mockSupabase.getUpsertedData();
       const mergedItems = upsertedData.bookmark_data;
-      
+
       // Items should be sorted by folderPath first, then by index
       // Expected order:
       // 1. Bookmarks Bar items (Work folder at 0, Personal folder at 1)
       // 2. Bookmarks Bar/Personal items (Personal Site at 0)
       // 3. Bookmarks Bar/Work items (Work Site at 0)
-      
+
       expect(mergedItems).toHaveLength(4);
-      
+
       // First two should be from "Bookmarks Bar" (sorted by index)
       expect(mergedItems[0].folderPath).toBe('Bookmarks Bar');
       expect(mergedItems[0].index).toBe(0);
       expect(mergedItems[1].folderPath).toBe('Bookmarks Bar');
       expect(mergedItems[1].index).toBe(1);
-      
+
       // Next should be from "Bookmarks Bar/Personal" (alphabetically before "Bookmarks Bar/Work")
       expect(mergedItems[2].folderPath).toBe('Bookmarks Bar/Personal');
-      
+
       // Last should be from "Bookmarks Bar/Work"
       expect(mergedItems[3].folderPath).toBe('Bookmarks Bar/Work');
     });
@@ -2398,11 +2536,7 @@ describe('Bookmark Count Limits', () => {
      * Helper to create a mock that simulates existing bookmarks in the database
      */
     function createMergeLimitMockSupabase(options = {}) {
-      const {
-        userExists = true,
-        existingBookmarks = [],
-        existingVersion = 1,
-      } = options;
+      const { userExists = true, existingBookmarks = [], existingVersion = 1 } = options;
 
       // Mock for ensureUserExists - user check
       const usersSelectMock = vi.fn().mockReturnValue({
@@ -2424,12 +2558,15 @@ describe('Bookmark Count Limits', () => {
       const bookmarksSelectMock = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
-            data: existingBookmarks.length > 0 ? {
-              bookmark_data: existingBookmarks,
-              tombstones: [],
-              version: existingVersion,
-              checksum: 'existing-checksum',
-            } : null,
+            data:
+              existingBookmarks.length > 0
+                ? {
+                    bookmark_data: existingBookmarks,
+                    tombstones: [],
+                    version: existingVersion,
+                    checksum: 'existing-checksum',
+                  }
+                : null,
             error: existingBookmarks.length > 0 ? null : { code: 'PGRST116' },
           }),
         }),
@@ -2608,13 +2745,19 @@ describe('Server-Side Tombstone Cleanup', () => {
     const bookmarksSelectMock = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
-          data: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? {
-            bookmark_data: existingBookmarks,
-            tombstones: existingTombstones,
-            version: existingVersion,
-            checksum: 'existing-checksum',
-          } : null,
-          error: (existingBookmarks.length > 0 || existingTombstones.length > 0) ? null : { code: 'PGRST116' },
+          data:
+            existingBookmarks.length > 0 || existingTombstones.length > 0
+              ? {
+                  bookmark_data: existingBookmarks,
+                  tombstones: existingTombstones,
+                  version: existingVersion,
+                  checksum: 'existing-checksum',
+                }
+              : null,
+          error:
+            existingBookmarks.length > 0 || existingTombstones.length > 0
+              ? null
+              : { code: 'PGRST116' },
         }),
       }),
     });
@@ -2625,12 +2768,14 @@ describe('Server-Side Tombstone Cleanup', () => {
       return {
         select: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
-            data: upsertSuccess ? {
-              version: existingVersion + 1,
-              checksum: 'new-checksum',
-              bookmark_data: data.bookmark_data,
-              tombstones: data.tombstones,
-            } : null,
+            data: upsertSuccess
+              ? {
+                  version: existingVersion + 1,
+                  checksum: 'new-checksum',
+                  bookmark_data: data.bookmark_data,
+                  tombstones: data.tombstones,
+                }
+              : null,
             error: upsertSuccess ? null : { message: 'Upsert failed' },
           }),
         }),
@@ -2657,9 +2802,9 @@ describe('Server-Side Tombstone Cleanup', () => {
   describe('POST /api/bookmarks - Tombstone Cleanup', () => {
     it('should remove tombstones older than 30 days from existing data', async () => {
       const now = Date.now();
-      const thirtyOneDaysAgo = now - (31 * 24 * 60 * 60 * 1000);
-      const twentyNineDaysAgo = now - (29 * 24 * 60 * 60 * 1000);
-      
+      const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
+      const twentyNineDaysAgo = now - 29 * 24 * 60 * 60 * 1000;
+
       const existingTombstones = [
         { url: 'https://old-deleted.com', deletedAt: thirtyOneDaysAgo }, // Should be cleaned up
         { url: 'https://recent-deleted.com', deletedAt: twentyNineDaysAgo }, // Should be kept
@@ -2667,7 +2812,7 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       mockSupabase = createTombstoneCleanupMockSupabase({
         existingTombstones,
-        existingVersion: 1
+        existingVersion: 1,
       });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
@@ -2681,7 +2826,7 @@ describe('Server-Side Tombstone Cleanup', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      
+
       // Check that the old tombstone was cleaned up
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData).not.toBeNull();
@@ -2691,9 +2836,9 @@ describe('Server-Side Tombstone Cleanup', () => {
 
     it('should remove tombstones older than 30 days from incoming data', async () => {
       const now = Date.now();
-      const thirtyOneDaysAgo = now - (31 * 24 * 60 * 60 * 1000);
-      const twentyNineDaysAgo = now - (29 * 24 * 60 * 60 * 1000);
-      
+      const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
+      const twentyNineDaysAgo = now - 29 * 24 * 60 * 60 * 1000;
+
       const incomingTombstones = [
         { url: 'https://old-incoming.com', deletedAt: thirtyOneDaysAgo }, // Should be cleaned up
         { url: 'https://recent-incoming.com', deletedAt: twentyNineDaysAgo }, // Should be kept
@@ -2712,7 +2857,7 @@ describe('Server-Side Tombstone Cleanup', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      
+
       // Check that the old tombstone was cleaned up
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData).not.toBeNull();
@@ -2722,15 +2867,15 @@ describe('Server-Side Tombstone Cleanup', () => {
 
     it('should keep tombstones exactly 30 days old', async () => {
       const now = Date.now();
-      const exactlyThirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-      
+      const exactlyThirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
       const existingTombstones = [
         { url: 'https://exactly-30-days.com', deletedAt: exactlyThirtyDaysAgo },
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
         existingTombstones,
-        existingVersion: 1
+        existingVersion: 1,
       });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
@@ -2742,7 +2887,7 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       const response = await POST(request);
       expect(response.status).toBe(200);
-      
+
       // Tombstone at exactly 30 days should be kept (cutoff is > 30 days)
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData.tombstones).toHaveLength(1);
@@ -2750,22 +2895,22 @@ describe('Server-Side Tombstone Cleanup', () => {
 
     it('should clean up old tombstones during merge', async () => {
       const now = Date.now();
-      const fortyDaysAgo = now - (40 * 24 * 60 * 60 * 1000);
-      const tenDaysAgo = now - (10 * 24 * 60 * 60 * 1000);
-      const fiveDaysAgo = now - (5 * 24 * 60 * 60 * 1000);
-      
+      const fortyDaysAgo = now - 40 * 24 * 60 * 60 * 1000;
+      const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
+      const fiveDaysAgo = now - 5 * 24 * 60 * 60 * 1000;
+
       const existingTombstones = [
         { url: 'https://very-old.com', deletedAt: fortyDaysAgo }, // Should be cleaned up (> 30 days)
         { url: 'https://existing-recent.com', deletedAt: tenDaysAgo }, // Should be kept (< 30 days)
       ];
-      
+
       const incomingTombstones = [
         { url: 'https://incoming-recent.com', deletedAt: fiveDaysAgo }, // Should be kept
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
         existingTombstones,
-        existingVersion: 1
+        existingVersion: 1,
       });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
@@ -2777,12 +2922,12 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       const response = await POST(request);
       expect(response.status).toBe(200);
-      
+
       // Should have 2 tombstones (the two recent ones)
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData.tombstones).toHaveLength(2);
-      
-      const urls = upsertedData.tombstones.map(t => t.url);
+
+      const urls = upsertedData.tombstones.map((t) => t.url);
       expect(urls).toContain('https://existing-recent.com');
       expect(urls).toContain('https://incoming-recent.com');
       expect(urls).not.toContain('https://very-old.com');
@@ -2792,12 +2937,12 @@ describe('Server-Side Tombstone Cleanup', () => {
       // Tombstones without deletedAt should be kept (can't determine age)
       const existingTombstones = [
         { url: 'https://no-timestamp.com' }, // No deletedAt - should be kept
-        { url: 'https://with-timestamp.com', deletedAt: Date.now() - (5 * 24 * 60 * 60 * 1000) },
+        { url: 'https://with-timestamp.com', deletedAt: Date.now() - 5 * 24 * 60 * 60 * 1000 },
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
         existingTombstones,
-        existingVersion: 1
+        existingVersion: 1,
       });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
@@ -2809,7 +2954,7 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       const response = await POST(request);
       expect(response.status).toBe(200);
-      
+
       // Both should be kept
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData.tombstones).toHaveLength(2);
@@ -2821,23 +2966,23 @@ describe('Server-Side Tombstone Cleanup', () => {
       // This test verifies the ROOT CAUSE fix:
       // Before: Tombstones accumulated forever in the cloud
       // After: Tombstones older than 30 days are automatically cleaned up
-      
+
       const now = Date.now();
-      
+
       // Simulate a scenario where tombstones have been accumulating for months
       const accumulatedTombstones = [
-        { url: 'https://deleted-90-days-ago.com', deletedAt: now - (90 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-60-days-ago.com', deletedAt: now - (60 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-45-days-ago.com', deletedAt: now - (45 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-31-days-ago.com', deletedAt: now - (31 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-29-days-ago.com', deletedAt: now - (29 * 24 * 60 * 60 * 1000) },
-        { url: 'https://deleted-7-days-ago.com', deletedAt: now - (7 * 24 * 60 * 60 * 1000) },
+        { url: 'https://deleted-90-days-ago.com', deletedAt: now - 90 * 24 * 60 * 60 * 1000 },
+        { url: 'https://deleted-60-days-ago.com', deletedAt: now - 60 * 24 * 60 * 60 * 1000 },
+        { url: 'https://deleted-45-days-ago.com', deletedAt: now - 45 * 24 * 60 * 60 * 1000 },
+        { url: 'https://deleted-31-days-ago.com', deletedAt: now - 31 * 24 * 60 * 60 * 1000 },
+        { url: 'https://deleted-29-days-ago.com', deletedAt: now - 29 * 24 * 60 * 60 * 1000 },
+        { url: 'https://deleted-7-days-ago.com', deletedAt: now - 7 * 24 * 60 * 60 * 1000 },
         { url: 'https://deleted-today.com', deletedAt: now },
       ];
 
       mockSupabase = createTombstoneCleanupMockSupabase({
         existingTombstones: accumulatedTombstones,
-        existingVersion: 1
+        existingVersion: 1,
       });
       getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
 
@@ -2849,16 +2994,16 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       const response = await POST(request);
       expect(response.status).toBe(200);
-      
+
       // Only tombstones from the last 30 days should remain
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData.tombstones).toHaveLength(3); // 29 days, 7 days, today
-      
-      const urls = upsertedData.tombstones.map(t => t.url);
+
+      const urls = upsertedData.tombstones.map((t) => t.url);
       expect(urls).toContain('https://deleted-29-days-ago.com');
       expect(urls).toContain('https://deleted-7-days-ago.com');
       expect(urls).toContain('https://deleted-today.com');
-      
+
       // Old tombstones should be gone
       expect(urls).not.toContain('https://deleted-90-days-ago.com');
       expect(urls).not.toContain('https://deleted-60-days-ago.com');

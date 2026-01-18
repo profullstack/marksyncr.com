@@ -293,10 +293,7 @@ describe('SyncEngine', () => {
         id: 'folder-1',
         type: 'folder',
         title: 'My Folder',
-        children: [
-          createBookmark({ title: 'Child 1' }),
-          createBookmark({ title: 'Child 2' }),
-        ],
+        children: [createBookmark({ title: 'Child 1' }), createBookmark({ title: 'Child 2' })],
         dateAdded: new Date().toISOString(),
         dateModified: new Date().toISOString(),
       };

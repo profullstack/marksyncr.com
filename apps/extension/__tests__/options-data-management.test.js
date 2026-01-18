@@ -67,7 +67,10 @@ describe('Options Data Management', () => {
           title: 'Tagged Bookmark',
           url: 'https://example.com',
           type: 'bookmark',
-          tags: [{ id: 't1', name: 'work' }, { id: 't2', name: 'important' }],
+          tags: [
+            { id: 't1', name: 'work' },
+            { id: 't2', name: 'important' },
+          ],
           notes: 'This is a test note',
           dateAdded: 1609459200000,
         },
@@ -131,9 +134,7 @@ describe('Options Data Management', () => {
       const jsonContent = JSON.stringify({
         source: 'MarkSyncr',
         version: '1.1',
-        bookmarks: [
-          { title: 'Test', url: 'https://test.com' },
-        ],
+        bookmarks: [{ title: 'Test', url: 'https://test.com' }],
       });
 
       const format = detectImportFormat(jsonContent);
@@ -179,8 +180,10 @@ describe('Options Data Management', () => {
 
     it('should throw error for invalid JSON structure', () => {
       const invalidJson = JSON.stringify({ invalid: 'structure' });
-      
-      expect(() => parseImportFile(invalidJson, IMPORT_FORMATS.JSON)).toThrow('Invalid JSON bookmark format');
+
+      expect(() => parseImportFile(invalidJson, IMPORT_FORMATS.JSON)).toThrow(
+        'Invalid JSON bookmark format'
+      );
     });
 
     it('should preserve tags from imported JSON', () => {
@@ -238,7 +241,7 @@ describe('Options Data Management', () => {
 
       // Export to JSON
       const exported = formatToJson(originalBookmarks);
-      
+
       // Import back
       const imported = parseImportFile(exported, IMPORT_FORMATS.JSON);
 

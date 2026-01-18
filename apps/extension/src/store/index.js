@@ -63,11 +63,41 @@ import {
 
 // Default sources available
 const DEFAULT_SOURCES = [
-  { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true, description: 'Sync your browser bookmarks' },
-  { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false, description: 'Sync to cloud (requires login)' },
-  { id: 'github', name: 'GitHub', type: 'github', connected: false, description: 'Sync to GitHub repository' },
-  { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false, description: 'Sync to Dropbox' },
-  { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false, description: 'Sync to Google Drive' },
+  {
+    id: 'browser-bookmarks',
+    name: 'Browser Bookmarks',
+    type: 'browser-bookmarks',
+    connected: true,
+    description: 'Sync your browser bookmarks',
+  },
+  {
+    id: 'supabase-cloud',
+    name: 'MarkSyncr Cloud',
+    type: 'supabase-cloud',
+    connected: false,
+    description: 'Sync to cloud (requires login)',
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    type: 'github',
+    connected: false,
+    description: 'Sync to GitHub repository',
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    type: 'dropbox',
+    connected: false,
+    description: 'Sync to Dropbox',
+  },
+  {
+    id: 'google-drive',
+    name: 'Google Drive',
+    type: 'google-drive',
+    connected: false,
+    description: 'Sync to Google Drive',
+  },
 ];
 
 // Default settings
@@ -103,9 +133,19 @@ const getBrowserAPI = () => {
     return browser;
   }
   // Return mock for development/testing - THIS SHOULD NOT HAPPEN IN PRODUCTION
-  console.warn('[MarkSyncr Store] WARNING: Using mock browser API - extension features will not work!');
-  console.warn('[MarkSyncr Store] chrome:', typeof chrome, chrome ? Object.keys(chrome) : 'undefined');
-  console.warn('[MarkSyncr Store] browser:', typeof browser, typeof browser !== 'undefined' ? Object.keys(browser) : 'undefined');
+  console.warn(
+    '[MarkSyncr Store] WARNING: Using mock browser API - extension features will not work!'
+  );
+  console.warn(
+    '[MarkSyncr Store] chrome:',
+    typeof chrome,
+    chrome ? Object.keys(chrome) : 'undefined'
+  );
+  console.warn(
+    '[MarkSyncr Store] browser:',
+    typeof browser,
+    typeof browser !== 'undefined' ? Object.keys(browser) : 'undefined'
+  );
   return {
     storage: {
       local: {
@@ -115,8 +155,14 @@ const getBrowserAPI = () => {
     },
     runtime: {
       sendMessage: async (message) => {
-        console.error('[MarkSyncr Store] Mock sendMessage called - this should not happen in production!', message);
-        return { success: false, error: 'Browser extension API not available. Please reload the extension.' };
+        console.error(
+          '[MarkSyncr Store] Mock sendMessage called - this should not happen in production!',
+          message
+        );
+        return {
+          success: false,
+          error: 'Browser extension API not available. Please reload the extension.',
+        };
       },
     },
     bookmarks: {
@@ -197,13 +243,13 @@ export const useStore = create(
 
         try {
           const { user, session } = await signInWithEmail(email, password);
-          
+
           // Fetch subscription status
           const subscription = await fetchSubscription();
-          
+
           // Fetch cloud settings
           const cloudSettings = await fetchCloudSettings();
-          
+
           set({
             user,
             isAuthenticated: true,
@@ -244,7 +290,7 @@ export const useStore = create(
 
         try {
           await signUpWithEmail(email, password);
-          
+
           set({
             isAuthLoading: false,
             authError: null,
@@ -271,7 +317,7 @@ export const useStore = create(
 
         try {
           await apiSignOut();
-          
+
           // Mark supabase-cloud as disconnected since user is logging out
           const sources = get().sources.map((source) => {
             if (source.id === 'supabase-cloud') {
@@ -283,11 +329,11 @@ export const useStore = create(
             }
             return source;
           });
-          
+
           // Persist updated sources to browser storage
           const browserAPI = getBrowserAPI();
           await browserAPI.storage.local.set({ sources });
-          
+
           set({
             user: null,
             isAuthenticated: false,
@@ -298,7 +344,10 @@ export const useStore = create(
             sources,
           });
 
-          console.log('[MarkSyncr Store] Logged out, sources disconnected:', sources.map(s => ({ id: s.id, connected: s.connected })));
+          console.log(
+            '[MarkSyncr Store] Logged out, sources disconnected:',
+            sources.map((s) => ({ id: s.id, connected: s.connected }))
+          );
 
           return { success: true };
         } catch (err) {
@@ -321,15 +370,15 @@ export const useStore = create(
       checkAuth: async () => {
         try {
           const session = await getSession();
-          
+
           if (session) {
             // Set sources loading state early so UI knows we're fetching
             set({ isSourcesLoading: true });
-            
+
             const user = await getUser();
             const subscription = await fetchSubscription();
             const cloudSettings = await fetchCloudSettings();
-            
+
             set({
               user,
               isAuthenticated: true,
@@ -346,11 +395,14 @@ export const useStore = create(
             // the correct connected services in the UI immediately
             console.log('[MarkSyncr Store] Refreshing sources after auth check...');
             const refreshResult = await get().refreshSources();
-            console.log('[MarkSyncr Store] Sources refresh result after auth check:', refreshResult);
+            console.log(
+              '[MarkSyncr Store] Sources refresh result after auth check:',
+              refreshResult
+            );
 
             return true;
           }
-          
+
           return false;
         } catch (err) {
           console.error('Auth check failed:', err);
@@ -463,10 +515,16 @@ export const useStore = create(
 
         console.log('[MarkSyncr Store] triggerSync called');
         console.log('[MarkSyncr Store] selectedSource:', selectedSource);
-        console.log('[MarkSyncr Store] sources:', sources?.map(s => ({ id: s.id, connected: s.connected })));
+        console.log(
+          '[MarkSyncr Store] sources:',
+          sources?.map((s) => ({ id: s.id, connected: s.connected }))
+        );
 
         if (!selectedSource) {
-          set({ error: 'No sync source selected. Please select a source from the dropdown.', status: 'error' });
+          set({
+            error: 'No sync source selected. Please select a source from the dropdown.',
+            status: 'error',
+          });
           return;
         }
 
@@ -497,7 +555,9 @@ export const useStore = create(
           console.log('[MarkSyncr Store] Sync result from background:', result);
 
           if (!result) {
-            throw new Error('No response from background script. The extension may need to be reloaded.');
+            throw new Error(
+              'No response from background script. The extension may need to be reloaded.'
+            );
           }
 
           if (result.requiresAuth) {
@@ -538,7 +598,9 @@ export const useStore = create(
             const addedFromCloud = result.addedFromCloud || 0;
             const deletedLocally = result.deletedLocally || 0;
             if (addedFromCloud > 0 || deletedLocally > 0) {
-              console.log(`[MarkSyncr Store] Sync complete: ${addedFromCloud} added from cloud, ${deletedLocally} deleted locally`);
+              console.log(
+                `[MarkSyncr Store] Sync complete: ${addedFromCloud} added from cloud, ${deletedLocally} deleted locally`
+              );
             }
           } else {
             throw new Error(result?.error || 'Sync failed - unknown error from background script');
@@ -561,7 +623,7 @@ export const useStore = create(
         try {
           const browserAPI = getBrowserAPI();
           console.log('[MarkSyncr Store] Force Push: Sending FORCE_PUSH message...');
-          
+
           const result = await browserAPI.runtime.sendMessage({
             type: 'FORCE_PUSH',
           });
@@ -600,7 +662,7 @@ export const useStore = create(
         try {
           const browserAPI = getBrowserAPI();
           console.log('[MarkSyncr Store] Force Pull: Sending FORCE_PULL message...');
-          
+
           const result = await browserAPI.runtime.sendMessage({
             type: 'FORCE_PULL',
           });
@@ -609,7 +671,7 @@ export const useStore = create(
 
           if (result?.success) {
             const lastSync = new Date().toISOString();
-            
+
             // Refresh bookmark stats after pull
             try {
               const tree = await browserAPI.bookmarks.getTree();
@@ -772,7 +834,7 @@ export const useStore = create(
 
         try {
           console.log('[MarkSyncr Store] Refreshing sources from server...');
-          
+
           const result = await browserAPI.runtime.sendMessage({
             type: 'REFRESH_SOURCES',
           });
@@ -780,12 +842,15 @@ export const useStore = create(
           if (result?.success && result.sources) {
             // Update Zustand store state
             set({ sources: result.sources, isSourcesLoading: false });
-            
+
             // Also persist to browser.storage.local so sources are available
             // immediately on next popup open (before refreshSources completes)
             await browserAPI.storage.local.set({ sources: result.sources });
-            
-            console.log('[MarkSyncr Store] Sources refreshed and persisted:', result.sources.map(s => ({ id: s.id, connected: s.connected })));
+
+            console.log(
+              '[MarkSyncr Store] Sources refreshed and persisted:',
+              result.sources.map((s) => ({ id: s.id, connected: s.connected }))
+            );
             return { success: true, sources: result.sources };
           } else {
             console.warn('[MarkSyncr Store] Failed to refresh sources:', result?.error);
@@ -815,7 +880,9 @@ export const useStore = create(
             // Dashboard was opened in a new tab
             return {
               success: true,
-              message: result.message || 'Please connect the source from the dashboard, then refresh sources.',
+              message:
+                result.message ||
+                'Please connect the source from the dashboard, then refresh sources.',
             };
           }
 
@@ -872,7 +939,7 @@ export const useStore = create(
         try {
           // Get auth token from storage
           const { authToken } = await browserAPI.storage.local.get('authToken');
-          
+
           if (!authToken) {
             set({ tags: [], isLoadingTags: false });
             return;
@@ -909,7 +976,7 @@ export const useStore = create(
 
         try {
           const { authToken } = await browserAPI.storage.local.get('authToken');
-          
+
           if (!authToken) {
             throw new Error('Not authenticated');
           }
@@ -949,7 +1016,7 @@ export const useStore = create(
 
         try {
           const { authToken } = await browserAPI.storage.local.get('authToken');
-          
+
           if (!authToken) {
             throw new Error('Not authenticated');
           }
@@ -991,7 +1058,7 @@ export const useStore = create(
 
         try {
           const { authToken } = await browserAPI.storage.local.get('authToken');
-          
+
           if (!authToken) {
             throw new Error('Not authenticated');
           }
@@ -1121,9 +1188,7 @@ export const useStore = create(
           await browserAPI.bookmarks.update(bookmarkId, updates);
           // Update local state
           set({
-            bookmarks: get().bookmarks.map((b) =>
-              b.id === bookmarkId ? { ...b, ...updates } : b
-            ),
+            bookmarks: get().bookmarks.map((b) => (b.id === bookmarkId ? { ...b, ...updates } : b)),
           });
         } catch (err) {
           console.error('Failed to update bookmark:', err);
@@ -1146,7 +1211,7 @@ export const useStore = create(
         try {
           for (let i = 0; i < bookmarksToScan.length; i++) {
             const bookmark = bookmarksToScan[i];
-            
+
             if (onProgress) {
               onProgress({
                 completed: i,

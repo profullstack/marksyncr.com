@@ -32,7 +32,7 @@ const { getAuthenticatedUser } = await import('@/lib/auth-helper');
  */
 function createMockRequest(options = {}) {
   const { method = 'DELETE', body = null, headers = {} } = options;
-  
+
   const request = {
     method,
     headers: {
@@ -40,7 +40,7 @@ function createMockRequest(options = {}) {
     },
     json: async () => body,
   };
-  
+
   return request;
 }
 

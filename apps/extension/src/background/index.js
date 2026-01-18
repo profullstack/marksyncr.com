@@ -37,7 +37,7 @@ let lastSyncError = null;
  */
 function getApiBaseUrl() {
   // In production builds, this will be replaced by Vite with the actual URL
-   
+
   return typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_URL
     ? import.meta.env.VITE_APP_URL
     : 'https://marksyncr.com';
@@ -96,10 +96,10 @@ async function storeTombstones(tombstones) {
  */
 async function addTombstone(url) {
   if (!url) return;
-  
+
   const tombstones = await getTombstones();
-  const existingIndex = tombstones.findIndex(t => t.url === url);
-  
+  const existingIndex = tombstones.findIndex((t) => t.url === url);
+
   if (existingIndex >= 0) {
     // Update existing tombstone with new deletion time
     tombstones[existingIndex].deletedAt = Date.now();
@@ -107,7 +107,7 @@ async function addTombstone(url) {
     // Add new tombstone
     tombstones.push({ url, deletedAt: Date.now() });
   }
-  
+
   await storeTombstones(tombstones);
   console.log(`[MarkSyncr] Added tombstone for: ${url}`);
 }
@@ -118,10 +118,10 @@ async function addTombstone(url) {
  */
 async function removeTombstone(url) {
   if (!url) return;
-  
+
   const tombstones = await getTombstones();
-  const filtered = tombstones.filter(t => t.url !== url);
-  
+  const filtered = tombstones.filter((t) => t.url !== url);
+
   if (filtered.length !== tombstones.length) {
     await storeTombstones(filtered);
     console.log(`[MarkSyncr] Removed tombstone for: ${url}`);
@@ -135,8 +135,8 @@ async function removeTombstone(url) {
 async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
   const tombstones = await getTombstones();
   const cutoff = Date.now() - maxAgeMs;
-  const filtered = tombstones.filter(t => t.deletedAt > cutoff);
-  
+  const filtered = tombstones.filter((t) => t.deletedAt > cutoff);
+
   if (filtered.length !== tombstones.length) {
     await storeTombstones(filtered);
     console.log(`[MarkSyncr] Cleaned up ${tombstones.length - filtered.length} old tombstones`);
@@ -166,37 +166,39 @@ async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
  */
 function normalizeItemsForChecksum(items) {
   if (!Array.isArray(items)) return [];
-  
-  return items.map(item => {
-    if (item.type === 'folder') {
-      // Folder entry
-      return {
-        type: 'folder',
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    } else {
-      // Bookmark entry (default for backwards compatibility)
-      // NOTE: dateAdded is intentionally excluded - see function comment
-      return {
-        type: 'bookmark',
-        url: item.url,
-        title: item.title ?? '',
-        folderPath: item.folderPath || item.folder_path || '',
-        index: item.index ?? 0,
-      };
-    }
-  }).sort((a, b) => {
-    // Sort by folderPath first, then by index within the folder
-    // IMPORTANT: Do NOT sort by type - this would break the interleaved order
-    // of folders and bookmarks. When a user moves a folder from position 3 to
-    // the last position, the index should be preserved, not reset based on type.
-    const folderCompare = a.folderPath.localeCompare(b.folderPath);
-    if (folderCompare !== 0) return folderCompare;
-    // Then by index within the folder to preserve original order
-    return (a.index ?? 0) - (b.index ?? 0);
-  });
+
+  return items
+    .map((item) => {
+      if (item.type === 'folder') {
+        // Folder entry
+        return {
+          type: 'folder',
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      } else {
+        // Bookmark entry (default for backwards compatibility)
+        // NOTE: dateAdded is intentionally excluded - see function comment
+        return {
+          type: 'bookmark',
+          url: item.url,
+          title: item.title ?? '',
+          folderPath: item.folderPath || item.folder_path || '',
+          index: item.index ?? 0,
+        };
+      }
+    })
+    .sort((a, b) => {
+      // Sort by folderPath first, then by index within the folder
+      // IMPORTANT: Do NOT sort by type - this would break the interleaved order
+      // of folders and bookmarks. When a user moves a folder from position 3 to
+      // the last position, the index should be preserved, not reset based on type.
+      const folderCompare = a.folderPath.localeCompare(b.folderPath);
+      if (folderCompare !== 0) return folderCompare;
+      // Then by index within the folder to preserve original order
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
 }
 
 /**
@@ -221,7 +223,7 @@ async function generateChecksum(bookmarks) {
   const dataBuffer = encoder.encode(data);
   const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -282,44 +284,48 @@ function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime)
   if (!cloudTombstones || cloudTombstones.length === 0) {
     return [];
   }
-  
+
   // If we've never synced before, don't apply any cloud tombstones
   // This is a fresh install, so we shouldn't delete anything
   if (!lastSyncTime) {
     console.log('[MarkSyncr] First sync - not applying cloud tombstones (safeguard)');
     return [];
   }
-  
+
   // Create a set of local tombstone URLs for quick lookup
-  const localTombstoneUrls = new Set(localTombstones.map(t => t.url));
-  
+  const localTombstoneUrls = new Set(localTombstones.map((t) => t.url));
+
   // Filter cloud tombstones
-  const filtered = cloudTombstones.filter(tombstone => {
+  const filtered = cloudTombstones.filter((tombstone) => {
     // If we have a local tombstone for this URL, we already know about this deletion
     if (localTombstoneUrls.has(tombstone.url)) {
       return true;
     }
-    
+
     // If the tombstone was created AFTER our last sync, it's a new deletion
     // from another browser that we should apply
     if (tombstone.deletedAt > lastSyncTime) {
       return true;
     }
-    
+
     // Otherwise, this is a stale tombstone from before our last sync
     // We don't have a local tombstone for it, which means either:
     // 1. We cleared local storage (lost our tombstones)
     // 2. The bookmark was re-added after the tombstone was created
     // In either case, we should NOT delete the local bookmark
-    console.log(`[MarkSyncr] Skipping stale tombstone (safeguard): ${tombstone.url} (deletedAt: ${new Date(tombstone.deletedAt).toISOString()}, lastSync: ${new Date(lastSyncTime).toISOString()})`);
+    console.log(
+      `[MarkSyncr] Skipping stale tombstone (safeguard): ${tombstone.url} (deletedAt: ${new Date(tombstone.deletedAt).toISOString()}, lastSync: ${new Date(lastSyncTime).toISOString()})`
+    );
     return false;
   });
-  
+
   const skipped = cloudTombstones.length - filtered.length;
   if (skipped > 0) {
-    console.log(`[MarkSyncr] Tombstone safeguard: ${skipped} stale tombstones skipped, ${filtered.length} will be applied`);
+    console.log(
+      `[MarkSyncr] Tombstone safeguard: ${skipped} stale tombstones skipped, ${filtered.length} will be applied`
+    );
   }
-  
+
   return filtered;
 }
 
@@ -338,20 +344,22 @@ function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime)
  */
 function normalizeFolderPath(path) {
   if (!path) return '';
-  return path
-    // Normalize toolbar variations
-    .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
-    .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
-    .replace(/^Speed Dial\/?/i, 'toolbar/')
-    .replace(/^Favourites Bar\/?/i, 'toolbar/')
-    .replace(/^Favorites Bar\/?/i, 'toolbar/')
-    // Normalize other bookmarks variations
-    .replace(/^Other Bookmarks\/?/i, 'other/')
-    .replace(/^Unsorted Bookmarks\/?/i, 'other/')
-    // Normalize menu variations (Firefox)
-    .replace(/^Bookmarks Menu\/?/i, 'menu/')
-    // Clean up trailing slashes
-    .replace(/\/+$/, '');
+  return (
+    path
+      // Normalize toolbar variations
+      .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
+      .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
+      .replace(/^Speed Dial\/?/i, 'toolbar/')
+      .replace(/^Favourites Bar\/?/i, 'toolbar/')
+      .replace(/^Favorites Bar\/?/i, 'toolbar/')
+      // Normalize other bookmarks variations
+      .replace(/^Other Bookmarks\/?/i, 'other/')
+      .replace(/^Unsorted Bookmarks\/?/i, 'other/')
+      // Normalize menu variations (Firefox)
+      .replace(/^Bookmarks Menu\/?/i, 'menu/')
+      // Clean up trailing slashes
+      .replace(/\/+$/, '')
+  );
 }
 
 /**
@@ -365,15 +373,16 @@ function normalizeFolderPath(path) {
 function bookmarkNeedsUpdate(cloudBm, localBm) {
   // Title changed
   if ((cloudBm.title ?? '') !== (localBm.title ?? '')) return true;
-  
+
   // Folder changed (with normalization)
   const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
   const localFolder = normalizeFolderPath(localBm.folderPath);
   if (cloudFolder !== localFolder) return true;
-  
+
   // Index changed (position within folder)
-  if (cloudBm.index !== undefined && localBm.index !== undefined && cloudBm.index !== localBm.index) return true;
-  
+  if (cloudBm.index !== undefined && localBm.index !== undefined && cloudBm.index !== localBm.index)
+    return true;
+
   return false;
 }
 
@@ -386,26 +395,32 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
  * @returns {{toAdd: Array, toUpdate: Array, skippedByTombstone: Array}} - Categorized bookmarks
  */
 function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
-  const localByUrl = new Map(localBookmarks.filter(b => b.url).map(b => [b.url, b]));
+  const localByUrl = new Map(localBookmarks.filter((b) => b.url).map((b) => [b.url, b]));
 
   const toAdd = [];
   const toUpdate = [];
   const skippedByTombstone = [];
   const alreadyExistsUnchanged = [];
 
-  console.log(`[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones`);
+  console.log(
+    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones`
+  );
 
   for (const cloudBm of cloudBookmarks) {
     // Skip folders (handled separately)
     if (!cloudBm.url) continue;
 
     // Check tombstones - only add if bookmark is newer than tombstone
-    const tombstone = tombstones.find(t => t.url === cloudBm.url);
+    const tombstone = tombstones.find((t) => t.url === cloudBm.url);
     if (tombstone) {
       const bookmarkDate = cloudBm.dateAdded || 0;
       const tombstoneDate = tombstone.deletedAt || 0;
       if (bookmarkDate <= tombstoneDate) {
-        skippedByTombstone.push({ bookmark: cloudBm, tombstone, reason: `dateAdded(${bookmarkDate}) <= deletedAt(${tombstoneDate})` });
+        skippedByTombstone.push({
+          bookmark: cloudBm,
+          tombstone,
+          reason: `dateAdded(${bookmarkDate}) <= deletedAt(${tombstoneDate})`,
+        });
         continue; // Skip - tombstone is newer
       }
     }
@@ -422,17 +437,23 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
 
   // Log categorization results for debugging
   if (skippedByTombstone.length > 0) {
-    console.log(`[MarkSyncr] ⚠️ Skipped ${skippedByTombstone.length} cloud bookmarks due to tombstones:`);
+    console.log(
+      `[MarkSyncr] ⚠️ Skipped ${skippedByTombstone.length} cloud bookmarks due to tombstones:`
+    );
     for (const { bookmark, reason } of skippedByTombstone.slice(0, 5)) {
       console.log(`  - ${bookmark.url}: ${reason}`);
     }
   }
 
   if (alreadyExistsUnchanged.length > 0) {
-    console.log(`[MarkSyncr] ✓ ${alreadyExistsUnchanged.length} cloud bookmarks already exist locally (unchanged)`);
+    console.log(
+      `[MarkSyncr] ✓ ${alreadyExistsUnchanged.length} cloud bookmarks already exist locally (unchanged)`
+    );
   }
 
-  console.log(`[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, unchanged=${alreadyExistsUnchanged.length}`);
+  console.log(
+    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, unchanged=${alreadyExistsUnchanged.length}`
+  );
 
   return { toAdd, toUpdate, skippedByTombstone };
 }
@@ -446,59 +467,68 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
  */
 async function findOrCreateFolderForBookmark(folderPath) {
   if (!folderPath) return null;
-  
+
   // Get current browser bookmarks to find root folders
   const currentTree = await browser.bookmarks.getTree();
   const rootFolders = {};
-  
+
   if (currentTree[0]?.children) {
     for (const root of currentTree[0].children) {
       const title = root.title?.toLowerCase() || '';
       const id = root.id;
-      
+
       if (title.includes('toolbar') || title.includes('bar') || id === '1') {
         rootFolders.toolbar = root;
       } else if (title.includes('menu') || id === 'menu________') {
         rootFolders.menu = root;
-      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+      } else if (
+        title.includes('other') ||
+        title.includes('unsorted') ||
+        id === '2' ||
+        id === 'unfiled_____'
+      ) {
         rootFolders.other = root;
       }
     }
   }
-  
+
   // Parse the folder path to determine root and relative path
   let rootFolderKey = 'other';
   let relativePath = folderPath;
   const lowerPath = folderPath.toLowerCase();
-  
-  if (lowerPath.startsWith('bookmarks bar') ||
-      lowerPath.startsWith('bookmarks toolbar') ||
-      lowerPath.startsWith('speed dial')) {
+
+  if (
+    lowerPath.startsWith('bookmarks bar') ||
+    lowerPath.startsWith('bookmarks toolbar') ||
+    lowerPath.startsWith('speed dial')
+  ) {
     rootFolderKey = 'toolbar';
     relativePath = folderPath.split('/').slice(1).join('/');
   } else if (lowerPath.startsWith('bookmarks menu')) {
     rootFolderKey = 'menu';
     relativePath = folderPath.split('/').slice(1).join('/');
-  } else if (lowerPath.startsWith('other bookmarks') ||
-             lowerPath.startsWith('unsorted bookmarks')) {
+  } else if (
+    lowerPath.startsWith('other bookmarks') ||
+    lowerPath.startsWith('unsorted bookmarks')
+  ) {
     rootFolderKey = 'other';
     relativePath = folderPath.split('/').slice(1).join('/');
   }
-  
+
   const rootFolder = rootFolders[rootFolderKey] || rootFolders.other || rootFolders.toolbar;
   if (!rootFolder) return null;
-  
+
   // If no relative path, return the root folder
   if (!relativePath) return rootFolder.id;
-  
+
   // Navigate/create the folder path
-  const parts = relativePath.split('/').filter(p => p);
+  const parts = relativePath.split('/').filter((p) => p);
   let currentParentId = rootFolder.id;
-  
+
   for (const part of parts) {
     const children = await browser.bookmarks.getChildren(currentParentId);
-    const existingFolder = children.find(c => !c.url && c.title === part);
-    
+    const existingFolder = children.find((c) => !c.url && c.title === part);
+
     if (existingFolder) {
       currentParentId = existingFolder.id;
     } else {
@@ -510,7 +540,7 @@ async function findOrCreateFolderForBookmark(folderPath) {
       currentParentId = newFolder.id;
     }
   }
-  
+
   return currentParentId;
 }
 
@@ -532,61 +562,89 @@ async function getParentIdForBookmark(bookmarkId) {
 /**
  * Try to refresh the access token using the long-lived extension token
  *
- * Extension sessions are designed to last 1 year, so users rarely need to re-login.
+ * Extension sessions are designed to last 2 years, so users rarely need to re-login.
  * When the access_token expires (1 hour), we use the extension_token to get a new one.
+ *
+ * Includes retry logic for transient network errors and 503 responses.
  *
  * @returns {Promise<boolean>} - True if refresh was successful
  */
 async function tryRefreshToken() {
   const session = await getSession();
-  
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
+
   // First try extension token refresh (preferred for long-lived sessions)
   if (session?.extension_token) {
-    try {
-      const baseUrl = getApiBaseUrl();
-      console.log('[MarkSyncr] Attempting to refresh token using extension_token...');
-      
-      const response = await fetch(`${baseUrl}/api/auth/extension/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ extension_token: session.extension_token }),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.session?.access_token) {
-          console.log('[MarkSyncr] Token refreshed successfully via extension_token');
-          // Update the session with new access token, keeping extension_token
-          await storeSession({
-            ...session,
-            access_token: data.session.access_token,
-            access_token_expires_at: data.session.access_token_expires_at,
-          });
-          return true;
+    const baseUrl = getApiBaseUrl();
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(
+          `[MarkSyncr] Attempting to refresh token using extension_token (attempt ${attempt}/${MAX_RETRIES})...`
+        );
+
+        const response = await fetch(`${baseUrl}/api/auth/extension/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ extension_token: session.extension_token }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.session?.access_token) {
+            console.log('[MarkSyncr] Token refreshed successfully via extension_token');
+            // Update the session with new access token, keeping extension_token
+            await storeSession({
+              ...session,
+              access_token: data.session.access_token,
+              access_token_expires_at: data.session.access_token_expires_at,
+            });
+            return true;
+          }
+        }
+
+        // If extension token refresh failed with 401, the session is truly expired - don't retry
+        if (response.status === 401) {
+          console.log('[MarkSyncr] Extension session expired (401), clearing session');
+          await clearSession();
+          return false;
+        }
+
+        // Retry on 503 (service unavailable) or 500 (server error)
+        if (response.status === 503 || response.status === 500) {
+          console.log(`[MarkSyncr] Server error (${response.status}), will retry...`);
+          if (attempt < MAX_RETRIES) {
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+            continue;
+          }
+        }
+
+        console.log('[MarkSyncr] Extension token refresh failed:', response.status);
+        // Don't retry on other status codes (400, 404, etc.)
+        break;
+      } catch (err) {
+        console.error(
+          `[MarkSyncr] Extension token refresh error (attempt ${attempt}):`,
+          err.message
+        );
+        // Retry on network errors
+        if (attempt < MAX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
         }
       }
-      
-      // If extension token refresh failed with 401, the session is truly expired
-      if (response.status === 401) {
-        console.log('[MarkSyncr] Extension session expired (401), clearing session');
-        await clearSession();
-        return false;
-      }
-      
-      console.log('[MarkSyncr] Extension token refresh failed:', response.status);
-    } catch (err) {
-      console.error('[MarkSyncr] Extension token refresh error:', err);
     }
   }
-  
+
   // Fallback to legacy refresh token if available (for backwards compatibility during migration)
   if (session?.refresh_token) {
     try {
       const baseUrl = getApiBaseUrl();
       console.log('[MarkSyncr] Attempting legacy refresh token...');
-      
+
       const response = await fetch(`${baseUrl}/api/auth/refresh`, {
         method: 'POST',
         headers: {
@@ -594,12 +652,12 @@ async function tryRefreshToken() {
         },
         body: JSON.stringify({ refresh_token: session.refresh_token }),
       });
-      
+
       if (!response.ok) {
         console.log('[MarkSyncr] Legacy token refresh failed:', response.status);
         return false;
       }
-      
+
       const data = await response.json();
       if (data.session) {
         console.log('[MarkSyncr] Token refreshed successfully via legacy refresh_token');
@@ -610,7 +668,7 @@ async function tryRefreshToken() {
       console.error('[MarkSyncr] Legacy token refresh error:', err);
     }
   }
-  
+
   console.log('[MarkSyncr] No valid refresh token available');
   return false;
 }
@@ -631,15 +689,15 @@ async function isLoggedIn() {
 async function validateToken() {
   const token = await getAccessToken();
   if (!token) return false;
-  
+
   try {
     const baseUrl = getApiBaseUrl();
     const response = await fetch(`${baseUrl}/api/auth/session`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     });
-    
+
     return response.ok;
   } catch {
     return false;
@@ -647,7 +705,28 @@ async function validateToken() {
 }
 
 /**
+ * Check if the access token is expired or about to expire
+ * We refresh proactively 5 minutes before expiry to avoid mid-operation failures
+ * @returns {Promise<boolean>} - True if token is expired or expiring soon
+ */
+async function isTokenExpiredOrExpiringSoon() {
+  const session = await getSession();
+  if (!session?.access_token_expires_at) {
+    // No expiry stored, assume expired to trigger refresh
+    return true;
+  }
+
+  const expiresAt = new Date(session.access_token_expires_at).getTime();
+  const now = Date.now();
+  const fiveMinutes = 5 * 60 * 1000;
+
+  // Return true if token expires within 5 minutes
+  return now >= expiresAt - fiveMinutes;
+}
+
+/**
  * Ensure we have a valid token, refreshing if necessary
+ * Uses proactive refresh based on stored expiry time to avoid network calls
  * @returns {Promise<boolean>} - True if we have a valid token
  */
 async function ensureValidToken() {
@@ -657,24 +736,45 @@ async function ensureValidToken() {
     console.log('[MarkSyncr] No access token found');
     return false;
   }
-  
-  // Validate the token
+
+  // Check if token is expired or expiring soon (proactive refresh)
+  const needsRefresh = await isTokenExpiredOrExpiringSoon();
+  if (needsRefresh) {
+    console.log('[MarkSyncr] Token expired or expiring soon, proactively refreshing...');
+    const refreshed = await tryRefreshToken();
+
+    if (!refreshed) {
+      // Refresh failed - try validating anyway (token might still work)
+      console.log('[MarkSyncr] Proactive refresh failed, validating current token...');
+      const isValid = await validateToken();
+      if (isValid) {
+        return true;
+      }
+      // Token is truly invalid, clear session
+      console.log('[MarkSyncr] Token invalid and refresh failed, clearing session');
+      await clearSession();
+      return false;
+    }
+    return true;
+  }
+
+  // Token should be valid based on expiry, but validate to be sure
+  // Only do this if we haven't refreshed recently (avoid unnecessary network calls)
   const isValid = await validateToken();
   if (isValid) {
     return true;
   }
-  
-  // Token is invalid, try to refresh
-  console.log('[MarkSyncr] Token appears invalid, attempting refresh...');
+
+  // Token validation failed despite not being expired - try refresh
+  console.log('[MarkSyncr] Token validation failed unexpectedly, attempting refresh...');
   const refreshed = await tryRefreshToken();
-  
+
   if (!refreshed) {
-    // Refresh failed, clear session
     console.log('[MarkSyncr] Token refresh failed, clearing session');
     await clearSession();
     return false;
   }
-  
+
   return true;
 }
 
@@ -684,22 +784,22 @@ async function ensureValidToken() {
 async function apiRequest(endpoint, options = {}) {
   const baseUrl = getApiBaseUrl();
   const token = await getAccessToken();
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
   };
-  
+
   // Add Authorization header if we have a token
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
   });
-  
+
   return response;
 }
 
@@ -715,12 +815,12 @@ async function syncBookmarksToCloud(bookmarks, source = 'browser', tombstones = 
       method: 'POST',
       body: JSON.stringify({ bookmarks, source, tombstones }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to sync bookmarks');
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('[MarkSyncr] Failed to sync bookmarks to cloud:', err);
@@ -742,12 +842,12 @@ async function saveVersionToCloud(bookmarkData, sourceType, deviceName, changeSu
         changeSummary,
       }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to save version');
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('[MarkSyncr] Failed to save version to cloud:', err);
@@ -764,7 +864,7 @@ async function getDeviceId() {
   if (deviceId) {
     return deviceId;
   }
-  
+
   // Generate a new device ID
   const newDeviceId = `${detectBrowser()}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   await browser.storage.local.set({ deviceId: newDeviceId });
@@ -794,7 +894,7 @@ async function registerDevice() {
     const deviceId = await getDeviceId();
     const browserName = detectBrowser();
     const os = detectOS();
-    
+
     const response = await apiRequest('/api/devices', {
       method: 'POST',
       body: JSON.stringify({
@@ -804,13 +904,13 @@ async function registerDevice() {
         os,
       }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       console.warn('[MarkSyncr] Failed to register device:', data.error);
       return { success: false, error: data.error };
     }
-    
+
     const data = await response.json();
     console.log('[MarkSyncr] Device registered:', data.device);
     return { success: true, device: data.device };
@@ -828,12 +928,12 @@ async function getBookmarksFromCloud() {
     const response = await apiRequest('/api/bookmarks', {
       method: 'GET',
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to get bookmarks from cloud');
     }
-    
+
     return await response.json();
   } catch (err) {
     console.error('[MarkSyncr] Failed to get bookmarks from cloud:', err);
@@ -849,27 +949,27 @@ async function getLatestVersionFromCloud() {
     const response = await apiRequest('/api/versions?limit=1', {
       method: 'GET',
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to get latest version');
     }
-    
+
     const data = await response.json();
     if (!data.versions || data.versions.length === 0) {
       return null;
     }
-    
+
     // Get full version data
     const versionResponse = await apiRequest(`/api/versions/${data.versions[0].version}`, {
       method: 'GET',
     });
-    
+
     if (!versionResponse.ok) {
       const errorData = await versionResponse.json();
       throw new Error(errorData.error || 'Failed to get version data');
     }
-    
+
     return await versionResponse.json();
   } catch (err) {
     console.error('[MarkSyncr] Failed to get latest version from cloud:', err);
@@ -885,53 +985,64 @@ async function getLatestVersionFromCloud() {
 async function initialize() {
   const browserInfo = detectBrowser();
   const isFirefox = browserInfo === 'firefox';
-  
+
   console.log(`[MarkSyncr] Background script initialized (${browserInfo})`);
   console.log(`[MarkSyncr] User agent: ${navigator.userAgent}`);
-  console.log(`[MarkSyncr] Script type: ${isFirefox ? 'persistent background script' : 'service worker'}`);
+  console.log(
+    `[MarkSyncr] Script type: ${isFirefox ? 'persistent background script' : 'service worker'}`
+  );
 
   // Set up alarm for automatic sync
   await setupAutoSync();
 
   // Listen for bookmark changes
   setupBookmarkListeners();
-  
+
   // For Firefox, set up a periodic check to ensure alarm is still active
   // Firefox background scripts are persistent, so we can use setInterval
   if (isFirefox) {
     console.log('[MarkSyncr] Firefox detected - setting up alarm health check');
-    
-    // Check alarm health every 2 minutes
-    setInterval(async () => {
-      const { settings } = await browser.storage.local.get('settings');
-      const expectedInterval = settings?.syncInterval || DEFAULT_SYNC_INTERVAL;
-      
-      const alarm = await browser.alarms.get(SYNC_ALARM_NAME);
-      if (!alarm) {
-        console.warn('[MarkSyncr] Firefox: Alarm not found, recreating...');
-        await setupAutoSync();
-      } else {
-        const nextFire = new Date(alarm.scheduledTime);
-        const now = new Date();
-        const minutesUntilFire = Math.round((nextFire - now) / 60000);
 
-        // Check if alarm interval matches expected interval OR if alarm is stale
-        if (alarm.periodInMinutes !== expectedInterval) {
-          console.warn(`[MarkSyncr] Firefox: Alarm interval mismatch (${alarm.periodInMinutes} vs ${expectedInterval}), recreating...`);
-          await browser.alarms.clear(SYNC_ALARM_NAME);
-          await setupAutoSync();
-        } else if (nextFire <= now) {
-          // Alarm is stale (scheduled time in past) - recreate it
-          console.warn(`[MarkSyncr] Firefox: Alarm is stale (scheduled for ${nextFire.toISOString()}), recreating...`);
-          await browser.alarms.clear(SYNC_ALARM_NAME);
+    // Check alarm health every 2 minutes
+    setInterval(
+      async () => {
+        const { settings } = await browser.storage.local.get('settings');
+        const expectedInterval = settings?.syncInterval || DEFAULT_SYNC_INTERVAL;
+
+        const alarm = await browser.alarms.get(SYNC_ALARM_NAME);
+        if (!alarm) {
+          console.warn('[MarkSyncr] Firefox: Alarm not found, recreating...');
           await setupAutoSync();
         } else {
-          console.log(`[MarkSyncr] Firefox: Alarm health check OK - next fire in ${minutesUntilFire} minutes (interval: ${alarm.periodInMinutes})`);
+          const nextFire = new Date(alarm.scheduledTime);
+          const now = new Date();
+          const minutesUntilFire = Math.round((nextFire - now) / 60000);
+
+          // Check if alarm interval matches expected interval OR if alarm is stale
+          if (alarm.periodInMinutes !== expectedInterval) {
+            console.warn(
+              `[MarkSyncr] Firefox: Alarm interval mismatch (${alarm.periodInMinutes} vs ${expectedInterval}), recreating...`
+            );
+            await browser.alarms.clear(SYNC_ALARM_NAME);
+            await setupAutoSync();
+          } else if (nextFire <= now) {
+            // Alarm is stale (scheduled time in past) - recreate it
+            console.warn(
+              `[MarkSyncr] Firefox: Alarm is stale (scheduled for ${nextFire.toISOString()}), recreating...`
+            );
+            await browser.alarms.clear(SYNC_ALARM_NAME);
+            await setupAutoSync();
+          } else {
+            console.log(
+              `[MarkSyncr] Firefox: Alarm health check OK - next fire in ${minutesUntilFire} minutes (interval: ${alarm.periodInMinutes})`
+            );
+          }
         }
-      }
-    }, 2 * 60 * 1000); // Every 2 minutes
+      },
+      2 * 60 * 1000
+    ); // Every 2 minutes
   }
-  
+
   // Log that initialization is complete
   console.log('[MarkSyncr] Initialization complete');
 }
@@ -947,13 +1058,15 @@ async function setupAutoSync() {
 
     // Auto-sync is enabled by default (when settings.autoSync is undefined or true)
     const autoSyncEnabled = settings?.autoSync !== false;
-    
-    console.log(`[MarkSyncr] Auto-sync setup (${browserInfo}): enabled=${autoSyncEnabled}, interval=${interval} minutes`);
+
+    console.log(
+      `[MarkSyncr] Auto-sync setup (${browserInfo}): enabled=${autoSyncEnabled}, interval=${interval} minutes`
+    );
 
     if (autoSyncEnabled) {
       // Check if alarm already exists
       const existingAlarm = await browser.alarms.get(SYNC_ALARM_NAME);
-      
+
       if (existingAlarm) {
         console.log(`[MarkSyncr] Existing alarm found:`, existingAlarm);
         const nextFireTime = new Date(existingAlarm.scheduledTime);
@@ -964,12 +1077,16 @@ async function setupAutoSync() {
         // Check if the alarm interval matches the settings
         // If not, recreate the alarm
         if (existingAlarm.periodInMinutes !== interval) {
-          console.log(`[MarkSyncr] Alarm interval mismatch (${existingAlarm.periodInMinutes} vs ${interval}), recreating...`);
+          console.log(
+            `[MarkSyncr] Alarm interval mismatch (${existingAlarm.periodInMinutes} vs ${interval}), recreating...`
+          );
           await browser.alarms.clear(SYNC_ALARM_NAME);
         } else if (nextFireTime <= now) {
           // Alarm's scheduledTime is in the past - this is stale and won't fire correctly
           // This can happen after browser sleep, system hibernate, or clock changes
-          console.log(`[MarkSyncr] Alarm is stale (scheduled for past: ${nextFireTime.toISOString()}), recreating...`);
+          console.log(
+            `[MarkSyncr] Alarm is stale (scheduled for past: ${nextFireTime.toISOString()}), recreating...`
+          );
           await browser.alarms.clear(SYNC_ALARM_NAME);
         } else {
           console.log(`[MarkSyncr] Alarm already configured correctly, skipping recreation`);
@@ -985,8 +1102,10 @@ async function setupAutoSync() {
         periodInMinutes: interval,
       });
 
-      console.log(`[MarkSyncr] Auto-sync alarm created: first fire in ${interval} minutes, then every ${interval} minutes`);
-      
+      console.log(
+        `[MarkSyncr] Auto-sync alarm created: first fire in ${interval} minutes, then every ${interval} minutes`
+      );
+
       // Verify the alarm was created
       const verifyAlarm = await browser.alarms.get(SYNC_ALARM_NAME);
       if (verifyAlarm) {
@@ -995,7 +1114,7 @@ async function setupAutoSync() {
       } else {
         console.error(`[MarkSyncr] ERROR: Alarm was not created!`);
       }
-      
+
       // Log all current alarms for debugging
       const alarms = await browser.alarms.getAll();
       console.log('[MarkSyncr] All current alarms:', JSON.stringify(alarms));
@@ -1107,7 +1226,7 @@ function setupBookmarkListeners() {
  */
 async function addTombstonesForFolder(folder) {
   if (!folder.children) return;
-  
+
   for (const child of folder.children) {
     if (child.url) {
       await addTombstone(child.url);
@@ -1150,7 +1269,7 @@ function flattenBookmarkTree(tree) {
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       const nodeIndex = node.index ?? i;
-      
+
       if (node.url) {
         // It's a bookmark
         items.push({
@@ -1166,8 +1285,12 @@ function flattenBookmarkTree(tree) {
         });
       } else if (node.children) {
         // It's a folder - add folder metadata
-        const folderPath = node.title ? (parentPath ? `${parentPath}/${node.title}` : node.title) : parentPath;
-        
+        const folderPath = node.title
+          ? parentPath
+            ? `${parentPath}/${node.title}`
+            : node.title
+          : parentPath;
+
         // Only add folder entry if:
         // 1. It has a title (skip root nodes without titles)
         // 2. It's NOT a root-level folder (parentPath is not empty)
@@ -1183,7 +1306,7 @@ function flattenBookmarkTree(tree) {
             index: nodeIndex,
           });
         }
-        
+
         // Recurse into children
         traverse(node.children, folderPath);
       }
@@ -1201,7 +1324,7 @@ function flattenBookmarkTree(tree) {
  */
 async function performSync(sourceId) {
   console.log('[MarkSyncr] performSync called with sourceId:', sourceId);
-  
+
   // Prevent concurrent syncs and sync loops
   if (isSyncInProgress) {
     console.log('[MarkSyncr] Sync already in progress, skipping');
@@ -1210,26 +1333,24 @@ async function performSync(sourceId) {
 
   // Stop retrying after MAX_CONSECUTIVE_FAILURES
   if (consecutiveSyncFailures >= MAX_CONSECUTIVE_FAILURES) {
-    console.error(`[MarkSyncr] Sync disabled after ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Last error: ${lastSyncError}`);
+    console.error(
+      `[MarkSyncr] Sync disabled after ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Last error: ${lastSyncError}`
+    );
     return {
       success: false,
       error: `Sync stopped after ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Please check your connection and try again manually. Last error: ${lastSyncError}`,
-      retryLimitReached: true
+      retryLimitReached: true,
     };
   }
 
   isSyncInProgress = true;
   console.log('[MarkSyncr] Sync started, setting isSyncInProgress=true');
-  
+
   try {
-    const storageData = await browser.storage.local.get([
-      'selectedSource',
-      'sources',
-      'session',
-    ]);
-    
+    const storageData = await browser.storage.local.get(['selectedSource', 'sources', 'session']);
+
     const { selectedSource, sources, session } = storageData;
-    
+
     console.log('[MarkSyncr] Storage data:');
     console.log('  - selectedSource:', selectedSource);
     console.log('  - sources count:', sources?.length || 0);
@@ -1240,7 +1361,10 @@ async function performSync(sourceId) {
 
     if (!targetSourceId) {
       console.log('[MarkSyncr] No sync source configured');
-      return { success: false, error: 'No sync source configured. Please select a source in the extension popup.' };
+      return {
+        success: false,
+        error: 'No sync source configured. Please select a source in the extension popup.',
+      };
     }
 
     console.log(`[MarkSyncr] Starting two-way sync with source: ${targetSourceId}`);
@@ -1248,34 +1372,38 @@ async function performSync(sourceId) {
     // Get source configuration
     const source = sources?.find((s) => s.id === targetSourceId);
     console.log('[MarkSyncr] Source config:', source);
-    
+
     // Browser bookmarks source is always available
     const isBrowserSource = targetSourceId === 'browser-bookmarks';
-    
+
     if (!isBrowserSource && !source?.connected) {
       console.log('[MarkSyncr] Source not connected:', targetSourceId, source);
-      return { success: false, error: `Source "${targetSourceId}" is not connected. Please connect it first.` };
+      return {
+        success: false,
+        error: `Source "${targetSourceId}" is not connected. Please connect it first.`,
+      };
     }
 
     // Ensure we have a valid token (will attempt refresh if expired)
     console.log('[MarkSyncr] Validating authentication...');
     const hasValidToken = await ensureValidToken();
     console.log('[MarkSyncr] Has valid token:', hasValidToken);
-    
+
     // Cloud sync requires authentication
     if (!hasValidToken) {
       console.log('[MarkSyncr] No valid token, cannot sync to cloud');
       return {
         success: false,
-        error: 'Please log in to sync bookmarks to the cloud. Go to the Account tab in the extension popup.',
+        error:
+          'Please log in to sync bookmarks to the cloud. Go to the Account tab in the extension popup.',
         requiresAuth: true,
       };
     }
-    
+
     // Register this device with the server (updates last_seen_at if already registered)
     console.log('[MarkSyncr] Registering device...');
     await registerDevice();
-    
+
     // Two-way sync with tombstone support
     try {
       // Step 1: Get current local bookmarks and tombstones
@@ -1284,12 +1412,15 @@ async function performSync(sourceId) {
       const localTombstones = await getTombstones();
       console.log(`[MarkSyncr] Local bookmarks: ${localFlat.length}`);
       console.log(`[MarkSyncr] Local tombstones: ${localTombstones.length}`);
-      
+
       // Debug: Log sample local tombstones
       if (localTombstones.length > 0) {
-        console.log('[MarkSyncr] Sample local tombstones:', JSON.stringify(localTombstones.slice(0, 3)));
+        console.log(
+          '[MarkSyncr] Sample local tombstones:',
+          JSON.stringify(localTombstones.slice(0, 3))
+        );
       }
-      
+
       // Step 2: Get bookmarks and tombstones from cloud
       console.log('[MarkSyncr] 📥 Fetching cloud bookmarks...');
       const cloudData = await getBookmarksFromCloud();
@@ -1300,36 +1431,44 @@ async function performSync(sourceId) {
       console.log(`  - Tombstones: ${cloudTombstones.length}`);
       console.log(`  - Cloud checksum: ${cloudData.checksum || 'none'}`);
       console.log(`  - Cloud version: ${cloudData.version || 'none'}`);
-      
+
       // Step 2.5: Get last sync time for tombstone safeguard
       const lastSyncTime = await getLastSyncTime();
-      console.log(`[MarkSyncr] Last sync time: ${lastSyncTime ? new Date(lastSyncTime).toISOString() : 'never'}`);
-      
+      console.log(
+        `[MarkSyncr] Last sync time: ${lastSyncTime ? new Date(lastSyncTime).toISOString() : 'never'}`
+      );
+
       // Step 3: Apply cloud tombstones to local bookmarks (delete locally if deleted elsewhere)
       // IMPORTANT: Use the tombstone safeguard to prevent unintended deletions
       // when local storage was cleared but cloud still has old tombstones
       let deletedLocally = 0;
       if (cloudTombstones.length > 0) {
         // Filter tombstones using the safeguard
-        const tombstonesToApply = filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime);
-        
+        const tombstonesToApply = filterTombstonesToApply(
+          cloudTombstones,
+          localTombstones,
+          lastSyncTime
+        );
+
         if (tombstonesToApply.length > 0) {
           deletedLocally = await applyTombstonesToLocal(tombstonesToApply, localFlat);
-          console.log(`[MarkSyncr] Deleted ${deletedLocally} local bookmarks based on ${tombstonesToApply.length} filtered cloud tombstones`);
+          console.log(
+            `[MarkSyncr] Deleted ${deletedLocally} local bookmarks based on ${tombstonesToApply.length} filtered cloud tombstones`
+          );
         } else {
           console.log(`[MarkSyncr] No tombstones to apply after safeguard filtering`);
         }
       }
-      
+
       // Step 4: Merge tombstones (keep the newest deletion time for each URL)
       const mergedTombstones = mergeTombstonesLocal(localTombstones, cloudTombstones);
       await storeTombstones(mergedTombstones);
       console.log(`[MarkSyncr] Merged tombstones: ${mergedTombstones.length}`);
-      
+
       // Step 5: Get updated local bookmarks after applying tombstones
       const updatedTree = await browser.bookmarks.getTree();
       const updatedLocalFlat = flattenBookmarkTree(updatedTree);
-      
+
       // Step 6: Categorize cloud bookmarks into those to add vs update
       // This uses the new categorizeCloudBookmarks function that properly handles:
       // - New bookmarks (URL not in local)
@@ -1340,32 +1479,38 @@ async function performSync(sourceId) {
         updatedLocalFlat,
         mergedTombstones
       );
-      
+
       console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
       console.log(`[MarkSyncr] 🔍 Bookmarks to update from cloud: ${bookmarksToUpdate.length}`);
-      
+
       if (newFromCloud.length > 0) {
-        console.log('[MarkSyncr] 🔍 Sample new bookmarks from cloud:', newFromCloud.slice(0, 3).map(b => ({
-          url: b.url,
-          title: b.title,
-          folderPath: b.folderPath,
-        })));
+        console.log(
+          '[MarkSyncr] 🔍 Sample new bookmarks from cloud:',
+          newFromCloud.slice(0, 3).map((b) => ({
+            url: b.url,
+            title: b.title,
+            folderPath: b.folderPath,
+          }))
+        );
       }
-      
+
       if (bookmarksToUpdate.length > 0) {
-        console.log('[MarkSyncr] 🔍 Sample bookmarks to update:', bookmarksToUpdate.slice(0, 3).map(u => ({
-          url: u.cloud.url,
-          cloudTitle: u.cloud.title,
-          localTitle: u.local.title,
-          cloudFolder: u.cloud.folderPath,
-          localFolder: u.local.folderPath,
-        })));
+        console.log(
+          '[MarkSyncr] 🔍 Sample bookmarks to update:',
+          bookmarksToUpdate.slice(0, 3).map((u) => ({
+            url: u.cloud.url,
+            cloudTitle: u.cloud.title,
+            localTitle: u.local.title,
+            cloudFolder: u.cloud.folderPath,
+            localFolder: u.local.folderPath,
+          }))
+        );
       }
-      
+
       // Step 6.5: Find local bookmarks that are not in cloud (local additions to push)
       // This is used to determine if we have local changes that need to be pushed
-      const cloudUrls = new Set(cloudBookmarks.filter(b => b.url).map(b => b.url));
-      const localAdditions = updatedLocalFlat.filter(lb => {
+      const cloudUrls = new Set(cloudBookmarks.filter((b) => b.url).map((b) => b.url));
+      const localAdditions = updatedLocalFlat.filter((lb) => {
         // Skip folders (they don't have URLs)
         if (!lb.url) {
           return false;
@@ -1374,13 +1519,13 @@ async function performSync(sourceId) {
         return !cloudUrls.has(lb.url);
       });
       console.log(`[MarkSyncr] Local additions (not in cloud): ${localAdditions.length}`);
-      
+
       // Step 7: Add new cloud bookmarks to local browser
       if (newFromCloud.length > 0) {
         await addCloudBookmarksToLocal(newFromCloud);
         console.log(`[MarkSyncr] Added ${newFromCloud.length} bookmarks from cloud to local`);
       }
-      
+
       // Step 7.5: Apply updates from cloud to local bookmarks
       // This is critical for proper two-way sync: if another browser modified
       // a bookmark's title, folder, or position, those changes should be pulled here.
@@ -1390,48 +1535,50 @@ async function performSync(sourceId) {
         updatedLocally = await updateLocalBookmarksFromCloud(bookmarksToUpdate);
         console.log(`[MarkSyncr] Updated ${updatedLocally} local bookmarks from cloud`);
       }
-      
+
       // Step 8: Get final local bookmarks after all merges
       const finalTree = await browser.bookmarks.getTree();
       const mergedFlat = flattenBookmarkTree(finalTree);
       const mergedData = convertBrowserBookmarks(finalTree);
       // Pass the merged bookmark count as synced count since we're syncing to cloud
-      const stats = countBookmarks(finalTree, mergedFlat.filter(b => b.url).length);
-      
+      const stats = countBookmarks(finalTree, mergedFlat.filter((b) => b.url).length);
+
       // Step 8.5: Check if there are any actual changes by comparing checksums
       // Generate checksum of merged bookmarks (same algorithm as server)
       const localChecksum = await generateChecksum(mergedFlat);
       const cloudChecksum = cloudData.checksum;
-      
+
       console.log(`[MarkSyncr] Local checksum: ${localChecksum}`);
       console.log(`[MarkSyncr] Cloud checksum: ${cloudChecksum}`);
-      
+
       // Determine if we have local changes to push to cloud
       // Local changes = bookmarks that exist locally but not in cloud (before this sync)
       // OR bookmarks that differ from cloud (local-first model: local changes override cloud)
       // OR tombstones that need to be synced
-      const hasLocalChangesToPush = localAdditions.length > 0 ||
-                                     bookmarksToUpdate.length > 0 ||
-                                     localTombstones.length > cloudTombstones.length ||
-                                     deletedLocally > 0;
-      
+      const hasLocalChangesToPush =
+        localAdditions.length > 0 ||
+        bookmarksToUpdate.length > 0 ||
+        localTombstones.length > cloudTombstones.length ||
+        deletedLocally > 0;
+
       // Check if there were any changes during this sync
-      const hasChanges = newFromCloud.length > 0 ||
-                         deletedLocally > 0 ||
-                         localChecksum !== cloudChecksum;
-      
-      console.log(`[MarkSyncr] Has changes: ${hasChanges}, Has local changes to push: ${hasLocalChangesToPush}`);
-      
+      const hasChanges =
+        newFromCloud.length > 0 || deletedLocally > 0 || localChecksum !== cloudChecksum;
+
+      console.log(
+        `[MarkSyncr] Has changes: ${hasChanges}, Has local changes to push: ${hasLocalChangesToPush}`
+      );
+
       if (!hasChanges) {
         console.log('[MarkSyncr] No changes detected - checksums match and no new bookmarks');
-        
+
         // Update last sync time even when skipping (both ISO string and timestamp)
         const syncTimestamp = Date.now();
         await browser.storage.local.set({
           lastSync: new Date(syncTimestamp).toISOString(),
         });
         await storeLastSyncTime(syncTimestamp);
-        
+
         // Store the cloud checksum for future reference
         await storeLastCloudChecksum(cloudChecksum);
 
@@ -1450,12 +1597,14 @@ async function performSync(sourceId) {
           message: 'No new updates',
         };
       }
-      
+
       // Step 9: Push merged bookmarks and tombstones back to cloud
-      console.log(`[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`);
+      console.log(
+        `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`
+      );
       const syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), mergedTombstones);
       console.log('[MarkSyncr] Cloud sync result:', syncResult);
-      
+
       // Store the new checksum
       if (syncResult.checksum) {
         await storeLastCloudChecksum(syncResult.checksum);
@@ -1486,12 +1635,14 @@ async function performSync(sourceId) {
           console.warn('[MarkSyncr] Version save failed (sync will continue):', versionErr.message);
         }
       } else {
-        console.log('[MarkSyncr] Skipping version history (only pulled from cloud, no local changes pushed)');
+        console.log(
+          '[MarkSyncr] Skipping version history (only pulled from cloud, no local changes pushed)'
+        );
       }
-      
+
       // Step 11: Cleanup old tombstones (older than 30 days)
       await cleanupOldTombstones();
-      
+
       console.log('[MarkSyncr] Two-way sync with tombstones completed:', stats);
 
       // Update last sync time (both ISO string for display and timestamp for tombstone safeguard)
@@ -1517,14 +1668,18 @@ async function performSync(sourceId) {
       console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
       consecutiveSyncFailures++;
       lastSyncError = cloudErr.message;
-      console.warn(`[MarkSyncr] Consecutive sync failures: ${consecutiveSyncFailures}/${MAX_CONSECUTIVE_FAILURES}`);
+      console.warn(
+        `[MarkSyncr] Consecutive sync failures: ${consecutiveSyncFailures}/${MAX_CONSECUTIVE_FAILURES}`
+      );
       return { success: false, error: `Cloud sync failed: ${cloudErr.message}` };
     }
   } catch (err) {
     console.error('[MarkSyncr] Sync failed:', err);
     consecutiveSyncFailures++;
     lastSyncError = err.message;
-    console.warn(`[MarkSyncr] Consecutive sync failures: ${consecutiveSyncFailures}/${MAX_CONSECUTIVE_FAILURES}`);
+    console.warn(
+      `[MarkSyncr] Consecutive sync failures: ${consecutiveSyncFailures}/${MAX_CONSECUTIVE_FAILURES}`
+    );
     return { success: false, error: err.message };
   } finally {
     // Always reset the sync flag, even if an error occurred
@@ -1569,29 +1724,37 @@ async function performSync(sourceId) {
  */
 async function applyTombstonesToLocal(tombstones, localBookmarks) {
   let deletedCount = 0;
-  
-  console.log(`[MarkSyncr] applyTombstonesToLocal: ${tombstones.length} tombstones, ${localBookmarks.length} local bookmarks`);
-  
+
+  console.log(
+    `[MarkSyncr] applyTombstonesToLocal: ${tombstones.length} tombstones, ${localBookmarks.length} local bookmarks`
+  );
+
   // Debug: Log first few tombstones
   if (tombstones.length > 0) {
-    console.log('[MarkSyncr] Sample tombstones:', tombstones.slice(0, 5).map(t => ({
-      url: t.url,
-      deletedAt: t.deletedAt,
-      deletedAtDate: new Date(t.deletedAt).toISOString(),
-    })));
+    console.log(
+      '[MarkSyncr] Sample tombstones:',
+      tombstones.slice(0, 5).map((t) => ({
+        url: t.url,
+        deletedAt: t.deletedAt,
+        deletedAtDate: new Date(t.deletedAt).toISOString(),
+      }))
+    );
   }
-  
+
   // Debug: Log first few local bookmarks
   if (localBookmarks.length > 0) {
-    console.log('[MarkSyncr] Sample local bookmarks:', localBookmarks.slice(0, 5).map(b => ({
-      url: b.url,
-      title: b.title,
-    })));
+    console.log(
+      '[MarkSyncr] Sample local bookmarks:',
+      localBookmarks.slice(0, 5).map((b) => ({
+        url: b.url,
+        title: b.title,
+      }))
+    );
   }
-  
+
   // Create a set of tombstoned URLs for quick lookup
-  const tombstonedUrls = new Set(tombstones.map(t => t.url));
-  
+  const tombstonedUrls = new Set(tombstones.map((t) => t.url));
+
   // Debug: Check for any matches
   let matchCount = 0;
   for (const bookmark of localBookmarks) {
@@ -1600,11 +1763,11 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
     }
   }
   console.log(`[MarkSyncr] Found ${matchCount} local bookmarks that match tombstones`);
-  
+
   for (const bookmark of localBookmarks) {
     if (tombstonedUrls.has(bookmark.url)) {
       console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
-      
+
       try {
         await browser.bookmarks.remove(bookmark.id);
         deletedCount++;
@@ -1614,7 +1777,7 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
       }
     }
   }
-  
+
   console.log(`[MarkSyncr] applyTombstonesToLocal complete: deleted ${deletedCount} bookmarks`);
   return deletedCount;
 }
@@ -1627,12 +1790,12 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
  */
 function mergeTombstonesLocal(localTombstones, cloudTombstones) {
   const tombstoneMap = new Map();
-  
+
   // Add local tombstones
   for (const t of localTombstones) {
     tombstoneMap.set(t.url, t.deletedAt);
   }
-  
+
   // Merge cloud tombstones (keep newest)
   for (const t of cloudTombstones) {
     const existing = tombstoneMap.get(t.url);
@@ -1640,7 +1803,7 @@ function mergeTombstonesLocal(localTombstones, cloudTombstones) {
       tombstoneMap.set(t.url, t.deletedAt);
     }
   }
-  
+
   // Convert back to array
   return Array.from(tombstoneMap.entries()).map(([url, deletedAt]) => ({ url, deletedAt }));
 }
@@ -1659,21 +1822,26 @@ async function addCloudBookmarksToLocal(cloudItems) {
   const currentTree = await browser.bookmarks.getTree();
   const rootFolders = {};
   const browserType = detectBrowser();
-  
-  console.log(`[MarkSyncr] addCloudBookmarksToLocal: browser=${browserType}, items to add=${cloudItems.length}`);
-  
+
+  console.log(
+    `[MarkSyncr] addCloudBookmarksToLocal: browser=${browserType}, items to add=${cloudItems.length}`
+  );
+
   // Debug: Log the types of items we're adding
-  const bookmarkCount = cloudItems.filter(i => i.type !== 'folder' && i.url).length;
-  const folderCount = cloudItems.filter(i => i.type === 'folder').length;
+  const bookmarkCount = cloudItems.filter((i) => i.type !== 'folder' && i.url).length;
+  const folderCount = cloudItems.filter((i) => i.type === 'folder').length;
   console.log(`[MarkSyncr] Items breakdown: ${bookmarkCount} bookmarks, ${folderCount} folders`);
-  
+
   if (currentTree[0]?.children) {
-    console.log('[MarkSyncr] Root folder children:', currentTree[0].children.map(c => ({ id: c.id, title: c.title })));
-    
+    console.log(
+      '[MarkSyncr] Root folder children:',
+      currentTree[0].children.map((c) => ({ id: c.id, title: c.title }))
+    );
+
     for (const root of currentTree[0].children) {
       const title = root.title?.toLowerCase() || '';
       const id = root.id;
-      
+
       // Chrome/Opera/Edge/Brave use numeric IDs: '1' for bookmarks bar, '2' for other bookmarks
       // Firefox uses string IDs: 'toolbar_____', 'menu________', 'unfiled_____'
       if (title.includes('toolbar') || title.includes('bar') || id === '1') {
@@ -1682,42 +1850,51 @@ async function addCloudBookmarksToLocal(cloudItems) {
       } else if (title.includes('menu') || id === 'menu________') {
         rootFolders.menu = root;
         console.log(`[MarkSyncr] Found menu folder: id=${id}, title="${root.title}"`);
-      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+      } else if (
+        title.includes('other') ||
+        title.includes('unsorted') ||
+        id === '2' ||
+        id === 'unfiled_____'
+      ) {
         rootFolders.other = root;
         console.log(`[MarkSyncr] Found other folder: id=${id}, title="${root.title}"`);
       }
     }
   }
-  
+
   console.log('[MarkSyncr] Detected root folders:', Object.keys(rootFolders));
-  
+
   // Create a folder cache for quick lookup (folder path -> folder ID)
   const folderCache = new Map();
-  
+
   // Helper to determine root folder key and relative path from a folderPath
   function parseRootAndPath(folderPath) {
     let rootFolderKey = 'other';
     let relativePath = folderPath || '';
-    
+
     const lowerPath = relativePath.toLowerCase();
-    
-    if (lowerPath.startsWith('bookmarks bar') ||
-        lowerPath.startsWith('bookmarks toolbar') ||
-        lowerPath.startsWith('speed dial')) {
+
+    if (
+      lowerPath.startsWith('bookmarks bar') ||
+      lowerPath.startsWith('bookmarks toolbar') ||
+      lowerPath.startsWith('speed dial')
+    ) {
       rootFolderKey = 'toolbar';
       relativePath = relativePath.split('/').slice(1).join('/');
     } else if (lowerPath.startsWith('bookmarks menu')) {
       rootFolderKey = 'menu';
       relativePath = relativePath.split('/').slice(1).join('/');
-    } else if (lowerPath.startsWith('other bookmarks') ||
-               lowerPath.startsWith('unsorted bookmarks')) {
+    } else if (
+      lowerPath.startsWith('other bookmarks') ||
+      lowerPath.startsWith('unsorted bookmarks')
+    ) {
       rootFolderKey = 'other';
       relativePath = relativePath.split('/').slice(1).join('/');
     }
-    
+
     return { rootFolderKey, relativePath };
   }
-  
+
   // Promise cache to prevent race conditions during concurrent folder creation
   // Maps cache key -> Promise<folderId> for in-flight folder lookups/creations
   const pendingFolderOps = new Map();
@@ -1738,7 +1915,7 @@ async function addCloudBookmarksToLocal(cloudItems) {
     const folderPromise = (async () => {
       // Search for existing folder
       const children = await browser.bookmarks.getChildren(parentId);
-      let existingFolder = children.find(c => !c.url && c.title === folderName);
+      let existingFolder = children.find((c) => !c.url && c.title === folderName);
 
       if (existingFolder) {
         return existingFolder.id;
@@ -1753,11 +1930,13 @@ async function addCloudBookmarksToLocal(cloudItems) {
       // Double-check for duplicates that might have been created by race condition
       // This handles the case where another operation created the folder just before us
       const updatedChildren = await browser.bookmarks.getChildren(parentId);
-      const duplicates = updatedChildren.filter(c => !c.url && c.title === folderName);
+      const duplicates = updatedChildren.filter((c) => !c.url && c.title === folderName);
 
       if (duplicates.length > 1) {
         // Keep the first one (oldest), remove the rest
-        console.log(`[MarkSyncr] Found ${duplicates.length} duplicate folders named "${folderName}", cleaning up...`);
+        console.log(
+          `[MarkSyncr] Found ${duplicates.length} duplicate folders named "${folderName}", cleaning up...`
+        );
         for (let i = 1; i < duplicates.length; i++) {
           try {
             // Only remove if empty (no children)
@@ -1799,7 +1978,7 @@ async function addCloudBookmarksToLocal(cloudItems) {
       return folderCache.get(cacheKey);
     }
 
-    const parts = folderPath.split('/').filter(p => p);
+    const parts = folderPath.split('/').filter((p) => p);
     let currentParentId = parentId;
     let currentPath = '';
 
@@ -1813,14 +1992,14 @@ async function addCloudBookmarksToLocal(cloudItems) {
     folderCache.set(cacheKey, currentParentId);
     return currentParentId;
   }
-  
+
   // Group items by their target folder path for proper ordering
   // This groups both bookmarks AND folders that live in the same parent folder
   const itemsByParentFolder = new Map();
-  
+
   for (const item of cloudItems) {
     const { rootFolderKey, relativePath } = parseRootAndPath(item.folderPath || '');
-    
+
     const fullPath = `${rootFolderKey}:${relativePath}`;
     if (!itemsByParentFolder.has(fullPath)) {
       itemsByParentFolder.set(fullPath, []);
@@ -1831,38 +2010,41 @@ async function addCloudBookmarksToLocal(cloudItems) {
       _folderPath: relativePath,
     });
   }
-  
+
   // Sort items within each folder by their index
   // This ensures folders and bookmarks are interleaved correctly
   for (const [path, items] of itemsByParentFolder) {
     items.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
   }
-  
+
   // Add items in order
   let addedBookmarks = 0;
   let addedFolders = 0;
   let skippedCount = 0;
-  
+
   for (const [path, items] of itemsByParentFolder) {
     for (const item of items) {
       try {
-        const rootFolder = rootFolders[item._rootFolderKey] || rootFolders.other || rootFolders.toolbar;
-        
+        const rootFolder =
+          rootFolders[item._rootFolderKey] || rootFolders.other || rootFolders.toolbar;
+
         if (!rootFolder) {
-          console.warn(`[MarkSyncr] No root folder found for item: ${item.title}, folderPath: ${item.folderPath}`);
+          console.warn(
+            `[MarkSyncr] No root folder found for item: ${item.title}, folderPath: ${item.folderPath}`
+          );
           skippedCount++;
           continue;
         }
-        
+
         // Get or create the target parent folder
         const targetFolderId = await getOrCreateFolderPath(item._folderPath, rootFolder.id);
-        
+
         if (item.type === 'folder') {
           // It's a folder entry - create the folder at the correct index
           // First check if folder already exists
           const children = await browser.bookmarks.getChildren(targetFolderId);
-          const existingFolder = children.find(c => !c.url && c.title === item.title);
-          
+          const existingFolder = children.find((c) => !c.url && c.title === item.title);
+
           if (existingFolder) {
             // Folder exists - check if it's at the correct index
             if (typeof item.index === 'number' && existingFolder.index !== item.index) {
@@ -1872,13 +2054,17 @@ async function addCloudBookmarksToLocal(cloudItems) {
                   parentId: targetFolderId,
                   index: item.index,
                 });
-                console.log(`[MarkSyncr] Moved existing folder "${item.title}" to index ${item.index}`);
+                console.log(
+                  `[MarkSyncr] Moved existing folder "${item.title}" to index ${item.index}`
+                );
               } catch (moveErr) {
                 console.warn(`[MarkSyncr] Failed to move folder "${item.title}":`, moveErr);
               }
             }
             // Cache the folder ID
-            const folderFullPath = item._folderPath ? `${item._folderPath}/${item.title}` : item.title;
+            const folderFullPath = item._folderPath
+              ? `${item._folderPath}/${item.title}`
+              : item.title;
             folderCache.set(`${rootFolder.id}:${folderFullPath}`, existingFolder.id);
           } else {
             // Create new folder at the correct index
@@ -1886,19 +2072,21 @@ async function addCloudBookmarksToLocal(cloudItems) {
               parentId: targetFolderId,
               title: item.title || 'Untitled Folder',
             };
-            
+
             // Set index if available
             if (typeof item.index === 'number' && item.index >= 0) {
               createOptions.index = item.index;
             }
-            
+
             const newFolder = await browser.bookmarks.create(createOptions);
             addedFolders++;
-            
+
             // Cache the new folder ID
-            const folderFullPath = item._folderPath ? `${item._folderPath}/${item.title}` : item.title;
+            const folderFullPath = item._folderPath
+              ? `${item._folderPath}/${item.title}`
+              : item.title;
             folderCache.set(`${rootFolder.id}:${folderFullPath}`, newFolder.id);
-            
+
             console.log(`[MarkSyncr] Created folder "${item.title}" at index ${item.index}`);
           }
         } else if (item.url) {
@@ -1908,12 +2096,12 @@ async function addCloudBookmarksToLocal(cloudItems) {
             title: item.title ?? '',
             url: item.url,
           };
-          
+
           // Set index if available
           if (typeof item.index === 'number' && item.index >= 0) {
             createOptions.index = item.index;
           }
-          
+
           await browser.bookmarks.create(createOptions);
           addedBookmarks++;
         }
@@ -1923,8 +2111,10 @@ async function addCloudBookmarksToLocal(cloudItems) {
       }
     }
   }
-  
-  console.log(`[MarkSyncr] addCloudBookmarksToLocal complete: bookmarks=${addedBookmarks}, folders=${addedFolders}, skipped=${skippedCount}, total=${cloudItems.length}`);
+
+  console.log(
+    `[MarkSyncr] addCloudBookmarksToLocal complete: bookmarks=${addedBookmarks}, folders=${addedFolders}, skipped=${skippedCount}, total=${cloudItems.length}`
+  );
 }
 
 /**
@@ -1953,7 +2143,12 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
         rootFolders.toolbar = root;
       } else if (title.includes('menu') || id === 'menu________') {
         rootFolders.menu = root;
-      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+      } else if (
+        title.includes('other') ||
+        title.includes('unsorted') ||
+        id === '2' ||
+        id === 'unfiled_____'
+      ) {
         rootFolders.other = root;
       }
     }
@@ -1962,14 +2157,18 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
   // Helper to determine root folder key from a folderPath
   function parseRootKey(folderPath) {
     const lowerPath = (folderPath || '').toLowerCase();
-    if (lowerPath.startsWith('bookmarks bar') ||
-        lowerPath.startsWith('bookmarks toolbar') ||
-        lowerPath.startsWith('speed dial')) {
+    if (
+      lowerPath.startsWith('bookmarks bar') ||
+      lowerPath.startsWith('bookmarks toolbar') ||
+      lowerPath.startsWith('speed dial')
+    ) {
       return 'toolbar';
     } else if (lowerPath.startsWith('bookmarks menu')) {
       return 'menu';
-    } else if (lowerPath.startsWith('other bookmarks') ||
-               lowerPath.startsWith('unsorted bookmarks')) {
+    } else if (
+      lowerPath.startsWith('other bookmarks') ||
+      lowerPath.startsWith('unsorted bookmarks')
+    ) {
       return 'other';
     }
     return 'other';
@@ -1995,12 +2194,12 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
       return folderCache.get(cacheKey);
     }
 
-    const parts = relativePath.split('/').filter(p => p);
+    const parts = relativePath.split('/').filter((p) => p);
     let currentParentId = parentId;
 
     for (const part of parts) {
       const children = await browser.bookmarks.getChildren(currentParentId);
-      let folder = children.find(c => !c.url && c.title === part);
+      let folder = children.find((c) => !c.url && c.title === part);
 
       if (!folder) {
         folder = await browser.bookmarks.create({
@@ -2028,15 +2227,19 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
       const titleChanged = (cloud.title ?? '') !== (local.title ?? '');
 
       // Check if folder needs updating (normalize for comparison)
-      const folderChanged = normalizeFolderPath(cloud.folderPath) !== normalizeFolderPath(local.folderPath);
+      const folderChanged =
+        normalizeFolderPath(cloud.folderPath) !== normalizeFolderPath(local.folderPath);
 
       // Check if index needs updating
-      const indexChanged = cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
+      const indexChanged =
+        cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
 
       // Update title if changed
       if (titleChanged) {
         await browser.bookmarks.update(local.id, { title: cloud.title ?? '' });
-        console.log(`[MarkSyncr] Updated title for ${cloud.url}: "${local.title}" -> "${cloud.title}"`);
+        console.log(
+          `[MarkSyncr] Updated title for ${cloud.url}: "${local.title}" -> "${cloud.title}"`
+        );
       }
 
       // Move to new folder or position if needed
@@ -2054,7 +2257,9 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
           await browser.bookmarks.move(local.id, moveOptions);
 
           if (folderChanged) {
-            console.log(`[MarkSyncr] Moved ${cloud.url} from "${local.folderPath}" to "${cloud.folderPath}"`);
+            console.log(
+              `[MarkSyncr] Moved ${cloud.url} from "${local.folderPath}" to "${cloud.folderPath}"`
+            );
           } else {
             console.log(`[MarkSyncr] Repositioned ${cloud.url} to index ${cloud.index}`);
           }
@@ -2069,7 +2274,9 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
   }
 
   if (errorCount > 0) {
-    console.log(`[MarkSyncr] updateLocalBookmarksFromCloud: ${updatedCount} updated, ${errorCount} errors`);
+    console.log(
+      `[MarkSyncr] updateLocalBookmarksFromCloud: ${updatedCount} updated, ${errorCount} errors`
+    );
   }
 
   return updatedCount;
@@ -2152,27 +2359,27 @@ function convertNode(node, index = 0) {
  */
 function detectBrowser() {
   const ua = navigator.userAgent;
-  
+
   // Check Firefox first - Firefox has "Firefox/" in user agent
   if (ua.includes('Firefox/')) return 'firefox';
-  
+
   // Check Brave - Brave exposes navigator.brave for detection
   // Note: Brave doesn't include "Brave" in user agent for privacy reasons
   if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
     return 'brave';
   }
-  
+
   // Check other Chromium-based browsers by user agent
   if (ua.includes('Edg/')) return 'edge';
   if (ua.includes('OPR/') || ua.includes('Opera/')) return 'opera';
   if (ua.includes('Vivaldi/')) return 'vivaldi';
-  
+
   // Default to Chrome for other Chromium browsers
   if (ua.includes('Chrome/')) return 'chrome';
-  
+
   // Safari (though we don't have a Safari extension yet)
   if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'safari';
-  
+
   return 'unknown';
 }
 
@@ -2210,7 +2417,10 @@ async function forcePush() {
   // Prevent concurrent operations
   if (isSyncInProgress) {
     console.log('[MarkSyncr] Force Push blocked: sync already in progress');
-    return { success: false, error: 'Another sync operation is in progress. Please wait or reset sync state.' };
+    return {
+      success: false,
+      error: 'Another sync operation is in progress. Please wait or reset sync state.',
+    };
   }
 
   isSyncInProgress = true;
@@ -2227,19 +2437,19 @@ async function forcePush() {
         requiresAuth: true,
       };
     }
-    
+
     // Get current bookmarks from browser
     const bookmarkTree = await browser.bookmarks.getTree();
     const bookmarkData = convertBrowserBookmarks(bookmarkTree);
     const flatBookmarks = flattenBookmarkTree(bookmarkTree);
     // Pass the bookmark count as synced count since we're pushing all to cloud
-    const stats = countBookmarks(bookmarkTree, flatBookmarks.filter(b => b.url).length);
-    
+    const stats = countBookmarks(bookmarkTree, flatBookmarks.filter((b) => b.url).length);
+
     // Force push to cloud (overwrite)
     console.log(`[MarkSyncr] Force pushing ${flatBookmarks.length} bookmarks to cloud...`);
     const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
     console.log('[MarkSyncr] Force push sync result:', syncResult);
-    
+
     // Save version with force push marker (non-blocking)
     try {
       const versionResult = await saveVersionToCloud(
@@ -2253,12 +2463,12 @@ async function forcePush() {
       // Don't fail force push because of version save failure
       console.warn('[MarkSyncr] Force push version save failed (continuing):', versionErr.message);
     }
-    
+
     // Update last sync time
     await browser.storage.local.set({
       lastSync: new Date().toISOString(),
     });
-    
+
     return { success: true, stats, message: 'Successfully force pushed bookmarks to cloud' };
   } catch (err) {
     console.error('[MarkSyncr] Force push failed:', err);
@@ -2284,7 +2494,10 @@ async function forcePull() {
   // Prevent concurrent operations
   if (isSyncInProgress) {
     console.log('[MarkSyncr] Force Pull blocked: sync already in progress');
-    return { success: false, error: 'Another sync operation is in progress. Please wait or reset sync state.' };
+    return {
+      success: false,
+      error: 'Another sync operation is in progress. Please wait or reset sync state.',
+    };
   }
 
   isSyncInProgress = true;
@@ -2301,68 +2514,84 @@ async function forcePull() {
         requiresAuth: true,
       };
     }
-    
+
     // Get bookmarks from cloud_bookmarks (the authoritative source)
     // NOT from version history, which might have older data
     console.log('[MarkSyncr] Force Pull: Fetching bookmarks from cloud_bookmarks...');
     const cloudData = await getBookmarksFromCloud();
-    
+
     if (!cloudData || !cloudData.bookmarks || cloudData.bookmarks.length === 0) {
       return {
         success: false,
         error: 'No bookmark data found in cloud. Please sync first.',
       };
     }
-    
+
     const cloudBookmarksFlat = cloudData.bookmarks;
     const browserType = detectBrowser();
     console.log(`[MarkSyncr] Force Pull: browser=${browserType}`);
-    console.log(`[MarkSyncr] Force Pull: Retrieved ${cloudBookmarksFlat.length} bookmarks from cloud_bookmarks`);
+    console.log(
+      `[MarkSyncr] Force Pull: Retrieved ${cloudBookmarksFlat.length} bookmarks from cloud_bookmarks`
+    );
     console.log(`[MarkSyncr] Force Pull: Cloud checksum: ${cloudData.checksum}`);
-    
+
     // Get current browser bookmarks to find root folders
     const currentTree = await browser.bookmarks.getTree();
     const rootFolders = {};
-    
+
     if (currentTree[0]?.children) {
-      console.log('[MarkSyncr] Force Pull: Local root folders:', currentTree[0].children.map(c => ({ id: c.id, title: c.title })));
-      
+      console.log(
+        '[MarkSyncr] Force Pull: Local root folders:',
+        currentTree[0].children.map((c) => ({ id: c.id, title: c.title }))
+      );
+
       for (const root of currentTree[0].children) {
         const title = root.title?.toLowerCase() || '';
         const id = root.id;
-        
+
         // Chrome/Opera/Edge/Brave use numeric IDs: '1' for bookmarks bar, '2' for other bookmarks
         // Firefox uses string IDs: 'toolbar_____', 'menu________', 'unfiled_____'
         if (title.includes('toolbar') || title.includes('bar') || id === '1') {
           rootFolders.toolbar = root;
-          console.log(`[MarkSyncr] Force Pull: Found toolbar folder: id=${id}, title="${root.title}"`);
+          console.log(
+            `[MarkSyncr] Force Pull: Found toolbar folder: id=${id}, title="${root.title}"`
+          );
         } else if (title.includes('menu') || id === 'menu________') {
           rootFolders.menu = root;
           console.log(`[MarkSyncr] Force Pull: Found menu folder: id=${id}, title="${root.title}"`);
-        } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+        } else if (
+          title.includes('other') ||
+          title.includes('unsorted') ||
+          id === '2' ||
+          id === 'unfiled_____'
+        ) {
           rootFolders.other = root;
-          console.log(`[MarkSyncr] Force Pull: Found other folder: id=${id}, title="${root.title}"`);
+          console.log(
+            `[MarkSyncr] Force Pull: Found other folder: id=${id}, title="${root.title}"`
+          );
         }
       }
     }
-    
+
     console.log('[MarkSyncr] Force Pull: Detected root folders:', Object.keys(rootFolders));
-    
+
     // Set flag to prevent tombstone creation during Force Pull
     // This is important because we're about to delete all bookmarks and recreate them
     isForcePullInProgress = true;
     console.log('[MarkSyncr] Force Pull: Tombstone creation disabled');
-    
+
     try {
       // Clear existing bookmarks in each root folder
       for (const [rootKey, rootFolder] of Object.entries(rootFolders)) {
         if (!rootFolder) continue;
-        
+
         // Get fresh children list (in case it changed)
         try {
           const children = await browser.bookmarks.getChildren(rootFolder.id);
-          console.log(`[MarkSyncr] Force Pull: Clearing ${children.length} items from ${rootKey} (${rootFolder.title})`);
-          
+          console.log(
+            `[MarkSyncr] Force Pull: Clearing ${children.length} items from ${rootKey} (${rootFolder.title})`
+          );
+
           for (const child of children) {
             try {
               await browser.bookmarks.removeTree(child.id);
@@ -2374,38 +2603,44 @@ async function forcePull() {
           console.warn(`[MarkSyncr] Failed to get children for ${rootKey}:`, err);
         }
       }
-      
+
       // Recreate bookmarks from cloud data (flat format from cloud_bookmarks)
       // The flat format has items with folderPath like "Bookmarks Bar/Subfolder"
       // We need to recreate the folder structure and place bookmarks correctly
       let importedCount = 0;
       let foldersCreated = 0;
-      
-      console.log(`[MarkSyncr] Force Pull: Recreating ${cloudBookmarksFlat.length} items from flat format`);
-      
+
+      console.log(
+        `[MarkSyncr] Force Pull: Recreating ${cloudBookmarksFlat.length} items from flat format`
+      );
+
       // Use the same addCloudBookmarksToLocal function that regular sync uses
       // This handles folder creation and bookmark placement correctly
       await addCloudBookmarksToLocal(cloudBookmarksFlat);
-      
+
       // Count what was created
       const finalTree = await browser.bookmarks.getTree();
       const finalFlat = flattenBookmarkTree(finalTree);
       // Pass the bookmark count as synced count since we pulled all from cloud
-      const finalStats = countBookmarks(finalTree, finalFlat.filter(b => b.url).length);
+      const finalStats = countBookmarks(finalTree, finalFlat.filter((b) => b.url).length);
       importedCount = finalStats.total;
       foldersCreated = finalStats.folders;
-      
-      console.log(`[MarkSyncr] Force Pull: Created ${importedCount} bookmarks, ${foldersCreated} folders`);
-      
+
+      console.log(
+        `[MarkSyncr] Force Pull: Created ${importedCount} bookmarks, ${foldersCreated} folders`
+      );
+
       // Update last sync time
       await browser.storage.local.set({
         lastSync: new Date().toISOString(),
       });
-      
+
       const stats = { total: importedCount, folders: foldersCreated, synced: importedCount };
-      
-      console.log(`[MarkSyncr] Force Pull complete: ${importedCount} bookmarks, ${foldersCreated} folders`);
-      
+
+      console.log(
+        `[MarkSyncr] Force Pull complete: ${importedCount} bookmarks, ${foldersCreated} folders`
+      );
+
       // CRITICAL: After Force Pull, sync the pulled bookmarks back to cloud_bookmarks
       // This ensures the next regular sync sees matching data and doesn't revert changes.
       // Without this, the next sync would compare local bookmarks (from version history)
@@ -2415,19 +2650,19 @@ async function forcePull() {
         console.log('[MarkSyncr] Force Pull: Syncing pulled bookmarks to cloud_bookmarks...');
         const finalTree = await browser.bookmarks.getTree();
         const finalFlat = flattenBookmarkTree(finalTree);
-        
+
         // Clear tombstones since we just did a full replacement
         const emptyTombstones = [];
-        
+
         const syncResult = await syncBookmarksToCloud(finalFlat, detectBrowser(), emptyTombstones);
         console.log('[MarkSyncr] Force Pull: cloud_bookmarks updated:', syncResult);
-        
+
         // Store the new checksum so next sync knows we're in sync
         if (syncResult.checksum) {
           await storeLastCloudChecksum(syncResult.checksum);
           console.log('[MarkSyncr] Force Pull: Stored cloud checksum:', syncResult.checksum);
         }
-        
+
         // Clear local tombstones since we just did a full replacement
         await storeTombstones([]);
         console.log('[MarkSyncr] Force Pull: Cleared local tombstones');
@@ -2436,7 +2671,7 @@ async function forcePull() {
         // Don't fail the Force Pull - the local bookmarks were updated successfully
         // The next regular sync will eventually sync the data
       }
-      
+
       return {
         success: true,
         stats,
@@ -2467,7 +2702,7 @@ async function recreateBookmarks(parentId, items, startIndex = 0) {
   let bookmarks = 0;
   let folders = 0;
   let currentIndex = startIndex;
-  
+
   for (const item of items) {
     try {
       if (item.type === 'bookmark' && item.url) {
@@ -2490,7 +2725,7 @@ async function recreateBookmarks(parentId, items, startIndex = 0) {
         });
         folders++;
         currentIndex++;
-        
+
         if (item.children && item.children.length > 0) {
           // Child items start at index 0 within the new folder
           const childResult = await recreateBookmarks(newFolder.id, item.children, 0);
@@ -2504,7 +2739,7 @@ async function recreateBookmarks(parentId, items, startIndex = 0) {
       currentIndex++;
     }
   }
-  
+
   return { bookmarks, folders };
 }
 
@@ -2520,17 +2755,17 @@ async function connectSource(sourceId) {
 
     // 3rd party OAuth sources must be connected via the web app dashboard
     const oauthSources = ['github', 'dropbox', 'google-drive'];
-    
+
     if (oauthSources.includes(sourceId)) {
       // Direct user to web app dashboard to connect
       const baseUrl = getApiBaseUrl();
       const dashboardUrl = `${baseUrl}/dashboard`;
-      
+
       console.log(`[MarkSyncr] Redirecting to dashboard for ${sourceId} connection`);
-      
+
       // Open the dashboard in a new tab
       await browser.tabs.create({ url: dashboardUrl });
-      
+
       return {
         success: true,
         redirectUrl: dashboardUrl,
@@ -2540,9 +2775,7 @@ async function connectSource(sourceId) {
 
     // For non-OAuth sources (like browser-bookmarks), just mark as connected
     const { sources = [] } = await browser.storage.local.get('sources');
-    const updatedSources = sources.map((s) =>
-      s.id === sourceId ? { ...s, connected: true } : s
-    );
+    const updatedSources = sources.map((s) => (s.id === sourceId ? { ...s, connected: true } : s));
     await browser.storage.local.set({ sources: updatedSources });
     return { success: true };
   } catch (err) {
@@ -2564,35 +2797,35 @@ async function connectSource(sourceId) {
 async function refreshConnectedSources() {
   try {
     console.log('[MarkSyncr] Refreshing connected sources from server...');
-    
+
     const baseUrl = getApiBaseUrl();
     const token = await getAccessToken();
-    
+
     if (!token) {
       console.log('[MarkSyncr] No access token, cannot fetch sources');
       return { success: false, error: 'Not authenticated' };
     }
-    
+
     const response = await fetch(`${baseUrl}/api/sources`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       console.error('[MarkSyncr] Failed to fetch sources:', response.status);
       return { success: false, error: 'Failed to fetch sources' };
     }
-    
+
     const data = await response.json();
     const serverSources = data.sources || [];
-    
+
     console.log('[MarkSyncr] Server sources (OAuth providers):', serverSources);
-    
+
     // Get current local sources
     const { sources: localSources = [] } = await browser.storage.local.get('sources');
-    
+
     // Merge server sources with local sources
     // Handle each source type appropriately:
     // - browser-bookmarks: Always connected (local)
@@ -2603,16 +2836,16 @@ async function refreshConnectedSources() {
       if (localSource.id === 'browser-bookmarks') {
         return { ...localSource, connected: true };
       }
-      
+
       // supabase-cloud is connected when user is authenticated
       // Since we have a valid token at this point, mark it as connected
       if (localSource.id === 'supabase-cloud') {
         console.log('[MarkSyncr] Marking supabase-cloud as connected (user is authenticated)');
         return { ...localSource, connected: true };
       }
-      
+
       // For OAuth sources (github, dropbox, google-drive), check server response
-      const serverSource = serverSources.find(s => s.id === localSource.id);
+      const serverSource = serverSources.find((s) => s.id === localSource.id);
       if (serverSource) {
         console.log(`[MarkSyncr] OAuth source ${localSource.id} is connected`);
         return {
@@ -2625,15 +2858,18 @@ async function refreshConnectedSources() {
           connectedAt: serverSource.connectedAt,
         };
       }
-      
+
       // OAuth source not found on server - mark as disconnected
       return { ...localSource, connected: false };
     });
-    
+
     await browser.storage.local.set({ sources: updatedSources });
-    
-    console.log('[MarkSyncr] Updated local sources:', updatedSources.map(s => ({ id: s.id, connected: s.connected })));
-    
+
+    console.log(
+      '[MarkSyncr] Updated local sources:',
+      updatedSources.map((s) => ({ id: s.id, connected: s.connected }))
+    );
+
     return { success: true, sources: updatedSources };
   } catch (err) {
     console.error('[MarkSyncr] Failed to refresh sources:', err);
@@ -2652,9 +2888,7 @@ async function disconnectSource(sourceId) {
 
     const { sources = [] } = await browser.storage.local.get('sources');
 
-    const updatedSources = sources.map((s) =>
-      s.id === sourceId ? { ...s, connected: false } : s
-    );
+    const updatedSources = sources.map((s) => (s.id === sourceId ? { ...s, connected: false } : s));
 
     await browser.storage.local.set({ sources: updatedSources });
 
@@ -2697,18 +2931,19 @@ browser.runtime.onMessage.addListener((message, sender) => {
       }));
 
     case 'UPDATE_SETTINGS':
-      return browser.storage.local
-        .set({ settings: message.payload })
-        .then(() => {
-          setupAutoSync(); // Reconfigure auto-sync
-          return { success: true };
-        });
+      return browser.storage.local.set({ settings: message.payload }).then(() => {
+        setupAutoSync(); // Reconfigure auto-sync
+        return { success: true };
+      });
 
     case 'RESET_SYNC_FAILURES':
       console.log('[MarkSyncr] Resetting sync failure count');
       consecutiveSyncFailures = 0;
       lastSyncError = null;
-      return Promise.resolve({ success: true, message: 'Sync failures reset. You can try syncing again.' });
+      return Promise.resolve({
+        success: true,
+        message: 'Sync failures reset. You can try syncing again.',
+      });
 
     case 'GET_SYNC_STATUS':
       return Promise.resolve({
@@ -2721,7 +2956,11 @@ browser.runtime.onMessage.addListener((message, sender) => {
       });
 
     case 'FORCE_RESET_SYNC_STATE':
-      console.log('[MarkSyncr] Force resetting sync state (was stuck: isSyncInProgress=' + isSyncInProgress + ')');
+      console.log(
+        '[MarkSyncr] Force resetting sync state (was stuck: isSyncInProgress=' +
+          isSyncInProgress +
+          ')'
+      );
       isSyncInProgress = false;
       consecutiveSyncFailures = 0;
       lastSyncError = null;
@@ -2743,22 +2982,22 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
   const browserInfo = detectBrowser();
   const timestamp = new Date().toISOString();
   console.log(`[MarkSyncr] ⏰ Alarm fired: ${alarm.name} at ${timestamp} (${browserInfo})`);
-  
+
   if (alarm.name === SYNC_ALARM_NAME) {
     console.log('[MarkSyncr] ⏰ Auto-sync alarm triggered, starting periodic sync...');
-    
+
     // Check if user is logged in before syncing
     const loggedIn = await isLoggedIn();
     if (!loggedIn) {
       console.log('[MarkSyncr] ⏰ Auto-sync skipped: user not logged in');
       return;
     }
-    
+
     console.log('[MarkSyncr] ⏰ User is logged in, proceeding with periodic sync...');
-    
+
     try {
       const result = await performSync();
-      
+
       // Enhanced logging for periodic sync results
       if (result.success) {
         if (result.skipped) {
@@ -2809,17 +3048,47 @@ browser.runtime.onInstalled.addListener((details) => {
         conflictResolution: 'newest-wins',
       },
       sources: [
-        { id: 'browser-bookmarks', name: 'Browser Bookmarks', type: 'browser-bookmarks', connected: true, description: 'Sync your browser bookmarks' },
-        { id: 'supabase-cloud', name: 'MarkSyncr Cloud', type: 'supabase-cloud', connected: false, description: 'Sync to cloud (requires login)' },
-        { id: 'github', name: 'GitHub', type: 'github', connected: false, description: 'Sync to GitHub repository' },
-        { id: 'dropbox', name: 'Dropbox', type: 'dropbox', connected: false, description: 'Sync to Dropbox' },
-        { id: 'google-drive', name: 'Google Drive', type: 'google-drive', connected: false, description: 'Sync to Google Drive' },
+        {
+          id: 'browser-bookmarks',
+          name: 'Browser Bookmarks',
+          type: 'browser-bookmarks',
+          connected: true,
+          description: 'Sync your browser bookmarks',
+        },
+        {
+          id: 'supabase-cloud',
+          name: 'MarkSyncr Cloud',
+          type: 'supabase-cloud',
+          connected: false,
+          description: 'Sync to cloud (requires login)',
+        },
+        {
+          id: 'github',
+          name: 'GitHub',
+          type: 'github',
+          connected: false,
+          description: 'Sync to GitHub repository',
+        },
+        {
+          id: 'dropbox',
+          name: 'Dropbox',
+          type: 'dropbox',
+          connected: false,
+          description: 'Sync to Dropbox',
+        },
+        {
+          id: 'google-drive',
+          name: 'Google Drive',
+          type: 'google-drive',
+          connected: false,
+          description: 'Sync to Google Drive',
+        },
       ],
       // Auto-select browser bookmarks as default source
       selectedSource: 'browser-bookmarks',
     });
   }
-  
+
   // Re-setup auto-sync on install/update to ensure alarm is created
   setupAutoSync().then(() => {
     console.log('[MarkSyncr] Auto-sync setup completed after install/update');
@@ -2852,13 +3121,3 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
-
-
-
-
-
-
-
-
-
-

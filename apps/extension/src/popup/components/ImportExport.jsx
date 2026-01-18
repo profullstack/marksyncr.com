@@ -31,7 +31,12 @@ const EXPORT_FORMATS = {
 /**
  * File upload dropzone component
  */
-export function FileDropzone({ onFileSelect, acceptedFormats, supportedText = 'HTML, JSON', className = '' }) {
+export function FileDropzone({
+  onFileSelect,
+  acceptedFormats,
+  supportedText = 'HTML, JSON',
+  className = '',
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -96,9 +101,7 @@ export function FileDropzone({ onFileSelect, acceptedFormats, supportedText = 'H
       <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
         Drop your bookmark file here, or click to browse
       </p>
-      <p className="mt-1 text-xs text-gray-400">
-        Supports: {supportedText}
-      </p>
+      <p className="mt-1 text-xs text-gray-400">Supports: {supportedText}</p>
     </div>
   );
 }
@@ -158,9 +161,7 @@ export function ImportPreview({ data, onConfirm, onCancel, className = '' }) {
                 <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
               <span className="text-sm text-gray-700 dark:text-gray-300">{item.title}</span>
-              <span className="text-xs text-gray-400">
-                ({item.children?.length || 0} items)
-              </span>
+              <span className="text-xs text-gray-400">({item.children?.length || 0} items)</span>
             </label>
             {item.children && renderTree(item.children, depth + 1)}
           </div>
@@ -229,9 +230,7 @@ export function ImportPreview({ data, onConfirm, onCancel, className = '' }) {
               onChange={(e) => setMergeStrategy(e.target.value)}
               className="h-4 w-4 text-blue-600 border-gray-300"
             />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Import into new folder
-            </span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Import into new folder</span>
           </label>
         </div>
       </div>
@@ -270,19 +269,21 @@ export function ImportPreview({ data, onConfirm, onCancel, className = '' }) {
 /**
  * Export options component
  */
-export function ExportOptions({ bookmarks, onExport, isPro = false, onUpgradeClick, className = '' }) {
+export function ExportOptions({
+  bookmarks,
+  onExport,
+  isPro = false,
+  onUpgradeClick,
+  className = '',
+}) {
   const [selectedFormat, setSelectedFormat] = useState('html');
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeTags, setIncludeTags] = useState(true);
   const [selectedFolders, setSelectedFolders] = useState([]);
 
   // Filter formats based on user plan
-  const availableFormats = Object.values(EXPORT_FORMATS).filter(
-    (format) => isPro || format.free
-  );
-  const proOnlyFormats = Object.values(EXPORT_FORMATS).filter(
-    (format) => !format.free
-  );
+  const availableFormats = Object.values(EXPORT_FORMATS).filter((format) => isPro || format.free);
+  const proOnlyFormats = Object.values(EXPORT_FORMATS).filter((format) => !format.free);
 
   const handleExport = () => {
     onExport({
@@ -317,12 +318,12 @@ export function ExportOptions({ bookmarks, onExport, isPro = false, onUpgradeCli
             </button>
           ))}
         </div>
-        
+
         {/* Pro-only formats */}
         {!isPro && proOnlyFormats.length > 0 && (
           <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              Pro formats: {proOnlyFormats.map(f => f.name).join(', ')}
+              Pro formats: {proOnlyFormats.map((f) => f.name).join(', ')}
             </p>
             <button
               onClick={onUpgradeClick}
@@ -336,9 +337,7 @@ export function ExportOptions({ bookmarks, onExport, isPro = false, onUpgradeCli
 
       {/* Options */}
       <div>
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Include
-        </label>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Include</label>
         <div className="mt-2 space-y-2">
           <label className="flex items-center gap-2">
             <input
@@ -398,59 +397,66 @@ export function ImportExport({
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  const handleFileSelect = useCallback(async (file) => {
-    setError(null);
-    setIsProcessing(true);
+  const handleFileSelect = useCallback(
+    async (file) => {
+      setError(null);
+      setIsProcessing(true);
 
-    try {
-      const content = await file.text();
-      // The actual parsing will be done by the parent component
-      // Here we just pass the file content
-      const result = await onImport(content, 'preview');
-      setImportData(result);
-    } catch (err) {
-      setError(err.message || 'Failed to parse file');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [onImport]);
+      try {
+        const content = await file.text();
+        // The actual parsing will be done by the parent component
+        // Here we just pass the file content
+        const result = await onImport(content, 'preview');
+        setImportData(result);
+      } catch (err) {
+        setError(err.message || 'Failed to parse file');
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [onImport]
+  );
 
-  const handleConfirmImport = useCallback(async (options) => {
-    setIsProcessing(true);
-    setError(null);
+  const handleConfirmImport = useCallback(
+    async (options) => {
+      setIsProcessing(true);
+      setError(null);
 
-    try {
-      await onImport(importData, 'import', options);
-      setSuccess(`Successfully imported ${importData.totalCount} bookmarks`);
-      setImportData(null);
-    } catch (err) {
-      setError(err.message || 'Failed to import bookmarks');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [importData, onImport]);
+      try {
+        await onImport(importData, 'import', options);
+        setSuccess(`Successfully imported ${importData.totalCount} bookmarks`);
+        setImportData(null);
+      } catch (err) {
+        setError(err.message || 'Failed to import bookmarks');
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [importData, onImport]
+  );
 
-  const handleExport = useCallback(async (options) => {
-    setIsProcessing(true);
-    setError(null);
+  const handleExport = useCallback(
+    async (options) => {
+      setIsProcessing(true);
+      setError(null);
 
-    try {
-      await onExport(bookmarks, options);
-      setSuccess('Bookmarks exported successfully');
-    } catch (err) {
-      setError(err.message || 'Failed to export bookmarks');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [bookmarks, onExport]);
+      try {
+        await onExport(bookmarks, options);
+        setSuccess('Bookmarks exported successfully');
+      } catch (err) {
+        setError(err.message || 'Failed to export bookmarks');
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [bookmarks, onExport]
+  );
 
   // Filter import formats based on user plan
   const availableImportFormats = Object.values(IMPORT_FORMATS).filter(
     (format) => isPro || format.free
   );
-  const proOnlyImportFormats = Object.values(IMPORT_FORMATS).filter(
-    (format) => !format.free
-  );
+  const proOnlyImportFormats = Object.values(IMPORT_FORMATS).filter((format) => !format.free);
 
   return (
     <div className={`${className}`}>
@@ -512,8 +518,8 @@ export function ImportExport({
             <>
               <FileDropzone
                 onFileSelect={handleFileSelect}
-                acceptedFormats={isPro ? ".html,.json,.csv" : ".html,.json"}
-                supportedText={isPro ? "HTML, JSON, CSV" : "HTML, JSON"}
+                acceptedFormats={isPro ? '.html,.json,.csv' : '.html,.json'}
+                supportedText={isPro ? 'HTML, JSON, CSV' : 'HTML, JSON'}
               />
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -544,12 +550,12 @@ export function ImportExport({
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Pro-only import formats */}
                 {!isPro && proOnlyImportFormats.length > 0 && (
                   <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      Pro imports: {proOnlyImportFormats.map(f => f.name).join(', ')}
+                      Pro imports: {proOnlyImportFormats.map((f) => f.name).join(', ')}
                     </p>
                     <button
                       onClick={onUpgradeClick}

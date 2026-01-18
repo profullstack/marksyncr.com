@@ -17,6 +17,7 @@ Place your extension icons here:
 ## Generating Icons
 
 You can use tools like:
+
 - Figma
 - Adobe Illustrator
 - GIMP

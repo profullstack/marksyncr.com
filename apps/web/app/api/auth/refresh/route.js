@@ -28,10 +28,7 @@ export async function POST(request) {
     const { refresh_token } = await request.json();
 
     if (!refresh_token) {
-      return NextResponse.json(
-        { error: 'Refresh token is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Refresh token is required' }, { status: 400 });
     }
 
     // Use stateless client to avoid cookie-based session management
@@ -43,10 +40,7 @@ export async function POST(request) {
     });
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 401 });
     }
 
     return NextResponse.json({
@@ -58,9 +52,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Refresh error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

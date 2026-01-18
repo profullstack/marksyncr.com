@@ -437,9 +437,7 @@ export default function PricingPage() {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-blue-600">
         <div className="mx-auto max-w-4xl text-center">
           <h2 className="text-3xl font-bold text-white">Ready to sync your bookmarks?</h2>
-          <p className="mt-4 text-xl text-blue-100">
-            Start free today. No credit card required.
-          </p>
+          <p className="mt-4 text-xl text-blue-100">Start free today. No credit card required.</p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/signup"

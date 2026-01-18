@@ -555,7 +555,12 @@ describe('Individual Tag API', () => {
         error: null,
       });
 
-      const updatedTag = { id: 'tag-123', name: 'updated', color: '#3B82F6', created_at: '2025-01-01' };
+      const updatedTag = {
+        id: 'tag-123',
+        name: 'updated',
+        color: '#3B82F6',
+        created_at: '2025-01-01',
+      };
 
       // First call for subscription check
       mockSupabase.from.mockReturnValueOnce({

@@ -94,7 +94,7 @@ function buildChrome() {
   // Vite outputs to dist/chrome by default, so we need to copy from there
   // The clean() function already created the CHROME_DIR, but Vite may have populated it
   // We need to ensure the manifest and icons are correct
-  
+
   // Copy Chrome manifest as manifest.json
   const chromeManifest = readFileSync(join(ROOT_DIR, 'src/manifest.chrome.json'), 'utf-8');
   writeFileSync(join(CHROME_DIR, 'manifest.json'), chromeManifest);
@@ -170,7 +170,9 @@ function buildSafari() {
   console.log('   1. Use Xcode to create a Safari Web Extension project');
   console.log('   2. Copy the contents of dist/safari into the extension folder');
   console.log('   3. Build and sign with Xcode');
-  console.log('   See: https://developer.apple.com/documentation/safariservices/safari_web_extensions');
+  console.log(
+    '   See: https://developer.apple.com/documentation/safariservices/safari_web_extensions'
+  );
 }
 
 /**
@@ -195,7 +197,7 @@ function copyIcons(targetDir) {
     // Try PNG first, then SVG
     const pngFile = join(iconsDir, `icon-${size}.png`);
     const svgFile = join(iconsDir, `icon-${size}.svg`);
-    
+
     if (existsSync(pngFile)) {
       copyFileSync(pngFile, join(targetIconsDir, `icon-${size}.png`));
     }
@@ -203,7 +205,7 @@ function copyIcons(targetDir) {
       copyFileSync(svgFile, join(targetIconsDir, `icon-${size}.svg`));
     }
   }
-  
+
   // Also copy the base icon.svg if it exists
   const baseIcon = join(iconsDir, 'icon.svg');
   if (existsSync(baseIcon)) {

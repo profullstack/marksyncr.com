@@ -1,7 +1,7 @@
 /**
  * GET /api/subscription
  * Get the current user's subscription status
- * 
+ *
  * Authentication: Session cookie (web) OR Bearer token (extension)
  */
 
@@ -22,15 +22,12 @@ export async function OPTIONS(request) {
 
 export async function GET(request) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
     if (!user || !supabase) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401, headers }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers });
     }
 
     // Get subscription from database
@@ -49,21 +46,21 @@ export async function GET(request) {
     const tier = subscription?.tier || 'free';
     const isActive = subscription?.status === 'active' || tier === 'free';
 
-    return NextResponse.json({
-      subscription: {
-        tier,
-        status: subscription?.status || 'active',
-        isActive,
-        isPro: tier === 'pro' && isActive,
-        currentPeriodEnd: subscription?.current_period_end || null,
-        cancelAtPeriodEnd: subscription?.cancel_at_period_end || false,
+    return NextResponse.json(
+      {
+        subscription: {
+          tier,
+          status: subscription?.status || 'active',
+          isActive,
+          isPro: tier === 'pro' && isActive,
+          currentPeriodEnd: subscription?.current_period_end || null,
+          cancelAtPeriodEnd: subscription?.cancel_at_period_end || false,
+        },
       },
-    }, { headers });
+      { headers }
+    );
   } catch (error) {
     console.error('Subscription error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });
   }
 }

@@ -55,9 +55,8 @@ vi.mock('next/headers', () => ({
 }));
 
 // Import after mocks are set up
-const { signUpWithEmail, signInWithEmail, signInWithOAuth, resetPassword, signOut } = await import(
-  '../app/actions/auth.js'
-);
+const { signUpWithEmail, signInWithEmail, signInWithOAuth, resetPassword, signOut } =
+  await import('../app/actions/auth.js');
 
 /**
  * Helper to create FormData from an object

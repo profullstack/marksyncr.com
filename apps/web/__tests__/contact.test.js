@@ -182,11 +182,7 @@ describe('Contact API Route', () => {
         error: null,
       });
 
-      const validEmails = [
-        'test@example.com',
-        'user.name@domain.org',
-        'user+tag@example.co.uk',
-      ];
+      const validEmails = ['test@example.com', 'user.name@domain.org', 'user+tag@example.co.uk'];
 
       for (const email of validEmails) {
         const request = createRequest({

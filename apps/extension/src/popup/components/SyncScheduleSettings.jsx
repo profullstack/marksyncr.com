@@ -86,7 +86,8 @@ const SyncHistoryItem = ({ sync }) => {
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${sync.success ? 'bg-green-500' : 'bg-red-500'}`} />
         <span className="text-sm text-gray-700">
-          {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {date.toLocaleDateString()}{' '}
+          {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
       <div className="text-xs text-gray-500">
@@ -101,11 +102,7 @@ const SyncHistoryItem = ({ sync }) => {
  */
 const SyncStatsDisplay = ({ stats }) => {
   if (!stats || stats.totalSyncs === 0) {
-    return (
-      <div className="text-center py-4 text-gray-500 text-sm">
-        No sync history yet
-      </div>
-    );
+    return <div className="text-center py-4 text-gray-500 text-sm">No sync history yet</div>;
   }
 
   return (
@@ -263,9 +260,7 @@ export default function SyncScheduleSettings({
 
           {/* Interval selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sync Interval
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sync Interval</label>
             <div className="grid grid-cols-4 gap-2">
               {intervalOptions.map((option) => (
                 <IntervalOption
@@ -283,7 +278,9 @@ export default function SyncScheduleSettings({
           {/* Current setting display */}
           <div className="bg-blue-50 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${currentSchedule?.enabled ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <span
+                className={`w-2 h-2 rounded-full ${currentSchedule?.enabled ? 'bg-green-500' : 'bg-gray-400'}`}
+              />
               <span className="text-sm text-blue-800">
                 {currentSchedule?.enabled
                   ? `Auto-sync every ${formatSyncInterval(currentSchedule.intervalMinutes)}`
@@ -314,9 +311,7 @@ export default function SyncScheduleSettings({
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-center text-gray-500 text-sm">
-                No sync history yet
-              </div>
+              <div className="p-4 text-center text-gray-500 text-sm">No sync history yet</div>
             )}
           </div>
 
@@ -349,13 +344,13 @@ export function SyncIndicator({ schedule, onSyncNow }) {
     <button
       onClick={onSyncNow}
       className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-        isOverdue
-          ? 'bg-yellow-100 text-yellow-700'
-          : 'bg-green-100 text-green-700'
+        isOverdue ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
       }`}
       title={isOverdue ? 'Sync overdue - click to sync now' : 'Auto-sync enabled'}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${isOverdue ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${isOverdue ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}
+      />
       <span>{formatSyncInterval(schedule.intervalMinutes)}</span>
     </button>
   );

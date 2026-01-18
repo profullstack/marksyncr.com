@@ -122,9 +122,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
     <div className="mt-8">
       <h2 className="mb-4 text-lg font-semibold text-slate-900">Sync Sources</h2>
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
-      )}
+      {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {sources.map((source) => {
@@ -136,9 +134,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
             <div
               key={source.name}
               className={`rounded-xl border p-4 ${
-                source.available
-                  ? 'border-slate-200 bg-white'
-                  : 'border-slate-100 bg-slate-50'
+                source.available ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -166,9 +162,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                     >
                       {source.name}
                     </p>
-                    {connected && (
-                      <p className="text-xs text-green-600">Connected</p>
-                    )}
+                    {connected && <p className="text-xs text-green-600">Connected</p>}
                     {source.requiresPro && !source.available && (
                       <p className="text-xs text-slate-400">Pro plan required</p>
                     )}
@@ -195,40 +189,60 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                     )}
                   </div>
                 )}
-                {source.alwaysConnected && (
-                  <span className="text-xs text-slate-500">Default</span>
-                )}
+                {source.alwaysConnected && <span className="text-xs text-slate-500">Default</span>}
                 {source.requiresPro && !source.available && (
-                  <Link
-                    href="/pricing"
-                    className="text-sm text-primary-600 hover:text-primary-700"
-                  >
+                  <Link href="/pricing" className="text-sm text-primary-600 hover:text-primary-700">
                     Upgrade
                   </Link>
                 )}
               </div>
-              
+
               {/* Repository details for GitHub */}
               {connected && source.id === 'github' && sourceDetails?.repository && (
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex items-center space-x-2 text-xs text-slate-600">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                      />
                     </svg>
                     <span className="font-medium">{sourceDetails.repository}</span>
                   </div>
                   {sourceDetails.file_path && (
                     <div className="mt-1 flex items-center space-x-2 text-xs text-slate-500">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
                       <span>{sourceDetails.file_path}</span>
                     </div>
                   )}
                   {sourceDetails.branch && (
                     <div className="mt-1 flex items-center space-x-2 text-xs text-slate-500">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
                       </svg>
                       <span>Branch: {sourceDetails.branch}</span>
                     </div>
@@ -240,8 +254,18 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                     className="mt-2 inline-flex items-center text-xs text-primary-600 hover:text-primary-700"
                   >
                     View on GitHub
-                    <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    <svg
+                      className="ml-1 h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
                     </svg>
                   </a>
                 </div>
@@ -252,14 +276,31 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex items-center space-x-2 text-xs text-slate-600">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    <span className="font-medium">{sourceDetails?.file_path || '/Apps/MarkSyncr/bookmarks.json'}</span>
+                    <span className="font-medium">
+                      {sourceDetails?.file_path || '/Apps/MarkSyncr/bookmarks.json'}
+                    </span>
                   </div>
                   {sourceDetails?.provider_username && (
                     <div className="mt-1 flex items-center space-x-2 text-xs text-slate-500">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
                       </svg>
                       <span>{sourceDetails.provider_username}</span>
                     </div>
@@ -271,8 +312,18 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
                     className="mt-2 inline-flex items-center text-xs text-primary-600 hover:text-primary-700"
                   >
                     View in Dropbox
-                    <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    <svg
+                      className="ml-1 h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
                     </svg>
                   </a>
                 </div>
@@ -286,11 +337,7 @@ export default function SyncSourcesClient({ subscription, connectedSources = [] 
 }
 
 function SourceIcon({ icon, connected, available }) {
-  const colorClass = connected
-    ? 'text-green-600'
-    : available
-      ? 'text-slate-600'
-      : 'text-slate-400';
+  const colorClass = connected ? 'text-green-600' : available ? 'text-slate-600' : 'text-slate-400';
 
   switch (icon) {
     case 'github':

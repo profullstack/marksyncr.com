@@ -49,20 +49,13 @@ function SignupForm() {
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="mb-2 text-2xl font-bold text-slate-900">
-          Check your email
-        </h1>
+        <h1 className="mb-2 text-2xl font-bold text-slate-900">Check your email</h1>
         <p className="text-slate-600">
-          We&apos;ve sent a confirmation link to <strong>{email}</strong>.
-          Click the link to activate your account.
+          We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click the link to
+          activate your account.
         </p>
         <Link
           href="/login"
@@ -76,9 +69,7 @@ function SignupForm() {
 
   return (
     <>
-      <h1 className="mb-2 text-center text-2xl font-bold text-slate-900">
-        Create your account
-      </h1>
+      <h1 className="mb-2 text-center text-2xl font-bold text-slate-900">Create your account</h1>
       <p className="mb-6 text-center text-sm text-slate-600">
         {plan === 'free'
           ? 'Start syncing your bookmarks for free'
@@ -86,11 +77,7 @@ function SignupForm() {
       </p>
 
       {/* Error display */}
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {/* OAuth buttons */}
       <div className="space-y-3">
@@ -142,10 +129,7 @@ function SignupForm() {
       {/* Email form */}
       <form action={handleEmailSignup} className="space-y-4">
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="name" className="block text-sm font-medium text-slate-700">
             Name
           </label>
           <input
@@ -158,10 +142,7 @@ function SignupForm() {
         </div>
 
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
             Email
           </label>
           <input
@@ -175,10 +156,7 @@ function SignupForm() {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
             Password
           </label>
           <input
@@ -190,9 +168,7 @@ function SignupForm() {
             className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="••••••••"
           />
-          <p className="mt-1 text-xs text-slate-500">
-            Must be at least 8 characters
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Must be at least 8 characters</p>
         </div>
 
         <button
@@ -248,10 +224,7 @@ export default function SignupPage() {
         {/* Login link */}
         <p className="mt-6 text-center text-sm text-slate-600">
           Already have an account?{' '}
-          <Link
-            href="/login"
-            className="font-medium text-primary-600 hover:text-primary-700"
-          >
+          <Link href="/login" className="font-medium text-primary-600 hover:text-primary-700">
             Sign in
           </Link>
         </p>

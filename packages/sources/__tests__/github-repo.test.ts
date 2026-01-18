@@ -65,7 +65,14 @@ describe('GitHub Repository Helper', () => {
         status: 422,
         json: async () => ({
           message: 'Repository creation failed',
-          errors: [{ resource: 'Repository', code: 'custom', field: 'name', message: 'name already exists' }],
+          errors: [
+            {
+              resource: 'Repository',
+              code: 'custom',
+              field: 'name',
+              message: 'name already exists',
+            },
+          ],
         }),
       });
 
@@ -104,7 +111,10 @@ describe('GitHub Repository Helper', () => {
         }),
       });
 
-      const exists = await checkRepositoryExists('test-access-token', 'testuser/marksyncr-bookmarks');
+      const exists = await checkRepositoryExists(
+        'test-access-token',
+        'testuser/marksyncr-bookmarks'
+      );
 
       expect(exists).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(

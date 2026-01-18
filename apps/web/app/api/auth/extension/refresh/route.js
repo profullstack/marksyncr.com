@@ -12,7 +12,7 @@
  * 3. If valid and not expired, server uses stored refresh_token to get new access_token
  * 4. Returns new access_token to extension
  *
- * The extension_token itself doesn't expire for 1 year, but the access_token
+ * The extension_token itself doesn't expire for 2 years, but the access_token
  * it returns is short-lived (1 hour) for security.
  */
 
@@ -48,20 +48,14 @@ export async function POST(request) {
     // Validate environment variables
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error('Extension refresh error: Missing service role key');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
     const body = await request.json();
     const { extension_token } = body || {};
 
     if (!extension_token) {
-      return NextResponse.json(
-        { error: 'Extension token is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Extension token is required' }, { status: 400 });
     }
 
     // Step 1: Hash the token for lookup
@@ -69,7 +63,7 @@ export async function POST(request) {
 
     // Step 2: Look up the session in the database
     const adminClient = createAdminClient();
-    
+
     const { data: session, error: lookupError } = await adminClient
       .from('extension_sessions')
       .select('id, user_id, supabase_refresh_token, expires_at, revoked_at')
@@ -78,18 +72,12 @@ export async function POST(request) {
 
     if (lookupError) {
       console.error('Extension refresh error: Database lookup failed:', lookupError);
-      return NextResponse.json(
-        { error: 'Failed to validate session' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to validate session' }, { status: 500 });
     }
 
     // Step 3: Validate session exists
     if (!session) {
-      return NextResponse.json(
-        { error: 'Invalid or expired extension token' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid or expired extension token' }, { status: 401 });
     }
 
     // Step 4: Check if session is revoked
@@ -120,11 +108,15 @@ export async function POST(request) {
       // Try to generate a new session using admin API
       // This allows us to recover from expired Supabase refresh tokens
       // while keeping the extension session alive
-      const { data: userData, error: userError } = await adminClient
-        .auth.admin.getUserById(session.user_id);
+      const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(
+        session.user_id
+      );
 
       if (userError || !userData?.user) {
-        console.error('Extension refresh error: Failed to get user for session recovery:', userError);
+        console.error(
+          'Extension refresh error: Failed to get user for session recovery:',
+          userError
+        );
         // User doesn't exist anymore, revoke the session
         await adminClient
           .from('extension_sessions')
@@ -179,7 +171,10 @@ export async function POST(request) {
         .eq('id', session.id);
 
       if (recoveryUpdateError) {
-        console.error('Extension refresh error: Failed to save recovered session:', recoveryUpdateError);
+        console.error(
+          'Extension refresh error: Failed to save recovered session:',
+          recoveryUpdateError
+        );
         return NextResponse.json(
           { error: 'Session refresh temporarily unavailable. Please try again.' },
           { status: 503 }
@@ -216,7 +211,10 @@ export async function POST(request) {
     if (updateError) {
       // If we can't save the new refresh token, the session will break on next refresh
       // due to token rotation. Log this as an error, not a warning.
-      console.error('Extension refresh error: Failed to update refresh token - session may break:', updateError);
+      console.error(
+        'Extension refresh error: Failed to update refresh token - session may break:',
+        updateError
+      );
       // Return the access token anyway since it's valid for this request
       // but log prominently so we can investigate
     }
@@ -238,18 +236,17 @@ export async function POST(request) {
         expires_at: session.expires_at, // Extension session expiration
         access_token_expires_at: refreshData.session.expires_at, // Access token expiration
       },
-      user: userData?.user ? {
-        id: userData.user.id,
-        email: userData.user.email,
-        created_at: userData.user.created_at,
-        email_confirmed_at: userData.user.email_confirmed_at,
-      } : null,
+      user: userData?.user
+        ? {
+            id: userData.user.id,
+            email: userData.user.email,
+            created_at: userData.user.created_at,
+            email_confirmed_at: userData.user.email_confirmed_at,
+          }
+        : null,
     });
   } catch (error) {
     console.error('Extension refresh error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

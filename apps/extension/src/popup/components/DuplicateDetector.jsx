@@ -19,7 +19,16 @@ const normalizeUrl = (url) => {
     // Remove trailing slash
     let pathname = parsed.pathname.replace(/\/$/, '');
     // Remove common tracking parameters
-    const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'fbclid', 'gclid'];
+    const trackingParams = [
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content',
+      'ref',
+      'fbclid',
+      'gclid',
+    ];
     trackingParams.forEach((param) => parsed.searchParams.delete(param));
     // Reconstruct URL
     return `${parsed.protocol}//${hostname}${pathname}${parsed.search}`.toLowerCase();
@@ -98,20 +107,20 @@ const findDuplicates = (bookmarks, options = {}) => {
   // Find similar titles (if enabled)
   if (checkTitles) {
     const unprocessed = bookmarks.filter((b) => !processed.has(b.id));
-    
+
     for (let i = 0; i < unprocessed.length; i++) {
       const group = [unprocessed[i]];
-      
+
       for (let j = i + 1; j < unprocessed.length; j++) {
         if (processed.has(unprocessed[j].id)) continue;
-        
+
         const similarity = calculateSimilarity(unprocessed[i].title, unprocessed[j].title);
         if (similarity >= titleThreshold) {
           group.push(unprocessed[j]);
           processed.add(unprocessed[j].id);
         }
       }
-      
+
       if (group.length > 1) {
         processed.add(unprocessed[i].id);
         duplicateGroups.push({
@@ -143,7 +152,9 @@ export function DuplicateGroup({
   const someSelected = group.bookmarks.some((b) => selectedBookmarks.has(b.id));
 
   return (
-    <div className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden ${className}`}>
+    <div
+      className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden ${className}`}
+    >
       {/* Group Header */}
       <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -256,11 +267,9 @@ export function DetectionOptions({ options, onChange, className = '' }) {
             onChange={(e) => onChange({ ...options, checkTitles: e.target.checked })}
             className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
           />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            Find similar titles
-          </span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">Find similar titles</span>
         </label>
-        
+
         {options.checkTitles && (
           <div className="ml-6">
             <label className="text-xs text-gray-500 dark:text-gray-400">

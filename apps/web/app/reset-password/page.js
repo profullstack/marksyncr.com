@@ -17,7 +17,9 @@ export default function ResetPasswordPage() {
     // Check if we have a valid session from the reset link
     const checkSession = async () => {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         setError('Invalid or expired reset link. Please request a new one.');
       }
@@ -66,15 +68,9 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h1 className="text-center text-3xl font-extrabold text-gray-900">
-            🔖 MarkSyncr
-          </h1>
-          <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-            Set new password
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your new password below.
-          </p>
+          <h1 className="text-center text-3xl font-extrabold text-gray-900">🔖 MarkSyncr</h1>
+          <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">Set new password</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">Enter your new password below.</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -137,10 +133,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <div className="text-center">
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
+            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
               Back to sign in
             </Link>
           </div>

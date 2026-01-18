@@ -53,14 +53,7 @@ const EyeOffIcon = ({ className = '' }) => (
 
 const SpinnerIcon = ({ className = '' }) => (
   <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-    />
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
     <path
       className="opacity-75"
       fill="currentColor"
@@ -182,16 +175,10 @@ function LoginForm({ onLogin, onSwitchToSignup, isLoading, error }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Email
-        </label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <EmailIcon className="h-5 w-5 text-slate-400" />
@@ -208,9 +195,7 @@ function LoginForm({ onLogin, onSwitchToSignup, isLoading, error }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Password
-        </label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <LockIcon className="h-5 w-5 text-slate-400" />
@@ -328,13 +313,19 @@ function SignupForm({ onSignup, onSwitchToLogin, isLoading, error, success }) {
     return (
       <div className="text-center space-y-4">
         <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-          <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="h-6 w-6 text-green-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <h3 className="text-lg font-medium text-slate-900">Check your email</h3>
         <p className="text-sm text-slate-500">
-          We've sent a confirmation link to <strong>{email}</strong>. Click the link to activate your account.
+          We've sent a confirmation link to <strong>{email}</strong>. Click the link to activate
+          your account.
         </p>
         <button
           onClick={onSwitchToLogin}
@@ -355,9 +346,7 @@ function SignupForm({ onSignup, onSwitchToLogin, isLoading, error, success }) {
       )}
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Email
-        </label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <EmailIcon className="h-5 w-5 text-slate-400" />
@@ -374,9 +363,7 @@ function SignupForm({ onSignup, onSwitchToLogin, isLoading, error, success }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Password
-        </label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <LockIcon className="h-5 w-5 text-slate-400" />
@@ -406,9 +393,7 @@ function SignupForm({ onSignup, onSwitchToLogin, isLoading, error, success }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">
-          Confirm Password
-        </label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <LockIcon className="h-5 w-5 text-slate-400" />
@@ -484,11 +469,11 @@ export function UserProfile({ user, subscription, onLogout, isLoading }) {
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-900 truncate">
-            {user.email}
-          </p>
+          <p className="text-sm font-medium text-slate-900 truncate">{user.email}</p>
           <div className="flex items-center space-x-2 mt-1">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${planColors[subscription?.plan] || planColors.free}`}>
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${planColors[subscription?.plan] || planColors.free}`}
+            >
               {planLabels[subscription?.plan] || 'Free'}
             </span>
             {subscription?.status === 'active' && subscription?.plan !== 'free' && (
@@ -530,11 +515,7 @@ export function UserProfile({ user, subscription, onLogout, isLoading }) {
           disabled={isLoading}
           className="flex items-center justify-center w-full space-x-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
         >
-          {isLoading ? (
-            <SpinnerIcon className="h-4 w-4" />
-          ) : (
-            <LogoutIcon className="h-4 w-4" />
-          )}
+          {isLoading ? <SpinnerIcon className="h-4 w-4" /> : <LogoutIcon className="h-4 w-4" />}
           <span>Sign Out</span>
         </button>
       </div>

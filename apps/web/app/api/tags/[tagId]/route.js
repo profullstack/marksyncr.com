@@ -72,7 +72,9 @@ export async function PATCH(request, { params }) {
       .single();
 
     const hasPro =
-      subscription && ['pro', 'team'].includes(subscription.plan) && subscription.status === 'active';
+      subscription &&
+      ['pro', 'team'].includes(subscription.plan) &&
+      subscription.status === 'active';
 
     if (!hasPro) {
       return NextResponse.json(
@@ -98,7 +100,10 @@ export async function PATCH(request, { params }) {
       }
 
       if (normalizedName.length > 50) {
-        return NextResponse.json({ error: 'Tag name must be 50 characters or less' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Tag name must be 50 characters or less' },
+          { status: 400 }
+        );
       }
 
       updates.name = normalizedName;
@@ -108,7 +113,10 @@ export async function PATCH(request, { params }) {
     if (body.color !== undefined) {
       const colorRegex = /^#[0-9A-Fa-f]{6}$/;
       if (!colorRegex.test(body.color)) {
-        return NextResponse.json({ error: 'Invalid color format. Use hex format like #3B82F6' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid color format. Use hex format like #3B82F6' },
+          { status: 400 }
+        );
       }
       updates.color = body.color;
     }
@@ -173,7 +181,9 @@ export async function DELETE(request, { params }) {
       .single();
 
     const hasPro =
-      subscription && ['pro', 'team'].includes(subscription.plan) && subscription.status === 'active';
+      subscription &&
+      ['pro', 'team'].includes(subscription.plan) &&
+      subscription.status === 'active';
 
     if (!hasPro) {
       return NextResponse.json(

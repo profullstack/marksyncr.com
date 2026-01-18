@@ -79,9 +79,7 @@ export function NotesDisplay({ notes, maxLength = 100 }) {
       <div className="flex items-start gap-2">
         <NotesIcon className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-amber-800 whitespace-pre-wrap break-words">
-            {displayText}
-          </p>
+          <p className="text-sm text-amber-800 whitespace-pre-wrap break-words">{displayText}</p>
           {shouldTruncate && (
             <button
               onClick={() => setExpanded(!expanded)}
@@ -193,7 +191,7 @@ export function NotesEditor({
             {notes ? 'Edit' : 'Add notes'}
           </button>
         </div>
-        
+
         {notes ? (
           <NotesDisplay notes={notes} />
         ) : (
@@ -216,19 +214,11 @@ export function NotesEditor({
           className="text-slate-400 hover:text-slate-600 p-1"
           title={isExpanded ? 'Collapse' : 'Expand'}
         >
-          {isExpanded ? (
-            <CollapseIcon className="h-4 w-4" />
-          ) : (
-            <ExpandIcon className="h-4 w-4" />
-          )}
+          {isExpanded ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
         </button>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 p-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</div>}
 
       <textarea
         ref={textareaRef}
@@ -296,11 +286,7 @@ export function NotesEditor({
 /**
  * Inline notes editor for bookmark list items
  */
-export function InlineNotesEditor({
-  notes,
-  onSave,
-  isPro = false,
-}) {
+export function InlineNotesEditor({ notes, onSave, isPro = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState(notes || '');
   const [isSaving, setIsSaving] = useState(false);

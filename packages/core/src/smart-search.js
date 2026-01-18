@@ -112,9 +112,7 @@ export function filterByTag(bookmarks, tag) {
       return false;
     }
 
-    return bookmark.tags.some(
-      (t) => t.id === tag || t.name.toLowerCase() === tagLower
-    );
+    return bookmark.tags.some((t) => t.id === tag || t.name.toLowerCase() === tagLower);
   });
 }
 

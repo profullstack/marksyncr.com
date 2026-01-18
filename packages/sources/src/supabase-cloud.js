@@ -295,10 +295,7 @@ export class SupabaseCloudSource extends BaseSource {
       throw new Error('Not authenticated');
     }
 
-    const { error } = await this.client
-      .from('cloud_bookmarks')
-      .delete()
-      .eq('user_id', this.userId);
+    const { error } = await this.client.from('cloud_bookmarks').delete().eq('user_id', this.userId);
 
     if (error) {
       throw new Error(`Failed to delete bookmarks: ${error.message}`);

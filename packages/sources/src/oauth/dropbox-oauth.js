@@ -52,11 +52,7 @@ async function generatePKCE() {
  * - files.content.write: Write file content (to save bookmarks)
  * - account_info.read: Read account info (for user display)
  */
-const DEFAULT_SCOPES = [
-  'files.content.read',
-  'files.content.write',
-  'account_info.read',
-];
+const DEFAULT_SCOPES = ['files.content.read', 'files.content.write', 'account_info.read'];
 
 /**
  * Build Dropbox authorization URL with PKCE
@@ -70,7 +66,7 @@ const DEFAULT_SCOPES = [
  */
 export function buildAuthorizationUrl(clientId, redirectUri, options = {}) {
   const scopes = options.scopes || DEFAULT_SCOPES;
-  
+
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,

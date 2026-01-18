@@ -343,10 +343,12 @@ describe('Link Checker', () => {
       await checkLinks(bookmarks, { onProgress });
 
       expect(onProgress).toHaveBeenCalledTimes(2);
-      expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
-        completed: expect.any(Number),
-        total: 2,
-      }));
+      expect(onProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          completed: expect.any(Number),
+          total: 2,
+        })
+      );
     });
 
     it('should skip bookmarks without URLs', async () => {
@@ -374,7 +376,8 @@ describe('Link Checker', () => {
     });
 
     it('should handle mixed results', async () => {
-      global.fetch = vi.fn()
+      global.fetch = vi
+        .fn()
         .mockResolvedValueOnce({ ok: true, status: 200, headers: new Map() })
         .mockResolvedValueOnce({ ok: false, status: 404, headers: new Map() })
         .mockRejectedValueOnce(new Error('Network error'));

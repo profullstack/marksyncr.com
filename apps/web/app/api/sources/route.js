@@ -22,7 +22,9 @@ export async function GET() {
 
     const { data: sources, error } = await supabase
       .from('sync_sources')
-      .select('id, provider, provider_username, repository, branch, file_path, connected_at, updated_at')
+      .select(
+        'id, provider, provider_username, repository, branch, file_path, connected_at, updated_at'
+      )
       .eq('user_id', user.id);
 
     if (error) {

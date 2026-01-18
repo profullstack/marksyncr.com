@@ -467,31 +467,33 @@ describe('Import/Export Module', () => {
       // Should convert to nested structure
       expect(result.format).toBe(IMPORT_FORMATS.JSON);
       expect(result.totalCount).toBe(3);
-      
+
       // Root bookmark should be at top level
-      const rootBookmark = result.bookmarks.find(b => b.title === 'Root Bookmark');
+      const rootBookmark = result.bookmarks.find((b) => b.title === 'Root Bookmark');
       expect(rootBookmark).toBeDefined();
       expect(rootBookmark.url).toBe('https://example1.com');
       expect(rootBookmark.id).toBeDefined(); // Should have generated ID
-      
+
       // Work folder should exist
-      const workFolder = result.bookmarks.find(b => b.title === 'Work' && b.type === 'folder');
+      const workFolder = result.bookmarks.find((b) => b.title === 'Work' && b.type === 'folder');
       expect(workFolder).toBeDefined();
       expect(workFolder.id).toBeDefined();
       expect(workFolder.children).toBeDefined();
-      
+
       // Work bookmark should be inside Work folder
-      const workBookmark = workFolder.children.find(b => b.title === 'Work Bookmark');
+      const workBookmark = workFolder.children.find((b) => b.title === 'Work Bookmark');
       expect(workBookmark).toBeDefined();
       expect(workBookmark.url).toBe('https://example2.com');
       expect(workBookmark.id).toBeDefined();
-      
+
       // Projects folder should be inside Work folder
-      const projectsFolder = workFolder.children.find(b => b.title === 'Projects' && b.type === 'folder');
+      const projectsFolder = workFolder.children.find(
+        (b) => b.title === 'Projects' && b.type === 'folder'
+      );
       expect(projectsFolder).toBeDefined();
-      
+
       // Nested bookmark should be inside Projects folder
-      const nestedBookmark = projectsFolder.children.find(b => b.title === 'Nested Bookmark');
+      const nestedBookmark = projectsFolder.children.find((b) => b.title === 'Nested Bookmark');
       expect(nestedBookmark).toBeDefined();
       expect(nestedBookmark.url).toBe('https://example3.com');
       expect(nestedBookmark.id).toBeDefined();
@@ -572,28 +574,28 @@ describe('Import/Export Module', () => {
       const result = parseMarkSyncrJson(json);
 
       // Should have 2 top-level folders
-      const folders = result.bookmarks.filter(b => b.type === 'folder');
+      const folders = result.bookmarks.filter((b) => b.type === 'folder');
       expect(folders).toHaveLength(2);
-      
-      const folder1 = folders.find(f => f.title === 'Folder1');
+
+      const folder1 = folders.find((f) => f.title === 'Folder1');
       expect(folder1).toBeDefined();
-      
+
       // Folder1 should have bookmark A and subfolder Sub1
-      expect(folder1.children.find(c => c.title === 'A')).toBeDefined();
-      const sub1 = folder1.children.find(c => c.title === 'Sub1');
+      expect(folder1.children.find((c) => c.title === 'A')).toBeDefined();
+      const sub1 = folder1.children.find((c) => c.title === 'Sub1');
       expect(sub1).toBeDefined();
-      
+
       // Sub1 should have bookmark B and subfolder Deep
-      expect(sub1.children.find(c => c.title === 'B')).toBeDefined();
-      const deep = sub1.children.find(c => c.title === 'Deep');
+      expect(sub1.children.find((c) => c.title === 'B')).toBeDefined();
+      const deep = sub1.children.find((c) => c.title === 'Deep');
       expect(deep).toBeDefined();
-      
+
       // Deep should have bookmark C
-      expect(deep.children.find(c => c.title === 'C')).toBeDefined();
-      
+      expect(deep.children.find((c) => c.title === 'C')).toBeDefined();
+
       // Folder2 should have bookmark D
-      const folder2 = folders.find(f => f.title === 'Folder2');
-      expect(folder2.children.find(c => c.title === 'D')).toBeDefined();
+      const folder2 = folders.find((f) => f.title === 'Folder2');
+      expect(folder2.children.find((c) => c.title === 'D')).toBeDefined();
     });
 
     it('should handle null/undefined items in bookmarks array', () => {
@@ -981,9 +983,7 @@ Example,https://example.com`;
     });
 
     it('should detect generic JSON array with url property', () => {
-      const content = JSON.stringify([
-        { title: 'Test', url: 'https://example.com' },
-      ]);
+      const content = JSON.stringify([{ title: 'Test', url: 'https://example.com' }]);
       expect(detectImportFormat(content)).toBe(IMPORT_FORMATS.JSON);
     });
 
@@ -1012,9 +1012,7 @@ Example,https://example.com`;
     it('should parse MarkSyncr JSON format', () => {
       const content = JSON.stringify({
         source: 'MarkSyncr',
-        bookmarks: [
-          { title: 'Test', url: 'https://example.com' },
-        ],
+        bookmarks: [{ title: 'Test', url: 'https://example.com' }],
       });
 
       const result = parseImportFile(content, IMPORT_FORMATS.JSON);
@@ -1027,9 +1025,7 @@ Example,https://example.com`;
     it('should auto-detect and parse MarkSyncr JSON format', () => {
       const content = JSON.stringify({
         source: 'MarkSyncr',
-        bookmarks: [
-          { title: 'Auto-detected', url: 'https://example.com' },
-        ],
+        bookmarks: [{ title: 'Auto-detected', url: 'https://example.com' }],
       });
 
       const result = parseImportFile(content);
@@ -1056,9 +1052,7 @@ Example,https://example.com`;
     it('should validate correct import data', () => {
       const data = {
         format: IMPORT_FORMATS.NETSCAPE_HTML,
-        bookmarks: [
-          { title: 'Example', url: 'https://example.com' },
-        ],
+        bookmarks: [{ title: 'Example', url: 'https://example.com' }],
         totalCount: 1,
       };
 
@@ -1080,9 +1074,7 @@ Example,https://example.com`;
     it('should reject bookmarks without URLs', () => {
       const data = {
         format: IMPORT_FORMATS.NETSCAPE_HTML,
-        bookmarks: [
-          { title: 'No URL' },
-        ],
+        bookmarks: [{ title: 'No URL' }],
         totalCount: 1,
       };
 
@@ -1099,9 +1091,7 @@ Example,https://example.com`;
           {
             title: 'Folder',
             type: 'folder',
-            children: [
-              { title: 'Bookmark', url: 'https://example.com' },
-            ],
+            children: [{ title: 'Bookmark', url: 'https://example.com' }],
           },
         ],
         totalCount: 2,

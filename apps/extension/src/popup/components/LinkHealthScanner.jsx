@@ -75,9 +75,7 @@ export function ScanProgress({ completed, total, currentUrl, className = '' }) {
   return (
     <div className={`${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          Scanning bookmarks...
-        </span>
+        <span className="text-sm text-gray-600 dark:text-gray-400">Scanning bookmarks...</span>
         <span className="text-sm font-medium text-gray-900 dark:text-white">
           {completed} / {total}
         </span>
@@ -332,7 +330,8 @@ export function LinkHealthScanner({
   const filteredResults = useMemo(() => {
     if (activeFilter === 'all') return results;
     if (activeFilter === 'broken') return results.filter((r) => r.status === LINK_STATUS.BROKEN);
-    if (activeFilter === 'redirect') return results.filter((r) => r.status === LINK_STATUS.REDIRECT);
+    if (activeFilter === 'redirect')
+      return results.filter((r) => r.status === LINK_STATUS.REDIRECT);
     if (activeFilter === 'timeout') return results.filter((r) => r.status === LINK_STATUS.TIMEOUT);
     return results;
   }, [results, activeFilter]);
@@ -436,9 +435,7 @@ export function LinkHealthScanner({
         <div>
           <h3 className="text-sm font-medium text-gray-900 dark:text-white">Link Health Scanner</h3>
           {lastScanDate && (
-            <p className="text-xs text-gray-500">
-              Last scan: {lastScanDate.toLocaleString()}
-            </p>
+            <p className="text-xs text-gray-500">Last scan: {lastScanDate.toLocaleString()}</p>
           )}
         </div>
         <button
@@ -542,9 +539,7 @@ export function LinkHealthScanner({
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Click &quot;Scan Links&quot; to check your bookmarks for broken links
           </p>
-          <p className="text-xs text-gray-400">
-            {bookmarks.length} bookmarks will be scanned
-          </p>
+          <p className="text-xs text-gray-400">{bookmarks.length} bookmarks will be scanned</p>
         </div>
       )}
     </div>

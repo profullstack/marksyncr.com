@@ -30,117 +30,122 @@ NODE_OPTIONS=--no-experimental-fetch yarn add supabase
 ```
 
 > **Note**
-For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+> For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
 
 <details>
   <summary><b>macOS</b></summary>
 
-  Available via [Homebrew](https://brew.sh). To install:
+Available via [Homebrew](https://brew.sh). To install:
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+```sh
+brew install supabase/tap/supabase
+```
 
-  To install the beta release channel:
-  
-  ```sh
-  brew install supabase/tap/supabase-beta
-  brew link --overwrite supabase-beta
-  ```
-  
-  To upgrade:
+To install the beta release channel:
 
-  ```sh
-  brew upgrade supabase
-  ```
+```sh
+brew install supabase/tap/supabase-beta
+brew link --overwrite supabase-beta
+```
+
+To upgrade:
+
+```sh
+brew upgrade supabase
+```
+
 </details>
 
 <details>
   <summary><b>Windows</b></summary>
 
-  Available via [Scoop](https://scoop.sh). To install:
+Available via [Scoop](https://scoop.sh). To install:
 
-  ```powershell
-  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-  scoop install supabase
-  ```
+```powershell
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+```
 
-  To upgrade:
+To upgrade:
 
-  ```powershell
-  scoop update supabase
-  ```
+```powershell
+scoop update supabase
+```
+
 </details>
 
 <details>
   <summary><b>Linux</b></summary>
 
-  Available via [Homebrew](https://brew.sh) and Linux packages.
+Available via [Homebrew](https://brew.sh) and Linux packages.
 
-  #### via Homebrew
+#### via Homebrew
 
-  To install:
+To install:
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+```sh
+brew install supabase/tap/supabase
+```
 
-  To upgrade:
+To upgrade:
 
-  ```sh
-  brew upgrade supabase
-  ```
+```sh
+brew upgrade supabase
+```
 
-  #### via Linux packages
+#### via Linux packages
 
-  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
 
-  ```sh
-  sudo apk add --allow-untrusted <...>.apk
-  ```
+```sh
+sudo apk add --allow-untrusted <...>.apk
+```
 
-  ```sh
-  sudo dpkg -i <...>.deb
-  ```
+```sh
+sudo dpkg -i <...>.deb
+```
 
-  ```sh
-  sudo rpm -i <...>.rpm
-  ```
+```sh
+sudo rpm -i <...>.rpm
+```
 
-  ```sh
-  sudo pacman -U <...>.pkg.tar.zst
-  ```
+```sh
+sudo pacman -U <...>.pkg.tar.zst
+```
+
 </details>
 
 <details>
   <summary><b>Other Platforms</b></summary>
 
-  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
 
-  ```sh
-  go install github.com/supabase/cli@latest
-  ```
+```sh
+go install github.com/supabase/cli@latest
+```
 
-  Add a symlink to the binary in `$PATH` for easier access:
+Add a symlink to the binary in `$PATH` for easier access:
 
-  ```sh
-  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
+```sh
+ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+```
 
-  This works on other non-standard Linux distros.
+This works on other non-standard Linux distros.
+
 </details>
 
 <details>
   <summary><b>Community Maintained Packages</b></summary>
 
-  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
-  To install in your working directory:
+Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+To install in your working directory:
 
-  ```bash
-  pkgx install supabase
-  ```
+```bash
+pkgx install supabase
+```
 
-  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+
 </details>
 
 ### Run the CLI

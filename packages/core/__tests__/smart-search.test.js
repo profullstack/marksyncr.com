@@ -22,7 +22,10 @@ const sampleBookmarks = [
     url: 'https://react.dev/learn',
     dateAdded: '2025-01-15T10:00:00Z',
     parentId: 'folder-1',
-    tags: [{ id: 't1', name: 'javascript' }, { id: 't2', name: 'frontend' }],
+    tags: [
+      { id: 't1', name: 'javascript' },
+      { id: 't2', name: 'frontend' },
+    ],
     notes: 'Official React docs for learning',
   },
   {
@@ -31,7 +34,10 @@ const sampleBookmarks = [
     url: 'https://vuejs.org/guide/introduction.html',
     dateAdded: '2025-01-10T10:00:00Z',
     parentId: 'folder-1',
-    tags: [{ id: 't1', name: 'javascript' }, { id: 't2', name: 'frontend' }],
+    tags: [
+      { id: 't1', name: 'javascript' },
+      { id: 't2', name: 'frontend' },
+    ],
     notes: 'Vue framework documentation',
   },
   {
@@ -40,7 +46,10 @@ const sampleBookmarks = [
     url: 'https://github.com/goldbergyoni/nodebestpractices',
     dateAdded: '2025-01-05T10:00:00Z',
     parentId: 'folder-2',
-    tags: [{ id: 't1', name: 'javascript' }, { id: 't3', name: 'backend' }],
+    tags: [
+      { id: 't1', name: 'javascript' },
+      { id: 't3', name: 'backend' },
+    ],
     notes: 'Comprehensive Node.js best practices guide',
   },
   {
@@ -49,7 +58,10 @@ const sampleBookmarks = [
     url: 'https://docs.python.org/3/tutorial/',
     dateAdded: '2024-12-20T10:00:00Z',
     parentId: 'folder-3',
-    tags: [{ id: 't4', name: 'python' }, { id: 't3', name: 'backend' }],
+    tags: [
+      { id: 't4', name: 'python' },
+      { id: 't3', name: 'backend' },
+    ],
     notes: 'Official Python tutorial',
   },
   {
@@ -58,7 +70,10 @@ const sampleBookmarks = [
     url: 'https://css-tricks.com/',
     dateAdded: '2024-12-15T10:00:00Z',
     parentId: 'folder-1',
-    tags: [{ id: 't5', name: 'css' }, { id: 't2', name: 'frontend' }],
+    tags: [
+      { id: 't5', name: 'css' },
+      { id: 't2', name: 'frontend' },
+    ],
     notes: 'CSS tips and tricks website',
   },
   {
@@ -86,9 +101,7 @@ describe('Smart Search Engine', () => {
     });
 
     it('should handle bookmarks without optional fields', () => {
-      const bookmarks = [
-        { id: '1', title: 'Test', url: 'https://test.com' },
-      ];
+      const bookmarks = [{ id: '1', title: 'Test', url: 'https://test.com' }];
       const engine = createSearchEngine(bookmarks);
       expect(engine).toBeDefined();
     });
@@ -110,13 +123,13 @@ describe('Smart Search Engine', () => {
     it('should find bookmarks by partial title match', () => {
       const results = searchBookmarks(engine, 'Doc');
       expect(results.length).toBeGreaterThan(0);
-      expect(results.some(r => r.item.title.includes('Documentation'))).toBe(true);
+      expect(results.some((r) => r.item.title.includes('Documentation'))).toBe(true);
     });
 
     it('should find bookmarks by URL', () => {
       const results = searchBookmarks(engine, 'github.com');
       expect(results.length).toBeGreaterThan(0);
-      expect(results.some(r => r.item.url.includes('github.com'))).toBe(true);
+      expect(results.some((r) => r.item.url.includes('github.com'))).toBe(true);
     });
 
     it('should find bookmarks by notes content', () => {
@@ -128,7 +141,7 @@ describe('Smart Search Engine', () => {
     it('should find bookmarks by tag name', () => {
       const results = searchBookmarks(engine, 'python');
       expect(results.length).toBeGreaterThan(0);
-      expect(results.some(r => r.item.tags?.some(t => t.name === 'python'))).toBe(true);
+      expect(results.some((r) => r.item.tags?.some((t) => t.name === 'python'))).toBe(true);
     });
 
     it('should return empty array for no matches', () => {
@@ -168,7 +181,7 @@ describe('Smart Search Engine', () => {
     it('should filter bookmarks by folder ID', () => {
       const results = filterByFolder(sampleBookmarks, 'folder-1');
       expect(results.length).toBe(3);
-      expect(results.every(b => b.parentId === 'folder-1')).toBe(true);
+      expect(results.every((b) => b.parentId === 'folder-1')).toBe(true);
     });
 
     it('should return empty array for non-existent folder', () => {
@@ -186,7 +199,7 @@ describe('Smart Search Engine', () => {
     it('should filter bookmarks by tag ID', () => {
       const results = filterByTag(sampleBookmarks, 't1');
       expect(results.length).toBe(3);
-      expect(results.every(b => b.tags?.some(t => t.id === 't1'))).toBe(true);
+      expect(results.every((b) => b.tags?.some((t) => t.id === 't1'))).toBe(true);
     });
 
     it('should filter bookmarks by tag name', () => {
@@ -206,7 +219,7 @@ describe('Smart Search Engine', () => {
 
     it('should handle bookmarks without tags', () => {
       const results = filterByTag(sampleBookmarks, 'javascript');
-      expect(results.every(b => b.tags?.length > 0)).toBe(true);
+      expect(results.every((b) => b.tags?.length > 0)).toBe(true);
     });
   });
 
@@ -214,7 +227,7 @@ describe('Smart Search Engine', () => {
     it('should filter bookmarks by domain', () => {
       const results = filterByDomain(sampleBookmarks, 'github.com');
       expect(results.length).toBe(2);
-      expect(results.every(b => b.url.includes('github.com'))).toBe(true);
+      expect(results.every((b) => b.url.includes('github.com'))).toBe(true);
     });
 
     it('should be case-insensitive', () => {

@@ -23,25 +23,22 @@ export async function OPTIONS() {
 export async function GET(request) {
   try {
     const authHeader = request.headers.get('authorization');
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Authorization header required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
     const accessToken = authHeader.substring(7);
     const supabase = await createClient();
 
     // Get user from the access token
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(accessToken);
 
     if (error || !user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
     return NextResponse.json({
@@ -54,9 +51,6 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error('Session error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

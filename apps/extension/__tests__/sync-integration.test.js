@@ -219,8 +219,8 @@ describe('Sync Integration Tests', () => {
       setupFetchMock({ cloudBookmarks, cloudChecksum: 'matching-checksum' });
 
       // Simulate the categorization logic
-      const localByUrl = new Map(localBookmarks.map(b => [b.url, b]));
-      const toAdd = cloudBookmarks.filter(cb => !localByUrl.has(cb.url));
+      const localByUrl = new Map(localBookmarks.map((b) => [b.url, b]));
+      const toAdd = cloudBookmarks.filter((cb) => !localByUrl.has(cb.url));
 
       expect(toAdd).toHaveLength(0);
     });
@@ -233,8 +233,8 @@ describe('Sync Integration Tests', () => {
 
       setupFetchMock({ cloudBookmarks });
 
-      const localByUrl = new Map(localBookmarks.map(b => [b.url, b]));
-      const toAdd = cloudBookmarks.filter(cb => !localByUrl.has(cb.url));
+      const localByUrl = new Map(localBookmarks.map((b) => [b.url, b]));
+      const toAdd = cloudBookmarks.filter((cb) => !localByUrl.has(cb.url));
 
       expect(toAdd).toHaveLength(1);
       expect(toAdd[0].url).toBe('https://new.com');
@@ -242,14 +242,19 @@ describe('Sync Integration Tests', () => {
 
     it('should push local bookmarks to cloud', async () => {
       const localBookmarks = [
-        { url: 'https://local-only.com', title: 'Local Only', folderPath: 'Bookmarks Bar', index: 0 },
+        {
+          url: 'https://local-only.com',
+          title: 'Local Only',
+          folderPath: 'Bookmarks Bar',
+          index: 0,
+        },
       ];
       const cloudBookmarks = [];
 
       setupFetchMock({ cloudBookmarks });
 
-      const cloudUrls = new Set(cloudBookmarks.map(b => b.url));
-      const localAdditions = localBookmarks.filter(b => !cloudUrls.has(b.url));
+      const cloudUrls = new Set(cloudBookmarks.map((b) => b.url));
+      const localAdditions = localBookmarks.filter((b) => !cloudUrls.has(b.url));
 
       expect(localAdditions).toHaveLength(1);
       expect(localAdditions[0].url).toBe('https://local-only.com');
@@ -274,8 +279,8 @@ describe('Sync Integration Tests', () => {
         const cloudAfterASync = browserABookmarks;
 
         // Browser B syncs
-        const localByUrl = new Map(browserBLocal.map(b => [b.url, b]));
-        const newFromCloud = cloudAfterASync.filter(cb => !localByUrl.has(cb.url));
+        const localByUrl = new Map(browserBLocal.map((b) => [b.url, b]));
+        const newFromCloud = cloudAfterASync.filter((cb) => !localByUrl.has(cb.url));
 
         expect(newFromCloud).toHaveLength(1);
         expect(newFromCloud[0].url).toBe('https://new-on-a.com');
@@ -296,8 +301,8 @@ describe('Sync Integration Tests', () => {
         const mergedCloud = [...browserABookmarks, ...browserBBookmarks];
 
         expect(mergedCloud).toHaveLength(2);
-        expect(mergedCloud.map(b => b.url)).toContain('https://a.com');
-        expect(mergedCloud.map(b => b.url)).toContain('https://b.com');
+        expect(mergedCloud.map((b) => b.url)).toContain('https://a.com');
+        expect(mergedCloud.map((b) => b.url)).toContain('https://b.com');
       });
 
       it('should handle deletion on one browser propagating to another', async () => {
@@ -307,9 +312,7 @@ describe('Sync Integration Tests', () => {
         ];
 
         // Browser A deletes the bookmark
-        const browserATombstones = [
-          { url: 'https://to-delete.com', deletedAt: Date.now() },
-        ];
+        const browserATombstones = [{ url: 'https://to-delete.com', deletedAt: Date.now() }];
 
         // Browser B still has it locally
         const browserBLocal = [...initialBookmarks];
@@ -318,9 +321,7 @@ describe('Sync Integration Tests', () => {
         const cloudTombstones = browserATombstones;
 
         // B should delete locally
-        const toDelete = browserBLocal.filter(b =>
-          cloudTombstones.some(t => t.url === b.url)
-        );
+        const toDelete = browserBLocal.filter((b) => cloudTombstones.some((t) => t.url === b.url));
 
         expect(toDelete).toHaveLength(1);
         expect(toDelete[0].url).toBe('https://to-delete.com');
@@ -343,11 +344,18 @@ describe('Sync Integration Tests', () => {
         };
 
         // Normalize and compare
-        const normalizedCloudFolder = cloudBookmark.folderPath.replace(/^Bookmarks (Bar|Toolbar)\/?/i, 'toolbar/');
-        const normalizedLocalFolder = localBookmark.folderPath.replace(/^Bookmarks (Bar|Toolbar)\/?/i, 'toolbar/');
+        const normalizedCloudFolder = cloudBookmark.folderPath.replace(
+          /^Bookmarks (Bar|Toolbar)\/?/i,
+          'toolbar/'
+        );
+        const normalizedLocalFolder = localBookmark.folderPath.replace(
+          /^Bookmarks (Bar|Toolbar)\/?/i,
+          'toolbar/'
+        );
 
-        const hasConflict = cloudBookmark.title !== localBookmark.title ||
-                           normalizedCloudFolder !== normalizedLocalFolder;
+        const hasConflict =
+          cloudBookmark.title !== localBookmark.title ||
+          normalizedCloudFolder !== normalizedLocalFolder;
 
         expect(hasConflict).toBe(true);
       });
@@ -419,20 +427,23 @@ describe('Sync Integration Tests', () => {
         ];
 
         const localBookmarksBefore = [
-          { url: 'https://local-will-be-deleted.com', title: 'Local', folderPath: 'Bookmarks Bar', index: 0 },
+          {
+            url: 'https://local-will-be-deleted.com',
+            title: 'Local',
+            folderPath: 'Bookmarks Bar',
+            index: 0,
+          },
         ];
 
         // After force pull, local should exactly match cloud
         const expectedLocal = cloudBookmarks;
 
         expect(expectedLocal).toHaveLength(2);
-        expect(expectedLocal.map(b => b.url)).not.toContain('https://local-will-be-deleted.com');
+        expect(expectedLocal.map((b) => b.url)).not.toContain('https://local-will-be-deleted.com');
       });
 
       it('should clear local tombstones on force pull', async () => {
-        const localTombstonesBefore = [
-          { url: 'https://local-deleted.com', deletedAt: Date.now() },
-        ];
+        const localTombstonesBefore = [{ url: 'https://local-deleted.com', deletedAt: Date.now() }];
 
         // After force pull, local tombstones should be replaced with cloud tombstones
         const cloudTombstones = [];
@@ -531,12 +542,8 @@ describe('Sync Integration Tests', () => {
   // ==========================================================================
   describe('Tombstone Synchronization', () => {
     it('should sync tombstones bidirectionally', async () => {
-      const localTombstones = [
-        { url: 'https://deleted-locally.com', deletedAt: 1000 },
-      ];
-      const cloudTombstones = [
-        { url: 'https://deleted-on-cloud.com', deletedAt: 2000 },
-      ];
+      const localTombstones = [{ url: 'https://deleted-locally.com', deletedAt: 1000 }];
+      const cloudTombstones = [{ url: 'https://deleted-on-cloud.com', deletedAt: 2000 }];
 
       // Merge tombstones
       const tombstoneMap = new Map();
@@ -549,7 +556,10 @@ describe('Sync Integration Tests', () => {
           tombstoneMap.set(t.url, t.deletedAt);
         }
       }
-      const merged = Array.from(tombstoneMap.entries()).map(([url, deletedAt]) => ({ url, deletedAt }));
+      const merged = Array.from(tombstoneMap.entries()).map(([url, deletedAt]) => ({
+        url,
+        deletedAt,
+      }));
 
       expect(merged).toHaveLength(2);
     });
@@ -567,12 +577,12 @@ describe('Sync Integration Tests', () => {
 
       // Cleanup tombstones older than 30 days
       const cutoff = now - 30 * 24 * 60 * 60 * 1000;
-      const cleaned = tombstones.filter(t => t.deletedAt > cutoff);
+      const cleaned = tombstones.filter((t) => t.deletedAt > cutoff);
 
       expect(cleaned).toHaveLength(2);
-      expect(cleaned.map(t => t.url)).toContain('https://recent.com');
-      expect(cleaned.map(t => t.url)).toContain('https://old-but-ok.com');
-      expect(cleaned.map(t => t.url)).not.toContain('https://too-old.com');
+      expect(cleaned.map((t) => t.url)).toContain('https://recent.com');
+      expect(cleaned.map((t) => t.url)).toContain('https://old-but-ok.com');
+      expect(cleaned.map((t) => t.url)).not.toContain('https://too-old.com');
     });
 
     it('should handle re-add after delete correctly', async () => {
@@ -742,7 +752,7 @@ describe('Sync Integration Tests', () => {
       scheduleSync();
 
       // Wait for debounce
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       expect(syncCount).toBe(1);
     });
@@ -757,18 +767,15 @@ describe('Sync Integration Tests', () => {
           return { success: false, error: 'Sync already in progress' };
         }
         isSyncInProgress = true;
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         isSyncInProgress = false;
         return { success: true };
       };
 
       // Start two syncs concurrently
-      const results = await Promise.all([
-        performSync(),
-        performSync(),
-      ]);
+      const results = await Promise.all([performSync(), performSync()]);
 
-      expect(results.filter(r => r.success).length).toBe(1);
+      expect(results.filter((r) => r.success).length).toBe(1);
       expect(blockedAttempts).toBe(1);
     });
   });

@@ -9,7 +9,16 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 // Extract ConfirmDialog component for testing
 // This is a copy of the component from Popup.jsx for isolated testing
-function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onConfirm, onCancel, variant = 'warning' }) {
+function ConfirmDialog({
+  dialogRef,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  onConfirm,
+  onCancel,
+  variant = 'warning',
+}) {
   const variantStyles = {
     warning: {
       icon: 'text-orange-500',
@@ -49,8 +58,16 @@ function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onC
     >
       <div className="p-4">
         <div className="flex items-start space-x-3">
-          <div className={`flex-shrink-0 rounded-full p-2 ${styles.iconBg}`} data-testid="icon-container">
-            <svg className={`h-5 w-5 ${styles.icon}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div
+            className={`flex-shrink-0 rounded-full p-2 ${styles.iconBg}`}
+            data-testid="icon-container"
+          >
+            <svg
+              className={`h-5 w-5 ${styles.icon}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -60,8 +77,12 @@ function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onC
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-slate-900" data-testid="dialog-title">{title}</h3>
-            <p className="mt-1 text-sm text-slate-600" data-testid="dialog-message">{message}</p>
+            <h3 className="text-sm font-semibold text-slate-900" data-testid="dialog-title">
+              {title}
+            </h3>
+            <p className="mt-1 text-sm text-slate-600" data-testid="dialog-message">
+              {message}
+            </p>
           </div>
         </div>
       </div>
@@ -90,13 +111,10 @@ function ConfirmDialog({ dialogRef, title, message, confirmText, cancelText, onC
 // Wrapper component that provides a real ref
 function TestWrapper({ onConfirm, onCancel, title, message, confirmText, cancelText, variant }) {
   const dialogRef = useRef(null);
-  
+
   return (
     <div>
-      <button 
-        data-testid="open-dialog" 
-        onClick={() => dialogRef.current?.showModal()}
-      >
+      <button data-testid="open-dialog" onClick={() => dialogRef.current?.showModal()}>
         Open
       </button>
       <ConfirmDialog
@@ -154,28 +172,14 @@ describe('ConfirmDialog Component', () => {
     });
 
     it('should render with default button text when not provided', () => {
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={vi.fn()}
-          onCancel={vi.fn()}
-        />
-      );
+      render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} onCancel={vi.fn()} />);
 
       expect(screen.getByTestId('confirm-button')).toHaveTextContent('Confirm');
       expect(screen.getByTestId('cancel-button')).toHaveTextContent('Cancel');
     });
 
     it('should render dialog element with correct attributes', () => {
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={vi.fn()}
-          onCancel={vi.fn()}
-        />
-      );
+      render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} onCancel={vi.fn()} />);
 
       const dialog = screen.getByTestId('confirm-dialog');
       expect(dialog.tagName).toBe('DIALOG');
@@ -184,14 +188,7 @@ describe('ConfirmDialog Component', () => {
 
   describe('Variant Styles', () => {
     it('should apply warning variant styles by default', () => {
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={vi.fn()}
-          onCancel={vi.fn()}
-        />
-      );
+      render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} onCancel={vi.fn()} />);
 
       const iconContainer = screen.getByTestId('icon-container');
       expect(iconContainer.className).toContain('bg-orange-100');
@@ -261,15 +258,8 @@ describe('ConfirmDialog Component', () => {
   describe('Button Interactions', () => {
     it('should call onConfirm when confirm button is clicked', () => {
       const onConfirm = vi.fn();
-      
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={onConfirm}
-          onCancel={vi.fn()}
-        />
-      );
+
+      render(<TestWrapper title="Test" message="Test" onConfirm={onConfirm} onCancel={vi.fn()} />);
 
       fireEvent.click(screen.getByTestId('confirm-button'));
 
@@ -278,15 +268,8 @@ describe('ConfirmDialog Component', () => {
 
     it('should call onCancel when cancel button is clicked', () => {
       const onCancel = vi.fn();
-      
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={vi.fn()}
-          onCancel={onCancel}
-        />
-      );
+
+      render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} onCancel={onCancel} />);
 
       fireEvent.click(screen.getByTestId('cancel-button'));
 
@@ -294,13 +277,7 @@ describe('ConfirmDialog Component', () => {
     });
 
     it('should not throw when onConfirm is not provided', () => {
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onCancel={vi.fn()}
-        />
-      );
+      render(<TestWrapper title="Test" message="Test" onCancel={vi.fn()} />);
 
       expect(() => {
         fireEvent.click(screen.getByTestId('confirm-button'));
@@ -308,13 +285,7 @@ describe('ConfirmDialog Component', () => {
     });
 
     it('should not throw when onCancel is not provided', () => {
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={vi.fn()}
-        />
-      );
+      render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} />);
 
       expect(() => {
         fireEvent.click(screen.getByTestId('cancel-button'));
@@ -325,15 +296,8 @@ describe('ConfirmDialog Component', () => {
   describe('Dialog Close Event', () => {
     it('should call onCancel when dialog is closed via native close event', () => {
       const onCancel = vi.fn();
-      
-      render(
-        <TestWrapper
-          title="Test"
-          message="Test"
-          onConfirm={vi.fn()}
-          onCancel={onCancel}
-        />
-      );
+
+      render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} onCancel={onCancel} />);
 
       const dialog = screen.getByTestId('confirm-dialog');
       // Dispatch native close event
@@ -450,13 +414,7 @@ describe('Force Pull Dialog', () => {
 
 describe('Dialog Show/Hide Flow', () => {
   it('should have dialog element in the DOM', () => {
-    render(
-      <TestWrapper
-        title="Test"
-        message="Test"
-        onConfirm={vi.fn()}
-      />
-    );
+    render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} />);
 
     const dialog = screen.getByTestId('confirm-dialog');
     expect(dialog).toBeInTheDocument();
@@ -466,13 +424,7 @@ describe('Dialog Show/Hide Flow', () => {
   it('should call onConfirm callback when confirm is clicked', () => {
     const onConfirm = vi.fn();
 
-    render(
-      <TestWrapper
-        title="Test"
-        message="Test"
-        onConfirm={onConfirm}
-      />
-    );
+    render(<TestWrapper title="Test" message="Test" onConfirm={onConfirm} />);
 
     fireEvent.click(screen.getByTestId('confirm-button'));
 
@@ -482,13 +434,7 @@ describe('Dialog Show/Hide Flow', () => {
   it('should call onCancel callback when cancel is clicked', () => {
     const onCancel = vi.fn();
 
-    render(
-      <TestWrapper
-        title="Test"
-        message="Test"
-        onCancel={onCancel}
-      />
-    );
+    render(<TestWrapper title="Test" message="Test" onCancel={onCancel} />);
 
     fireEvent.click(screen.getByTestId('cancel-button'));
 
@@ -498,13 +444,7 @@ describe('Dialog Show/Hide Flow', () => {
 
 describe('Edge Cases', () => {
   it('should handle empty title and message', () => {
-    render(
-      <TestWrapper
-        title=""
-        message=""
-        onConfirm={vi.fn()}
-      />
-    );
+    render(<TestWrapper title="" message="" onConfirm={vi.fn()} />);
 
     // Empty strings should render as empty elements
     const titleEl = screen.getByTestId('dialog-title');
@@ -517,13 +457,7 @@ describe('Edge Cases', () => {
     const longTitle = 'A'.repeat(200);
     const longMessage = 'B'.repeat(1000);
 
-    render(
-      <TestWrapper
-        title={longTitle}
-        message={longMessage}
-        onConfirm={vi.fn()}
-      />
-    );
+    render(<TestWrapper title={longTitle} message={longMessage} onConfirm={vi.fn()} />);
 
     expect(screen.getByTestId('dialog-title')).toHaveTextContent(longTitle);
     expect(screen.getByTestId('dialog-message')).toHaveTextContent(longMessage);
@@ -533,13 +467,7 @@ describe('Edge Cases', () => {
     const specialTitle = '<script>alert("xss")</script>';
     const specialMessage = '& < > " \' / \\';
 
-    render(
-      <TestWrapper
-        title={specialTitle}
-        message={specialMessage}
-        onConfirm={vi.fn()}
-      />
-    );
+    render(<TestWrapper title={specialTitle} message={specialMessage} onConfirm={vi.fn()} />);
 
     // React automatically escapes these, so they should be rendered as text
     expect(screen.getByTestId('dialog-title')).toHaveTextContent(specialTitle);
@@ -549,16 +477,10 @@ describe('Edge Cases', () => {
   it('should handle multiple confirm clicks', () => {
     const onConfirm = vi.fn();
 
-    render(
-      <TestWrapper
-        title="Test"
-        message="Test"
-        onConfirm={onConfirm}
-      />
-    );
+    render(<TestWrapper title="Test" message="Test" onConfirm={onConfirm} />);
 
     const confirmButton = screen.getByTestId('confirm-button');
-    
+
     // Multiple clicks
     fireEvent.click(confirmButton);
     fireEvent.click(confirmButton);
@@ -587,13 +509,7 @@ describe('Accessibility', () => {
   });
 
   it('should have dialog element', () => {
-    render(
-      <TestWrapper
-        title="Test"
-        message="Test"
-        onConfirm={vi.fn()}
-      />
-    );
+    render(<TestWrapper title="Test" message="Test" onConfirm={vi.fn()} />);
 
     // Dialog element exists but may not be accessible when closed
     const dialog = screen.getByTestId('confirm-dialog');

@@ -151,9 +151,7 @@ describe('BaseSource', () => {
 
 describe('createSource', () => {
   it('should throw for unknown source type', async () => {
-    await expect(createSource({ type: 'unknown' })).rejects.toThrow(
-      'Unknown source type: unknown'
-    );
+    await expect(createSource({ type: 'unknown' })).rejects.toThrow('Unknown source type: unknown');
   });
 
   // Note: Other source types require mocking their implementations

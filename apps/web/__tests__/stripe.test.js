@@ -91,12 +91,8 @@ describe('PLAN_FEATURES', () => {
     });
 
     it('should have team plan more expensive than pro', () => {
-      expect(PLAN_FEATURES.team.monthlyPrice).toBeGreaterThan(
-        PLAN_FEATURES.pro.monthlyPrice
-      );
-      expect(PLAN_FEATURES.team.yearlyPrice).toBeGreaterThan(
-        PLAN_FEATURES.pro.yearlyPrice
-      );
+      expect(PLAN_FEATURES.team.monthlyPrice).toBeGreaterThan(PLAN_FEATURES.pro.monthlyPrice);
+      expect(PLAN_FEATURES.team.yearlyPrice).toBeGreaterThan(PLAN_FEATURES.pro.yearlyPrice);
     });
   });
 });

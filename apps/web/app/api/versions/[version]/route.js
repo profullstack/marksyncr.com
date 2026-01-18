@@ -27,7 +27,7 @@ export async function OPTIONS(request) {
  */
 export async function GET(request, { params }) {
   const headers = corsHeaders(request, METHODS);
-  
+
   try {
     const { user, supabase } = await getAuthenticatedUser(request);
 
@@ -56,20 +56,23 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Version not found' }, { status: 404, headers });
     }
 
-    return NextResponse.json({
-      version: {
-        id: data.id,
-        version: data.version,
-        bookmarkData: data.bookmark_data,
-        checksum: data.checksum,
-        sourceType: data.source_type,
-        sourceName: data.source_name,
-        deviceId: data.device_id,
-        deviceName: data.device_name,
-        changeSummary: data.change_summary,
-        createdAt: data.created_at,
+    return NextResponse.json(
+      {
+        version: {
+          id: data.id,
+          version: data.version,
+          bookmarkData: data.bookmark_data,
+          checksum: data.checksum,
+          sourceType: data.source_type,
+          sourceName: data.source_name,
+          deviceId: data.device_id,
+          deviceName: data.device_name,
+          changeSummary: data.change_summary,
+          createdAt: data.created_at,
+        },
       },
-    }, { headers });
+      { headers }
+    );
   } catch (error) {
     console.error('Get version error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });

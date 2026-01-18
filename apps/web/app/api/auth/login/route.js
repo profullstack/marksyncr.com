@@ -37,10 +37,7 @@ export async function POST(request) {
     const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
     // Use stateless client to avoid cookie-based session management
@@ -55,16 +52,16 @@ export async function POST(request) {
     if (error) {
       // Check if the error is a JSON parsing error (indicates Supabase connectivity issue)
       if (error.message && error.message.includes('Unexpected token')) {
-        console.error('Login error: Supabase returned non-JSON response. Check NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+        console.error(
+          'Login error: Supabase returned non-JSON response. Check NEXT_PUBLIC_SUPABASE_URL:',
+          process.env.NEXT_PUBLIC_SUPABASE_URL
+        );
         return NextResponse.json(
           { error: 'Unable to connect to authentication service. Please try again later.' },
           { status: 503 }
         );
       }
-      return NextResponse.json(
-        { error: error.message },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 401 });
     }
 
     return NextResponse.json({
@@ -85,9 +82,6 @@ export async function POST(request) {
         { status: 503 }
       );
     }
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
