@@ -27,6 +27,11 @@ let isSyncInProgress = false;
 let pendingSyncNeeded = false;
 let pendingSyncReasons = [];
 
+// Retry limiting for failed syncs
+const MAX_CONSECUTIVE_FAILURES = 3;
+let consecutiveSyncFailures = 0;
+let lastSyncError = null;
+
 /**
  * Get API base URL - uses VITE_APP_URL from build config or falls back to production URL
  */
@@ -1202,7 +1207,17 @@ async function performSync(sourceId) {
     console.log('[MarkSyncr] Sync already in progress, skipping');
     return { success: false, error: 'Sync already in progress' };
   }
-  
+
+  // Stop retrying after MAX_CONSECUTIVE_FAILURES
+  if (consecutiveSyncFailures >= MAX_CONSECUTIVE_FAILURES) {
+    console.error(`[MarkSyncr] Sync disabled after ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Last error: ${lastSyncError}`);
+    return {
+      success: false,
+      error: `Sync stopped after ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Please check your connection and try again manually. Last error: ${lastSyncError}`,
+      retryLimitReached: true
+    };
+  }
+
   isSyncInProgress = true;
   console.log('[MarkSyncr] Sync started, setting isSyncInProgress=true');
   
@@ -1419,7 +1434,11 @@ async function performSync(sourceId) {
         
         // Store the cloud checksum for future reference
         await storeLastCloudChecksum(cloudChecksum);
-        
+
+        // Reset failure count on success (even skipped syncs are successful)
+        consecutiveSyncFailures = 0;
+        lastSyncError = null;
+
         return {
           success: true,
           stats,
@@ -1476,6 +1495,10 @@ async function performSync(sourceId) {
       });
       await storeLastSyncTime(syncTimestamp);
 
+      // Reset failure count on success
+      consecutiveSyncFailures = 0;
+      lastSyncError = null;
+
       return {
         success: true,
         stats,
@@ -1486,10 +1509,16 @@ async function performSync(sourceId) {
       };
     } catch (cloudErr) {
       console.error('[MarkSyncr] Cloud sync failed:', cloudErr);
+      consecutiveSyncFailures++;
+      lastSyncError = cloudErr.message;
+      console.warn(`[MarkSyncr] Consecutive sync failures: ${consecutiveSyncFailures}/${MAX_CONSECUTIVE_FAILURES}`);
       return { success: false, error: `Cloud sync failed: ${cloudErr.message}` };
     }
   } catch (err) {
     console.error('[MarkSyncr] Sync failed:', err);
+    consecutiveSyncFailures++;
+    lastSyncError = err.message;
+    console.warn(`[MarkSyncr] Consecutive sync failures: ${consecutiveSyncFailures}/${MAX_CONSECUTIVE_FAILURES}`);
     return { success: false, error: err.message };
   } finally {
     // Always reset the sync flag, even if an error occurred
@@ -2642,6 +2671,22 @@ browser.runtime.onMessage.addListener((message, sender) => {
           return { success: true };
         });
 
+    case 'RESET_SYNC_FAILURES':
+      console.log('[MarkSyncr] Resetting sync failure count');
+      consecutiveSyncFailures = 0;
+      lastSyncError = null;
+      return Promise.resolve({ success: true, message: 'Sync failures reset. You can try syncing again.' });
+
+    case 'GET_SYNC_STATUS':
+      return Promise.resolve({
+        success: true,
+        syncInProgress: isSyncInProgress,
+        consecutiveFailures: consecutiveSyncFailures,
+        maxFailures: MAX_CONSECUTIVE_FAILURES,
+        lastError: lastSyncError,
+        retryLimitReached: consecutiveSyncFailures >= MAX_CONSECUTIVE_FAILURES,
+      });
+
     default:
       console.warn('[MarkSyncr] Unknown message type:', message.type);
       return Promise.resolve({ success: false, error: 'Unknown message type' });
@@ -2687,6 +2732,21 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
         }
       } else {
         console.warn('[MarkSyncr] ⏰ Periodic sync failed:', result.error);
+
+        // Show notification if retry limit reached
+        if (result.retryLimitReached) {
+          try {
+            await browser.notifications.create('sync-retry-limit', {
+              type: 'basic',
+              iconUrl: browser.runtime.getURL('icons/icon-48.png'),
+              title: 'MarkSyncr Sync Error',
+              message: `Sync stopped after ${MAX_CONSECUTIVE_FAILURES} failures. Click the extension to retry manually.`,
+            });
+          } catch (notifErr) {
+            // Notifications may not be available in all contexts
+            console.warn('[MarkSyncr] Could not show notification:', notifErr);
+          }
+        }
       }
     } catch (err) {
       console.error('[MarkSyncr] ⏰ Periodic sync error:', err);

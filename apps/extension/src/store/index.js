@@ -163,6 +163,8 @@ export const useStore = create(
       isScanning: false,
       // Duplicate detector state
       duplicateGroups: [],
+      // Sync failure tracking
+      syncFailureStatus: null, // { consecutiveFailures, maxFailures, lastError, retryLimitReached }
 
       // Actions
       setStatus: (status) => set({ status }),
@@ -506,17 +508,32 @@ export const useStore = create(
             return;
           }
 
+          if (result.retryLimitReached) {
+            set({
+              status: 'error',
+              error: result.error,
+              syncFailureStatus: {
+                consecutiveFailures: result.consecutiveFailures || 3,
+                maxFailures: result.maxFailures || 3,
+                lastError: result.lastError,
+                retryLimitReached: true,
+              },
+            });
+            return;
+          }
+
           if (result?.success) {
             const lastSync = new Date().toISOString();
             set({
               status: 'synced',
               lastSync,
               stats: result.stats || get().stats,
+              syncFailureStatus: null, // Clear failure status on success
             });
 
             // Persist last sync time
             await browserAPI.storage.local.set({ lastSync });
-            
+
             // Show success message with details
             const addedFromCloud = result.addedFromCloud || 0;
             const deletedLocally = result.deletedLocally || 0;
@@ -621,6 +638,50 @@ export const useStore = create(
             status: 'error',
             error: err.message || 'Force pull failed',
           });
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
+       * Get sync failure status from background script
+       */
+      getSyncStatus: async () => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'GET_SYNC_STATUS',
+          });
+
+          if (result?.success) {
+            set({ syncFailureStatus: result });
+            return result;
+          }
+          return null;
+        } catch (err) {
+          console.error('[MarkSyncr Store] Failed to get sync status:', err);
+          return null;
+        }
+      },
+
+      /**
+       * Reset sync failures to allow retrying
+       */
+      resetSyncFailures: async () => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'RESET_SYNC_FAILURES',
+          });
+
+          if (result?.success) {
+            set({ syncFailureStatus: null, error: null });
+            return { success: true };
+          }
+          return { success: false, error: result?.error };
+        } catch (err) {
+          console.error('[MarkSyncr Store] Failed to reset sync failures:', err);
           return { success: false, error: err.message };
         }
       },

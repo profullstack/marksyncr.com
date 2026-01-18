@@ -474,6 +474,10 @@ export function Popup() {
     logout,
     // Sources loading state
     isSourcesLoading,
+    // Sync failure tracking
+    syncFailureStatus,
+    getSyncStatus,
+    resetSyncFailures,
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
@@ -489,16 +493,32 @@ export function Popup() {
       await initialize();
       // Fetch tags if user is Pro
       await fetchTags();
+      // Check sync failure status
+      await getSyncStatus();
       setIsInitialized(true);
     };
     init();
-  }, [initialize, fetchTags]);
+  }, [initialize, fetchTags, getSyncStatus]);
 
   const handleSync = async () => {
     try {
       await triggerSync();
+      // Refresh sync status after sync
+      await getSyncStatus();
     } catch (err) {
       console.error('Sync failed:', err);
+    }
+  };
+
+  const handleResetAndRetry = async () => {
+    try {
+      const result = await resetSyncFailures();
+      if (result.success) {
+        // Immediately try syncing again
+        await handleSync();
+      }
+    } catch (err) {
+      console.error('Reset and retry failed:', err);
     }
   };
 
@@ -816,6 +836,38 @@ ${content}
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
                 {error}
+              </div>
+            )}
+
+            {/* Sync retry limit reached banner */}
+            {syncFailureStatus?.retryLimitReached && (
+              <div className="rounded-lg border border-orange-300 bg-orange-50 p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <AlertIcon className="h-5 w-5 text-orange-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-orange-800">
+                      Sync Paused
+                    </h3>
+                    <p className="mt-1 text-sm text-orange-700">
+                      Automatic sync stopped after {syncFailureStatus.maxFailures} consecutive failures.
+                      {syncFailureStatus.lastError && (
+                        <span className="block mt-1 text-xs text-orange-600">
+                          Last error: {syncFailureStatus.lastError}
+                        </span>
+                      )}
+                    </p>
+                    <button
+                      onClick={handleResetAndRetry}
+                      disabled={status === 'syncing'}
+                      className="mt-3 inline-flex items-center space-x-1 rounded-md bg-orange-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      <SyncIcon className="h-4 w-4" spinning={status === 'syncing'} />
+                      <span>Retry Sync</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
