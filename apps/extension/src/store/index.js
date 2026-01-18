@@ -687,6 +687,28 @@ export const useStore = create(
       },
 
       /**
+       * Force reset sync state (when sync gets stuck)
+       */
+      forceResetSyncState: async () => {
+        const browserAPI = getBrowserAPI();
+
+        try {
+          const result = await browserAPI.runtime.sendMessage({
+            type: 'FORCE_RESET_SYNC_STATE',
+          });
+
+          if (result?.success) {
+            set({ syncFailureStatus: null, error: null, status: 'synced' });
+            return { success: true };
+          }
+          return { success: false, error: result?.error };
+        } catch (err) {
+          console.error('[MarkSyncr Store] Failed to force reset sync state:', err);
+          return { success: false, error: err.message };
+        }
+      },
+
+      /**
        * Connect to a source (OAuth flow)
        */
       connectSource: async (sourceId) => {

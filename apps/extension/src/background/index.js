@@ -1464,21 +1464,27 @@ async function performSync(sourceId) {
       // Step 10: Save version history ONLY when we have local changes being pushed to cloud
       // This prevents version history from being cluttered with "pull-only" syncs
       // Version history should only record when THIS browser pushes changes to cloud/3rd-party storage
+      // NOTE: Version save is non-blocking - sync succeeds even if version save fails (e.g., timeout)
       if (hasLocalChangesToPush) {
         console.log('[MarkSyncr] Saving version history (local changes pushed to cloud)...');
-        const versionResult = await saveVersionToCloud(
-          mergedData,
-          detectBrowser(),
-          `${detectBrowser()}-extension`,
-          {
-            type: 'two_way_sync',
-            addedFromCloud: newFromCloud.length,
-            deletedLocally,
-            pushedToCloud: localAdditions.length,
-            tombstones: mergedTombstones.length,
-          }
-        );
-        console.log('[MarkSyncr] Version saved:', versionResult);
+        try {
+          const versionResult = await saveVersionToCloud(
+            mergedData,
+            detectBrowser(),
+            `${detectBrowser()}-extension`,
+            {
+              type: 'two_way_sync',
+              addedFromCloud: newFromCloud.length,
+              deletedLocally,
+              pushedToCloud: localAdditions.length,
+              tombstones: mergedTombstones.length,
+            }
+          );
+          console.log('[MarkSyncr] Version saved:', versionResult);
+        } catch (versionErr) {
+          // Don't fail the sync because of version save failure
+          console.warn('[MarkSyncr] Version save failed (sync will continue):', versionErr.message);
+        }
       } else {
         console.log('[MarkSyncr] Skipping version history (only pulled from cloud, no local changes pushed)');
       }
@@ -2201,9 +2207,17 @@ function countBookmarks(tree, syncedCount = 0) {
  * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
  */
 async function forcePush() {
+  // Prevent concurrent operations
+  if (isSyncInProgress) {
+    console.log('[MarkSyncr] Force Push blocked: sync already in progress');
+    return { success: false, error: 'Another sync operation is in progress. Please wait or reset sync state.' };
+  }
+
+  isSyncInProgress = true;
+
   try {
     console.log('[MarkSyncr] Force Push: Overwriting cloud data with local bookmarks');
-    
+
     // Ensure we have a valid token
     const hasValidToken = await ensureValidToken();
     if (!hasValidToken) {
@@ -2226,14 +2240,19 @@ async function forcePush() {
     const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
     console.log('[MarkSyncr] Force push sync result:', syncResult);
     
-    // Save version with force push marker
-    const versionResult = await saveVersionToCloud(
-      bookmarkData,
-      detectBrowser(),
-      `${detectBrowser()}-extension`,
-      { type: 'force_push', description: 'Force pushed from browser' }
-    );
-    console.log('[MarkSyncr] Force push version saved:', versionResult);
+    // Save version with force push marker (non-blocking)
+    try {
+      const versionResult = await saveVersionToCloud(
+        bookmarkData,
+        detectBrowser(),
+        `${detectBrowser()}-extension`,
+        { type: 'force_push', description: 'Force pushed from browser' }
+      );
+      console.log('[MarkSyncr] Force push version saved:', versionResult);
+    } catch (versionErr) {
+      // Don't fail force push because of version save failure
+      console.warn('[MarkSyncr] Force push version save failed (continuing):', versionErr.message);
+    }
     
     // Update last sync time
     await browser.storage.local.set({
@@ -2244,6 +2263,9 @@ async function forcePush() {
   } catch (err) {
     console.error('[MarkSyncr] Force push failed:', err);
     return { success: false, error: err.message };
+  } finally {
+    isSyncInProgress = false;
+    console.log('[MarkSyncr] Force push completed, setting isSyncInProgress=false');
   }
 }
 
@@ -2259,9 +2281,17 @@ async function forcePush() {
  * @returns {Promise<{success: boolean, stats?: object, error?: string}>}
  */
 async function forcePull() {
+  // Prevent concurrent operations
+  if (isSyncInProgress) {
+    console.log('[MarkSyncr] Force Pull blocked: sync already in progress');
+    return { success: false, error: 'Another sync operation is in progress. Please wait or reset sync state.' };
+  }
+
+  isSyncInProgress = true;
+
   try {
     console.log('[MarkSyncr] Force Pull: Overwriting local bookmarks with cloud data');
-    
+
     // Ensure we have a valid token
     const hasValidToken = await ensureValidToken();
     if (!hasValidToken) {
@@ -2420,6 +2450,9 @@ async function forcePull() {
   } catch (err) {
     console.error('[MarkSyncr] Force pull failed:', err);
     return { success: false, error: err.message };
+  } finally {
+    isSyncInProgress = false;
+    console.log('[MarkSyncr] Force pull completed, setting isSyncInProgress=false');
   }
 }
 
@@ -2686,6 +2719,13 @@ browser.runtime.onMessage.addListener((message, sender) => {
         lastError: lastSyncError,
         retryLimitReached: consecutiveSyncFailures >= MAX_CONSECUTIVE_FAILURES,
       });
+
+    case 'FORCE_RESET_SYNC_STATE':
+      console.log('[MarkSyncr] Force resetting sync state (was stuck: isSyncInProgress=' + isSyncInProgress + ')');
+      isSyncInProgress = false;
+      consecutiveSyncFailures = 0;
+      lastSyncError = null;
+      return Promise.resolve({ success: true, message: 'Sync state force reset' });
 
     default:
       console.warn('[MarkSyncr] Unknown message type:', message.type);

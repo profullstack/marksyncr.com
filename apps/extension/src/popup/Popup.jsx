@@ -478,6 +478,7 @@ export function Popup() {
     syncFailureStatus,
     getSyncStatus,
     resetSyncFailures,
+    forceResetSyncState,
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
@@ -519,6 +520,14 @@ export function Popup() {
       }
     } catch (err) {
       console.error('Reset and retry failed:', err);
+    }
+  };
+
+  const handleForceReset = async () => {
+    try {
+      await forceResetSyncState();
+    } catch (err) {
+      console.error('Force reset failed:', err);
     }
   };
 
@@ -835,7 +844,15 @@ ${content}
             {/* Error message */}
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                {error}
+                <p>{error}</p>
+                {(error.includes('in progress') || error.includes('sync operation')) && (
+                  <button
+                    onClick={handleForceReset}
+                    className="mt-2 inline-flex items-center space-x-1 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    <span>Reset Sync State</span>
+                  </button>
+                )}
               </div>
             )}
 
