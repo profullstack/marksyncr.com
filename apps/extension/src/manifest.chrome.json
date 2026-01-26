@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MarkSyncr",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "Sync your bookmarks across browsers using GitHub, Dropbox, Google Drive, or MarkSyncr Cloud",
   "icons": {
     "16": "icons/favicon-16.png",
@@ -23,8 +23,15 @@
     "type": "module"
   },
   "options_page": "options/index.html",
-  "permissions": ["bookmarks", "storage", "alarms", "identity"],
-  "optional_permissions": ["tabs"],
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "alarms",
+    "identity"
+  ],
+  "optional_permissions": [
+    "tabs"
+  ],
   "host_permissions": [
     "https://api.github.com/*",
     "https://api.dropboxapi.com/*",
@@ -36,15 +43,21 @@
   ],
   "oauth2": {
     "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-    "scopes": ["https://www.googleapis.com/auth/drive.file"]
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file"
+    ]
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "minimum_chrome_version": "102"
