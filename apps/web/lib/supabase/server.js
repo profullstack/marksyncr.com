@@ -3,8 +3,16 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 /**
+ * Cached client instances for singleton pattern
+ * These prevent memory leaks from creating new clients per request
+ */
+let cachedAdminClient = null;
+let cachedStatelessClient = null;
+
+/**
  * Create a Supabase client for server-side operations
  * This should be used in Server Components, Server Actions, and Route Handlers
+ * NOTE: This client uses cookies and must be created per-request (cannot be cached)
  * @returns {Promise<import('@supabase/supabase-js').SupabaseClient>}
  */
 export async function createClient() {
@@ -37,19 +45,23 @@ export async function createClient() {
 /**
  * Create a Supabase admin client with service role key
  * This should only be used for admin operations that bypass RLS
+ * Uses singleton pattern to prevent memory leaks from creating new clients per request
  * @returns {import('@supabase/supabase-js').SupabaseClient}
  */
 export function createAdminClient() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+  if (!cachedAdminClient) {
+    cachedAdminClient = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+  }
+  return cachedAdminClient;
 }
 
 /**
@@ -57,19 +69,23 @@ export function createAdminClient() {
  * This client does NOT use cookies and does NOT persist sessions
  * Use this for API routes called by the extension or other clients
  * that manage their own session tokens
+ * Uses singleton pattern to prevent memory leaks from creating new clients per request
  * @returns {import('@supabase/supabase-js').SupabaseClient}
  */
 export function createStatelessClient() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+  if (!cachedStatelessClient) {
+    cachedStatelessClient = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+  }
+  return cachedStatelessClient;
 }
 
 /**

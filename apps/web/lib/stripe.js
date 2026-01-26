@@ -366,10 +366,21 @@ export async function handleWebhookEvent(event, supabase) {
 }
 
 /**
+ * Cached Stripe client instance (singleton pattern)
+ * Prevents memory leaks from creating new clients per API call
+ */
+let cachedStripeClient = null;
+
+/**
  * Get Stripe client (async for dynamic import)
+ * Uses singleton pattern to reuse the same client instance
  * @returns {Promise<import('stripe').Stripe>}
  */
 async function getStripeClient() {
+  if (cachedStripeClient) {
+    return cachedStripeClient;
+  }
+
   const Stripe = (await import('stripe')).default;
   const secretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -377,9 +388,11 @@ async function getStripeClient() {
     throw new Error('STRIPE_SECRET_KEY not configured');
   }
 
-  return new Stripe(secretKey, {
+  cachedStripeClient = new Stripe(secretKey, {
     apiVersion: '2023-10-16',
   });
+
+  return cachedStripeClient;
 }
 
 export default {

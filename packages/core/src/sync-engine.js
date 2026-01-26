@@ -161,7 +161,8 @@ export class SyncEngine {
    */
   mergeBookmarkData(local, remote, localChanges, remoteChanges, resolvedConflicts) {
     // Create a deep copy of local as base
-    const merged = JSON.parse(JSON.stringify(local));
+    // Use structuredClone for better memory efficiency than JSON.parse(JSON.stringify())
+    const merged = structuredClone(local);
 
     // Create a map of conflict resolutions for quick lookup
     const conflictResolutions = new Map();

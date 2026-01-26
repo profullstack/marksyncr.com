@@ -264,7 +264,8 @@ export const hasChanges = (localBookmarks, remoteBookmarks) => {
  */
 export const applyChanges = (bookmarks, changes) => {
   // Deep clone the bookmarks to avoid mutation
-  const result = JSON.parse(JSON.stringify(bookmarks));
+  // Use structuredClone for better memory efficiency than JSON.parse(JSON.stringify())
+  const result = structuredClone(bookmarks);
 
   for (const change of changes) {
     switch (change.type) {
