@@ -158,6 +158,55 @@ export default function HomePage() {
               Learn More
             </Link>
           </div>
+
+          {/* Extension Store Badges */}
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a
+              href="https://chromewebstore.google.com/detail/marksyncr/hjcjjcpialiakkalcgadnfnoomdaegjg"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:border-slate-300"
+            >
+              <Image
+                src="/icons/browser-chrome.svg"
+                alt=""
+                width={20}
+                height={20}
+                className="h-5 w-5"
+              />
+              Chrome Web Store
+            </a>
+            <a
+              href="https://addons.mozilla.org/en-US/firefox/addon/marksyncr/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:border-slate-300"
+            >
+              <Image
+                src="/icons/browser-firefox.svg"
+                alt=""
+                width={20}
+                height={20}
+                className="h-5 w-5"
+              />
+              Firefox Add-ons
+            </a>
+            <a
+              href="https://microsoftedge.microsoft.com/addons/detail/marksyncr/pjoejnpnenajeaplngndlffihldgfofm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:border-slate-300"
+            >
+              <Image
+                src="/icons/browser-edge.svg"
+                alt=""
+                width={20}
+                height={20}
+                className="h-5 w-5"
+              />
+              Edge Add-ons
+            </a>
+          </div>
         </div>
 
         {/* Browser logos */}
