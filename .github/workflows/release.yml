@@ -154,7 +154,7 @@ jobs:
 
           echo "Chrome extension uploaded successfully"
 
-      - name: Publish to Chrome Web Store
+      - name: Submit to Chrome Web Store for review
         run: |
           RESPONSE=$(curl -sS \
             -X POST \
@@ -167,13 +167,13 @@ jobs:
           echo "$RESPONSE" | jq .
 
           STATUS=$(echo "$RESPONSE" | jq -r '.status[0] // empty')
-          if [[ "$STATUS" != "OK" && "$STATUS" != "PUBLISHED_WITH_FRICTION_WARNING" ]]; then
+          if [[ "$STATUS" != "OK" && "$STATUS" != "PUBLISHED_WITH_FRICTION_WARNING" && "$STATUS" != "PENDING_REVIEW" ]]; then
             echo "::error::Chrome publish failed with status: $STATUS"
             echo "$RESPONSE" | jq '.statusDetail // .'
             exit 1
           fi
 
-          echo "Chrome extension v${{ needs.build.outputs.version }} published"
+          echo "Chrome extension v${{ needs.build.outputs.version }} submitted (status: $STATUS)"
 
   firefox-release:
     name: Publish to Firefox Add-ons
@@ -218,7 +218,7 @@ jobs:
             --api-key "${{ env.FIREFOX_JWT_ISSUER }}" \
             --api-secret "${{ env.FIREFOX_JWT_SECRET }}" \
             --channel listed \
-            --timeout 900000
+            --approval-timeout 0
 
           echo "Firefox extension v${{ needs.build.outputs.version }} submitted to AMO"
 
