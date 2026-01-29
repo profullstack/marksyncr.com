@@ -34,10 +34,19 @@ jobs:
         if: steps.parse.outputs.bump_type == ''
         run: echo "No release keyword found. Skipping."
 
+      - name: Load environment variables
+        if: steps.parse.outputs.bump_type != ''
+        run: |
+          echo "${{ secrets.ENV_FILE }}" | while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" =~ ^# ]] && continue
+            echo "::add-mask::$value"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done
+
       - uses: actions/checkout@v4
         if: steps.parse.outputs.bump_type != ''
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.PAT_TOKEN }}
 
       - uses: pnpm/action-setup@v4
         if: steps.parse.outputs.bump_type != ''
@@ -76,10 +85,3 @@ jobs:
           git tag "v${{ steps.version.outputs.version }}"
           git push origin master --tags
 
-      - name: Trigger release pipeline
-        if: steps.parse.outputs.bump_type != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Triggering release pipeline for v${{ steps.version.outputs.version }}"
-          gh workflow run "Extension Release Pipeline" -f publish=true
