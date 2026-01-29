@@ -1,0 +1,316 @@
+name: Extension Release Pipeline
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to stores (false = build only)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Extension
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Extract and validate version
+        id: version
+        run: |
+          MANIFEST_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('apps/extension/src/manifest.chrome.json', 'utf-8')).version")
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "$TAG_VERSION" != "$MANIFEST_VERSION" ]]; then
+              echo "::error::Tag version ($TAG_VERSION) does not match manifest version ($MANIFEST_VERSION)"
+              exit 1
+            fi
+            VERSION="$TAG_VERSION"
+          else
+            VERSION="$MANIFEST_VERSION"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Build extension
+        run: pnpm turbo build --filter=@marksyncr/extension...
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+
+      - name: Verify build output
+        run: |
+          echo "Build artifacts:"
+          ls -lh apps/extension/dist/*.zip
+          test -f apps/extension/dist/marksyncr-chrome.zip || { echo "::error::Chrome ZIP not found"; exit 1; }
+          test -f apps/extension/dist/marksyncr-firefox.zip || { echo "::error::Firefox ZIP not found"; exit 1; }
+
+      - name: Upload Chrome ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: marksyncr-chrome
+          path: apps/extension/dist/marksyncr-chrome.zip
+          retention-days: 30
+
+      - name: Upload Firefox ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: marksyncr-firefox
+          path: apps/extension/dist/marksyncr-firefox.zip
+          retention-days: 30
+
+  chrome-release:
+    name: Publish to Chrome Web Store
+    needs: build
+    if: |
+      github.ref_type == 'tag' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: marksyncr-chrome
+
+      - name: Authenticate with Chrome Web Store
+        id: auth
+        run: |
+          RESPONSE=$(curl -sS -X POST "https://oauth2.googleapis.com/token" \
+            -d "client_id=${{ secrets.CHROME_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.CHROME_CLIENT_SECRET }}" \
+            -d "refresh_token=${{ secrets.CHROME_REFRESH_TOKEN }}" \
+            -d "grant_type=refresh_token")
+
+          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+
+          if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo "::error::Failed to obtain Chrome Web Store access token"
+            echo "$RESPONSE" | jq '{error, error_description}' 2>/dev/null || echo "$RESPONSE"
+            exit 1
+          fi
+
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "Chrome Web Store authentication successful"
+
+      - name: Upload to Chrome Web Store
+        run: |
+          RESPONSE=$(curl -sS \
+            -X PUT \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "x-goog-api-version: 2" \
+            -T marksyncr-chrome.zip \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}")
+
+          echo "Upload response:"
+          echo "$RESPONSE" | jq .
+
+          UPLOAD_STATE=$(echo "$RESPONSE" | jq -r '.uploadState')
+          if [[ "$UPLOAD_STATE" != "SUCCESS" ]]; then
+            echo "::error::Chrome upload failed with state: $UPLOAD_STATE"
+            echo "$RESPONSE" | jq '.itemError // .'
+            exit 1
+          fi
+
+          echo "Chrome extension uploaded successfully"
+
+      - name: Publish to Chrome Web Store
+        run: |
+          RESPONSE=$(curl -sS \
+            -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${{ secrets.CHROME_EXTENSION_ID }}/publish")
+
+          echo "Publish response:"
+          echo "$RESPONSE" | jq .
+
+          STATUS=$(echo "$RESPONSE" | jq -r '.status[0] // empty')
+          if [[ "$STATUS" != "OK" && "$STATUS" != "PUBLISHED_WITH_FRICTION_WARNING" ]]; then
+            echo "::error::Chrome publish failed with status: $STATUS"
+            echo "$RESPONSE" | jq '.statusDetail // .'
+            exit 1
+          fi
+
+          echo "Chrome extension v${{ needs.build.outputs.version }} published"
+
+  firefox-release:
+    name: Publish to Firefox Add-ons
+    needs: build
+    if: |
+      github.ref_type == 'tag' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: marksyncr-firefox
+
+      - name: Unpack extension
+        run: |
+          mkdir -p extension
+          unzip marksyncr-firefox.zip -d extension
+          echo "Extension contents:"
+          ls -la extension/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install web-ext
+        run: npm install -g web-ext
+
+      - name: Submit to AMO
+        run: |
+          web-ext sign \
+            --source-dir ./extension \
+            --artifacts-dir ./artifacts \
+            --api-key "${{ secrets.FIREFOX_JWT_ISSUER }}" \
+            --api-secret "${{ secrets.FIREFOX_JWT_SECRET }}" \
+            --channel listed \
+            --timeout 900000
+
+          echo "Firefox extension v${{ needs.build.outputs.version }} submitted to AMO"
+
+  edge-release:
+    name: Publish to Edge Add-ons
+    needs: build
+    if: |
+      github.ref_type == 'tag' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: marksyncr-chrome
+
+      - name: Authenticate with Edge API
+        id: auth
+        run: |
+          RESPONSE=$(curl -sS -X POST \
+            "https://login.microsoftonline.com/consumers/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.EDGE_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.EDGE_CLIENT_SECRET }}" \
+            -d "grant_type=client_credentials" \
+            -d "scope=https://api.addons.microsoftedge.microsoft.com/.default")
+
+          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+
+          if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo "::error::Failed to obtain Edge API access token"
+            echo "$RESPONSE" | jq '{error, error_description}' 2>/dev/null || echo "$RESPONSE"
+            exit 1
+          fi
+
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "Edge API authentication successful"
+
+      - name: Upload package
+        id: upload
+        run: |
+          RESPONSE=$(curl -sS -D /tmp/headers -o /tmp/body \
+            -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/zip" \
+            --data-binary @marksyncr-chrome.zip \
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ secrets.EDGE_PRODUCT_ID }}/submissions/draft/package" \
+            -w "%{http_code}")
+
+          HTTP_CODE="$RESPONSE"
+          BODY=$(cat /tmp/body)
+
+          echo "Upload response (HTTP $HTTP_CODE):"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+
+          if [[ "$HTTP_CODE" -ge 400 ]]; then
+            echo "::error::Edge upload failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          OPERATION_ID=$(echo "$BODY" | jq -r '.operationID // empty')
+          if [[ -n "$OPERATION_ID" ]]; then
+            echo "operation_id=$OPERATION_ID" >> "$GITHUB_OUTPUT"
+            echo "Upload operation ID: $OPERATION_ID"
+          fi
+
+      - name: Wait for upload processing
+        if: steps.upload.outputs.operation_id != ''
+        run: |
+          OPERATION_ID="${{ steps.upload.outputs.operation_id }}"
+          echo "Waiting for upload operation: $OPERATION_ID"
+
+          for i in $(seq 1 30); do
+            sleep 10
+
+            RESPONSE=$(curl -sS \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ secrets.EDGE_PRODUCT_ID }}/submissions/draft/package/operations/$OPERATION_ID")
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.status // "Unknown"')
+            echo "Attempt $i/30: $STATUS"
+
+            case "$STATUS" in
+              Succeeded)
+                echo "Upload processing complete"
+                exit 0
+                ;;
+              Failed)
+                echo "::error::Edge upload processing failed"
+                echo "$RESPONSE" | jq .
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "::error::Edge upload processing timed out"
+          exit 1
+
+      - name: Publish submission
+        run: |
+          RESPONSE=$(curl -sS -D /tmp/headers -o /tmp/body \
+            -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Length: 0" \
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ secrets.EDGE_PRODUCT_ID }}/submissions" \
+            -w "%{http_code}")
+
+          HTTP_CODE="$RESPONSE"
+          BODY=$(cat /tmp/body)
+
+          echo "Publish response (HTTP $HTTP_CODE):"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+
+          if [[ "$HTTP_CODE" -ge 400 ]]; then
+            echo "::error::Edge publish failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          echo "Edge extension v${{ needs.build.outputs.version }} submitted for review"
