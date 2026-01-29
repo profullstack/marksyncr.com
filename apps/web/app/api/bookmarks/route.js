@@ -26,6 +26,7 @@ import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
 import crypto from 'crypto';
 import { syncBookmarksToGitHub } from '@marksyncr/sources/oauth/github-sync';
 import { syncBookmarksToDropbox } from '@marksyncr/sources/oauth/dropbox-sync';
+import { refreshAccessToken } from '@marksyncr/sources/oauth/dropbox-oauth';
 
 /**
  * Maximum number of bookmarks allowed per user
@@ -590,7 +591,7 @@ async function syncToExternalSources(supabase, userId, bookmarks, tombstones, ch
         if (source.provider === 'github') {
           await syncToGitHub(source, bookmarks, tombstones, checksum);
         } else if (source.provider === 'dropbox') {
-          await syncToDropbox(source, bookmarks, tombstones, checksum);
+          await syncToDropbox(supabase, source, bookmarks, tombstones, checksum);
         } else if (source.provider === 'google-drive') {
           // TODO: Implement Google Drive sync
           console.log('[External Sync] Google Drive sync not yet implemented');
@@ -650,18 +651,75 @@ async function syncToGitHub(source, bookmarks, tombstones, checksum) {
 }
 
 /**
+ * Try to refresh the Dropbox access token using the stored refresh token
+ * @param {object} supabase - Supabase client
+ * @param {object} source - Sync source record from database
+ * @returns {string|null} New access token, or null if refresh failed
+ */
+async function tryRefreshDropboxToken(supabase, source) {
+  const clientId = process.env.DROPBOX_CLIENT_ID;
+  const clientSecret = process.env.DROPBOX_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error('[Dropbox Sync] Cannot refresh token: DROPBOX_CLIENT_ID or DROPBOX_CLIENT_SECRET not configured');
+    return null;
+  }
+
+  if (!source.refresh_token) {
+    console.error('[Dropbox Sync] Cannot refresh token: no refresh_token stored');
+    return null;
+  }
+
+  console.log('[Dropbox Sync] Refreshing expired access token...');
+
+  const tokenData = await refreshAccessToken(source.refresh_token, clientId, clientSecret);
+
+  // Update the token in the database
+  const { error: updateError } = await supabase
+    .from('sync_sources')
+    .update({
+      access_token: tokenData.access_token,
+      expires_at: tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+        : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', source.id);
+
+  if (updateError) {
+    console.error('[Dropbox Sync] Failed to update refreshed token in database:', updateError);
+  } else {
+    console.log('[Dropbox Sync] Successfully refreshed and stored new access token');
+  }
+
+  return tokenData.access_token;
+}
+
+/**
  * Sync bookmarks to Dropbox
+ * @param {object} supabase - Supabase client for token refresh
  * @param {object} source - Sync source configuration from database
  * @param {Array} bookmarks - Bookmarks to sync
  * @param {Array} tombstones - Tombstones for deleted bookmarks
  * @param {string} checksum - Checksum of the bookmark data
  */
-async function syncToDropbox(source, bookmarks, tombstones, checksum) {
-  const { access_token, file_path } = source;
+async function syncToDropbox(supabase, source, bookmarks, tombstones, checksum) {
+  let { access_token, file_path } = source;
 
   if (!access_token) {
     console.error('[Dropbox Sync] No access token found for Dropbox source');
     return;
+  }
+
+  // Check if token is expired and refresh proactively
+  if (source.expires_at && new Date(source.expires_at) <= new Date()) {
+    console.log('[Dropbox Sync] Token expired, refreshing before sync...');
+    const newToken = await tryRefreshDropboxToken(supabase, source);
+    if (newToken) {
+      access_token = newToken;
+    } else {
+      console.error('[Dropbox Sync] Token refresh failed, attempting sync with expired token');
+    }
   }
 
   const dropboxPath = file_path || '/Apps/MarkSyncr/bookmarks.json';
@@ -683,6 +741,32 @@ async function syncToDropbox(source, bookmarks, tombstones, checksum) {
       rev: result.rev,
     });
   } catch (error) {
+    // If the error indicates an expired token, try refreshing and retrying once
+    const isExpiredToken = error.message?.includes('expired_access_token') ||
+      error.message?.includes('invalid_access_token');
+
+    if (isExpiredToken) {
+      console.log('[Dropbox Sync] Token expired during sync, attempting refresh and retry...');
+      const newToken = await tryRefreshDropboxToken(supabase, source);
+      if (newToken) {
+        const retryResult = await syncBookmarksToDropbox(
+          newToken,
+          dropboxPath,
+          bookmarks,
+          tombstones,
+          checksum
+        );
+
+        console.log(`[Dropbox Sync] Retry succeeded after token refresh:`, {
+          created: retryResult.created,
+          skipped: retryResult.skipped,
+          bookmarkCount: retryResult.bookmarkCount,
+          rev: retryResult.rev,
+        });
+        return;
+      }
+    }
+
     console.error(`[Dropbox Sync] Failed to sync to ${dropboxPath}:`, error);
     throw error;
   }
