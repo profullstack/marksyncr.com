@@ -12,6 +12,8 @@ import browser from 'webextension-polyfill';
 
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
+const TOKEN_REFRESH_ALARM_NAME = 'marksyncr-token-refresh';
+const TOKEN_REFRESH_INTERVAL = 50; // minutes - refresh access token before 1 hour expiry
 const DEFAULT_SYNC_INTERVAL = 5; // minutes - sync every 5 minutes by default
 const TOMBSTONES_STORAGE_KEY = 'marksyncr-tombstones';
 const LAST_CLOUD_CHECKSUM_KEY = 'marksyncr-last-cloud-checksum';
@@ -750,9 +752,9 @@ async function ensureValidToken() {
       if (isValid) {
         return true;
       }
-      // Token is truly invalid, clear session
-      console.log('[MarkSyncr] Token invalid and refresh failed, clearing session');
-      await clearSession();
+      // Don't clear the session here — tryRefreshToken already clears on definitive 401.
+      // Temporary failures (503, network errors) should NOT destroy the extension_token.
+      console.log('[MarkSyncr] Token invalid and refresh failed, will retry on next attempt');
       return false;
     }
     return true;
@@ -770,8 +772,9 @@ async function ensureValidToken() {
   const refreshed = await tryRefreshToken();
 
   if (!refreshed) {
-    console.log('[MarkSyncr] Token refresh failed, clearing session');
-    await clearSession();
+    // Don't clear — preserve extension_token for future retry.
+    // tryRefreshToken handles clearing on definitive 401 (session revoked/expired).
+    console.log('[MarkSyncr] Token refresh failed, will retry on next attempt');
     return false;
   }
 
@@ -995,6 +998,9 @@ async function initialize() {
   // Set up alarm for automatic sync
   await setupAutoSync();
 
+  // Set up alarm for proactive token refresh (keeps session alive independent of sync)
+  await setupTokenRefreshAlarm();
+
   // Listen for bookmark changes
   setupBookmarkListeners();
 
@@ -1125,6 +1131,31 @@ async function setupAutoSync() {
     }
   } catch (err) {
     console.error('[MarkSyncr] Failed to set up auto-sync:', err);
+  }
+}
+
+/**
+ * Set up a periodic alarm to proactively refresh the access token.
+ * This runs independently of auto-sync so sessions stay alive even
+ * when sync is disabled. Fires every 50 minutes (before the 1-hour JWT expiry).
+ */
+async function setupTokenRefreshAlarm() {
+  try {
+    const existing = await browser.alarms.get(TOKEN_REFRESH_ALARM_NAME);
+    if (existing) {
+      console.log('[MarkSyncr] Token refresh alarm already exists');
+      return;
+    }
+
+    await browser.alarms.create(TOKEN_REFRESH_ALARM_NAME, {
+      delayInMinutes: TOKEN_REFRESH_INTERVAL,
+      periodInMinutes: TOKEN_REFRESH_INTERVAL,
+    });
+    console.log(
+      `[MarkSyncr] Token refresh alarm created: every ${TOKEN_REFRESH_INTERVAL} minutes`
+    );
+  } catch (err) {
+    console.error('[MarkSyncr] Failed to set up token refresh alarm:', err);
   }
 }
 
@@ -3031,6 +3062,27 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
       console.error('[MarkSyncr] ⏰ Periodic sync error:', err);
     }
   }
+
+  if (alarm.name === TOKEN_REFRESH_ALARM_NAME) {
+    console.log('[MarkSyncr] ⏰ Token refresh alarm triggered');
+
+    const session = await getSession();
+    if (!session?.extension_token) {
+      console.log('[MarkSyncr] ⏰ Token refresh skipped: no extension token');
+      return;
+    }
+
+    try {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) {
+        console.log('[MarkSyncr] ⏰ Proactive token refresh succeeded');
+      } else {
+        console.warn('[MarkSyncr] ⏰ Proactive token refresh failed, will retry next interval');
+      }
+    } catch (err) {
+      console.error('[MarkSyncr] ⏰ Token refresh alarm error:', err);
+    }
+  }
 });
 
 // Extension install/update handler - registered synchronously
@@ -3089,9 +3141,9 @@ browser.runtime.onInstalled.addListener((details) => {
     });
   }
 
-  // Re-setup auto-sync on install/update to ensure alarm is created
-  setupAutoSync().then(() => {
-    console.log('[MarkSyncr] Auto-sync setup completed after install/update');
+  // Re-setup alarms on install/update to ensure they are created
+  Promise.all([setupAutoSync(), setupTokenRefreshAlarm()]).then(() => {
+    console.log('[MarkSyncr] Alarms setup completed after install/update');
   });
 });
 
@@ -3100,10 +3152,11 @@ browser.runtime.onStartup.addListener(async () => {
   const browserInfo = detectBrowser();
   console.log(`[MarkSyncr] Browser started (${browserInfo})`);
 
-  // Re-setup auto-sync on startup to ensure alarm exists
+  // Re-setup alarms on startup to ensure they exist
   // This is important for Firefox where alarms may not persist across restarts
   await setupAutoSync();
-  console.log('[MarkSyncr] Auto-sync alarm verified on startup');
+  await setupTokenRefreshAlarm();
+  console.log('[MarkSyncr] Alarms verified on startup');
 
   const { settings } = await browser.storage.local.get('settings');
 

@@ -107,7 +107,7 @@ async function apiRequest(endpoint, options = {}) {
     headers,
   });
 
-  // Handle 401 - session expired, try to refresh or clear local data
+  // Handle 401 - access token expired, try to refresh
   if (response.status === 401) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
@@ -119,7 +119,8 @@ async function apiRequest(endpoint, options = {}) {
         headers,
       });
     }
-    await clearUserData();
+    // tryRefreshToken only returns false after clearing data when truly expired (401 from server)
+    // or when no extension_token exists at all — no extra clearing needed here
   }
 
   return response;

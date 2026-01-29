@@ -861,8 +861,8 @@ describe('API Client Session Handling', () => {
     mockStorageRemove.mockResolvedValue(undefined);
   });
 
-  it('should clear user data on 401 response when no refresh token', async () => {
-    // No session stored, so no refresh token available
+  it('should not clear session when 401 and no tokens exist (nothing to clear)', async () => {
+    // No session stored — tryRefreshToken returns false but apiRequest does not clear
     mockStorageGet.mockResolvedValue({});
     mockFetch.mockResolvedValue({
       ok: false,
@@ -872,10 +872,132 @@ describe('API Client Session Handling', () => {
 
     await api.fetchCloudSettings();
 
+    // apiRequest no longer calls clearUserData on refresh failure —
+    // only tryRefreshToken clears on definitive 401 from the extension refresh endpoint
+    expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  it('should clear session when extension token refresh returns 401 (session revoked)', async () => {
+    // Session has an extension_token, but the server says it's invalid/revoked
+    mockStorageGet.mockResolvedValue({
+      session: { extension_token: 'ext-token-123', access_token: 'expired-token' },
+    });
+
+    // First call: original API request returns 401
+    // Second call: extension refresh endpoint also returns 401 (session revoked)
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Token expired' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Extension session revoked' }),
+      });
+
+    await api.fetchCloudSettings();
+
+    // tryRefreshToken should clear data when extension refresh returns 401
     expect(mockStorageRemove).toHaveBeenCalledWith(['user', 'isLoggedIn', 'session']);
   });
 
-  it('should not clear user data on other errors', async () => {
+  it('should NOT clear session when extension token refresh fails temporarily (503)', async () => {
+    // Session has an extension_token — server is temporarily down
+    mockStorageGet.mockResolvedValue({
+      session: { extension_token: 'ext-token-123', access_token: 'expired-token' },
+    });
+
+    // First call: original API request returns 401
+    // Second call: extension refresh endpoint returns 503 (temporary error)
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Token expired' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: 'Service unavailable' }),
+      });
+
+    await api.fetchCloudSettings();
+
+    // Should NOT clear — extension_token is still valid, server is just temporarily down
+    expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  it('should NOT clear session when extension token refresh fails with network error', async () => {
+    mockStorageGet.mockResolvedValue({
+      session: { extension_token: 'ext-token-123', access_token: 'expired-token' },
+    });
+
+    // First call: original API request returns 401
+    // Second call: network error on refresh
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Token expired' }),
+      })
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    await api.fetchCloudSettings();
+
+    // Should NOT clear — network error is temporary
+    expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  it('should retry with new token after successful refresh', async () => {
+    mockStorageGet.mockResolvedValue({
+      session: { extension_token: 'ext-token-123', access_token: 'expired-token' },
+    });
+
+    // First call: original request returns 401
+    // Second call: refresh succeeds
+    // Third call (implicit): after refresh, mockStorageGet returns new token for retry
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Token expired' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          session: {
+            access_token: 'new-access-token',
+            access_token_expires_at: new Date(Date.now() + 3600000).toISOString(),
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ settings: { theme: 'dark' } }),
+      });
+
+    // After refresh, storage should return updated session
+    mockStorageGet
+      .mockResolvedValueOnce({
+        session: { extension_token: 'ext-token-123', access_token: 'expired-token' },
+      }) // first apiRequest getAccessToken
+      .mockResolvedValueOnce({
+        session: { extension_token: 'ext-token-123', access_token: 'expired-token' },
+      }) // tryRefreshToken getSession
+      .mockResolvedValueOnce({
+        session: { extension_token: 'ext-token-123', access_token: 'new-access-token' },
+      }); // retry getAccessToken
+
+    const result = await api.fetchCloudSettings();
+
+    // The retry should have succeeded
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  it('should not clear user data on non-401 errors', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
