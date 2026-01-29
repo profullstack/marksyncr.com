@@ -1,7 +1,9 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { existsSync, mkdirSync, renameSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
 
 const browser = process.env.BROWSER || 'chrome';
 
@@ -84,6 +86,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_APP_URL': JSON.stringify(
         env.NEXT_PUBLIC_APP_URL || 'https://marksyncr.com'
       ),
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
     },
   };
 });

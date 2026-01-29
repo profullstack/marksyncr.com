@@ -1046,7 +1046,7 @@ ${content}
       {/* Footer */}
       <footer className="border-t border-slate-200 px-4 py-3">
         <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>v0.1.0</span>
+          <span>v{import.meta.env.VITE_APP_VERSION}</span>
           <a
             href="https://marksyncr.com"
             target="_blank"

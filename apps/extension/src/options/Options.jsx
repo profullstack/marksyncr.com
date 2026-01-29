@@ -933,7 +933,7 @@ export function Options() {
           <Section title="About">
             <div className="space-y-2 text-sm text-slate-600">
               <p>
-                <strong>MarkSyncr</strong> v0.1.0
+                <strong>MarkSyncr</strong> v{import.meta.env.VITE_APP_VERSION}
               </p>
               <p>
                 Sync your bookmarks across browsers using GitHub, Dropbox, Google Drive, or
