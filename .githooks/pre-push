@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Marksyncr Pre-Push Hook
+#
+# The version bump and tagging now happen in the post-commit hook.
+# This hook just ensures a clean push.
+#
+
+# Always allow the push to proceed
+exit 0

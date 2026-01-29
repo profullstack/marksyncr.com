@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * Version bump script for all package.json and manifest files
- * Usage: pnpm version:bump <major|minor|patch> [--dry-run]
+ * Usage: pnpm version:bump <major|minor|patch> [--dry-run] [--from-hook]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -83,15 +84,41 @@ function updateFile(filePath: string, newVersion: string, dryRun: boolean): void
   }
 }
 
+function exec(command: string, silent = false): string {
+  try {
+    return execSync(command, {
+      cwd: rootDir,
+      stdio: silent ? 'pipe' : 'inherit',
+      encoding: 'utf-8',
+    }) as string;
+  } catch (error) {
+    if (!silent) {
+      console.error(`Command failed: ${command}`);
+    }
+    throw error;
+  }
+}
+
+function checkGitStatus(): void {
+  const status = exec('git status --porcelain', true);
+  if (status && status.trim()) {
+    console.error('❌ Working directory is not clean. Commit or stash changes first.');
+    console.error('\nUncommitted changes:');
+    console.error(status);
+    process.exit(1);
+  }
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
+  const fromHook = args.includes('--from-hook');
   const bumpType = args.find((arg) => ['major', 'minor', 'patch'].includes(arg)) as
     | BumpType
     | undefined;
 
   if (!bumpType) {
-    console.error('Usage: pnpm version:bump <major|minor|patch> [--dry-run]');
+    console.error('Usage: pnpm version:bump <major|minor|patch> [--dry-run] [--from-hook]');
     console.error('');
     console.error('Examples:');
     console.error('  pnpm version:bump patch        # 0.2.0 → 0.2.1');
@@ -99,6 +126,11 @@ function main(): void {
     console.error('  pnpm version:bump major        # 0.2.0 → 1.0.0');
     console.error('  pnpm version:bump patch --dry-run  # Preview changes');
     process.exit(1);
+  }
+
+  if (!fromHook) {
+    console.log('\n🔍 Checking git status...');
+    checkGitStatus();
   }
 
   const currentVersion = getCurrentVersion();
@@ -120,12 +152,27 @@ function main(): void {
 
   console.log('');
 
-  if (!dryRun) {
-    console.log(`✓ All files updated to version ${newVersion}`);
+  if (dryRun) {
+    return;
+  }
+
+  // Git operations: commit and tag
+  console.log('🔖 Creating git commit and tag...');
+
+  try {
+    exec(`git add ${FILES_TO_UPDATE.join(' ')}`);
+    exec(`git commit --no-verify -m "chore(release): v${newVersion}"`);
+    exec(`git tag -a v${newVersion} -m "Release v${newVersion}"`);
+
+    console.log(`\n✅ Version bumped to v${newVersion}`);
     console.log('\nNext steps:');
-    console.log('  1. Review changes: git diff');
-    console.log('  2. Commit: git commit -am "chore: bump version to ' + newVersion + '"');
-    console.log('  3. Tag: git tag v' + newVersion);
+    console.log('  1. Review the changes: git log --oneline -3');
+    console.log('  2. Push to remote: git push --follow-tags');
+    console.log('  3. CI will build and create the release');
+  } catch (error) {
+    console.error('\n❌ Git operations failed. Rolling back...');
+    exec('git checkout -- .', true);
+    throw error;
   }
 }
 
