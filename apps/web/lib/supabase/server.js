@@ -45,6 +45,13 @@ export async function createClient() {
 /**
  * Create a Supabase admin client with service role key
  * This should only be used for admin operations that bypass RLS
+ *
+ * IMPORTANT: Do NOT call session-setting auth methods (refreshSession, verifyOtp,
+ * signInWithPassword, etc.) on this client. Those methods store a user session
+ * in memory, causing _getAccessToken() to return the user's JWT instead of
+ * the service role key for all subsequent requests — which triggers RLS violations.
+ * Use createFreshClient() for those operations instead.
+ *
  * Uses singleton pattern to prevent memory leaks from creating new clients per request
  * @returns {import('@supabase/supabase-js').SupabaseClient}
  */
@@ -57,11 +64,32 @@ export function createAdminClient() {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
+          detectSessionInUrl: false,
         },
       }
     );
   }
   return cachedAdminClient;
+}
+
+/**
+ * Create a fresh (non-cached) Supabase client for auth operations that set sessions
+ * Use this for refreshSession(), verifyOtp(), signInWithPassword(), etc.
+ * Each call returns a new instance so session state never leaks between requests.
+ * @returns {import('@supabase/supabase-js').SupabaseClient}
+ */
+export function createFreshClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
 }
 
 /**

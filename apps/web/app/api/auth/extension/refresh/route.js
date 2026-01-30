@@ -17,7 +17,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient, createFreshClient } from '@/lib/supabase/server';
 import { createHash } from 'crypto';
 
 /**
@@ -98,7 +98,12 @@ export async function POST(request) {
     }
 
     // Step 6: Use the stored refresh token to get a new access token
-    const { data: refreshData, error: refreshError } = await adminClient.auth.refreshSession({
+    // IMPORTANT: Use a fresh (non-cached) client for refreshSession() and verifyOtp().
+    // These methods store a user session in memory. If called on a singleton client,
+    // subsequent requests use the user's JWT instead of the service role key,
+    // causing RLS violations on other routes (e.g. extension login INSERT).
+    const authClient = createFreshClient();
+    const { data: refreshData, error: refreshError } = await authClient.auth.refreshSession({
       refresh_token: session.supabase_refresh_token,
     });
 
@@ -148,7 +153,8 @@ export async function POST(request) {
       }
 
       // Verify the OTP to get a new session
-      const { data: otpData, error: otpError } = await adminClient.auth.verifyOtp({
+      // Use stateless client to avoid contaminating admin client with a user session
+      const { data: otpData, error: otpError } = await authClient.auth.verifyOtp({
         token_hash: linkData.properties.hashed_token,
         type: 'magiclink',
       });
@@ -219,8 +225,8 @@ export async function POST(request) {
       // but log prominently so we can investigate
     }
 
-    // Step 8: Get user info
-    const { data: userData, error: userError } = await adminClient.auth.getUser(
+    // Step 8: Get user info (use authClient, not adminClient, to avoid setting session state)
+    const { data: userData, error: userError } = await authClient.auth.getUser(
       refreshData.session.access_token
     );
 
