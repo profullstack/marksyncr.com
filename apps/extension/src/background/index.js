@@ -29,6 +29,9 @@ let isSyncInProgress = false;
 let pendingSyncNeeded = false;
 let pendingSyncReasons = [];
 
+// Track bookmarks modified locally since last sync - these take priority over cloud versions
+let locallyModifiedBookmarkIds = new Set();
+
 // Retry limiting for failed syncs
 const MAX_CONSECUTIVE_FAILURES = 3;
 let consecutiveSyncFailures = 0;
@@ -396,16 +399,17 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
  * @param {Array} tombstones - Merged tombstones
  * @returns {{toAdd: Array, toUpdate: Array, skippedByTombstone: Array}} - Categorized bookmarks
  */
-function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
+function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones, modifiedLocalIds) {
   const localByUrl = new Map(localBookmarks.filter((b) => b.url).map((b) => [b.url, b]));
 
   const toAdd = [];
   const toUpdate = [];
   const skippedByTombstone = [];
+  const skippedByLocalModification = [];
   const alreadyExistsUnchanged = [];
 
   console.log(
-    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones`
+    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones, ${modifiedLocalIds?.size || 0} locally modified`
   );
 
   for (const cloudBm of cloudBookmarks) {
@@ -430,6 +434,9 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     const localBm = localByUrl.get(cloudBm.url);
     if (!localBm) {
       toAdd.push(cloudBm);
+    } else if (modifiedLocalIds?.has(localBm.id)) {
+      // Local bookmark was modified by the user since last sync - local wins
+      skippedByLocalModification.push(cloudBm.url);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
@@ -447,6 +454,15 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     }
   }
 
+  if (skippedByLocalModification.length > 0) {
+    console.log(
+      `[MarkSyncr] 🏠 Skipped ${skippedByLocalModification.length} cloud→local updates (locally modified, local wins):`
+    );
+    for (const url of skippedByLocalModification.slice(0, 5)) {
+      console.log(`  - ${url}`);
+    }
+  }
+
   if (alreadyExistsUnchanged.length > 0) {
     console.log(
       `[MarkSyncr] ✓ ${alreadyExistsUnchanged.length} cloud bookmarks already exist locally (unchanged)`
@@ -454,7 +470,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
   }
 
   console.log(
-    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, unchanged=${alreadyExistsUnchanged.length}`
+    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, localWins=${skippedByLocalModification.length}, unchanged=${alreadyExistsUnchanged.length}`
   );
 
   return { toAdd, toUpdate, skippedByTombstone };
@@ -1167,6 +1183,9 @@ function setupBookmarkListeners() {
   browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
     console.log('[MarkSyncr] Bookmark created:', bookmark.title);
 
+    // Always track locally modified bookmarks, even during sync
+    locallyModifiedBookmarkIds.add(id);
+
     // Skip processing during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
     if (isSyncInProgress || isForcePullInProgress) {
@@ -1181,7 +1200,7 @@ function setupBookmarkListeners() {
       await removeTombstone(bookmark.url);
     }
 
-    scheduleSync('bookmark-created');
+    console.log(`[MarkSyncr] Tracked locally created bookmark: ${id}`);
   });
 
   // Listen for bookmark removal - add tombstone for deletion sync
@@ -1191,11 +1210,14 @@ function setupBookmarkListeners() {
     // Skip tombstone creation during sync operations to prevent sync loops
     // Force Pull clears all bookmarks before recreating from cloud,
     // so we don't want to create tombstones for those deletions
-    // BUT if user explicitly deleted during normal sync, queue for follow-up
     if (isForcePullInProgress) {
       console.log('[MarkSyncr] Skipping tombstone (force pull in progress)');
       return;
     }
+
+    // Always track locally modified bookmarks, even during sync
+    locallyModifiedBookmarkIds.add(id);
+
     if (isSyncInProgress) {
       // During normal sync, user deletions should still be recorded
       // Queue a follow-up sync to capture these changes
@@ -1215,12 +1237,15 @@ function setupBookmarkListeners() {
       await addTombstonesForFolder(removeInfo.node);
     }
 
-    scheduleSync('bookmark-removed');
+    console.log(`[MarkSyncr] Tracked locally removed bookmark: ${id}`);
   });
 
   // Listen for bookmark changes
   browser.bookmarks.onChanged.addListener((id, changeInfo) => {
     console.log('[MarkSyncr] Bookmark changed:', id);
+
+    // Always track locally modified bookmarks, even during sync
+    locallyModifiedBookmarkIds.add(id);
 
     // Skip during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1231,12 +1256,15 @@ function setupBookmarkListeners() {
       return;
     }
 
-    scheduleSync('bookmark-changed');
+    console.log(`[MarkSyncr] Tracked locally changed bookmark: ${id}`);
   });
 
   // Listen for bookmark moves
   browser.bookmarks.onMoved.addListener((id, moveInfo) => {
     console.log('[MarkSyncr] Bookmark moved:', id);
+
+    // Always track locally modified bookmarks, even during sync
+    locallyModifiedBookmarkIds.add(id);
 
     // Skip during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1247,7 +1275,7 @@ function setupBookmarkListeners() {
       return;
     }
 
-    scheduleSync('bookmark-moved');
+    console.log(`[MarkSyncr] Tracked locally moved bookmark: ${id}`);
   });
 }
 
@@ -1267,24 +1295,6 @@ async function addTombstonesForFolder(folder) {
   }
 }
 
-// Debounce sync scheduling
-let syncTimeout = null;
-
-/**
- * Schedule a sync after bookmark changes (debounced)
- * @param {string} reason - Reason for sync
- */
-function scheduleSync(reason) {
-  if (syncTimeout) {
-    clearTimeout(syncTimeout);
-  }
-
-  // Wait 5 seconds after last change before syncing
-  syncTimeout = setTimeout(async () => {
-    console.log(`[MarkSyncr] Triggering sync due to: ${reason}`);
-    await performSync();
-  }, 5000);
-}
 
 /**
  * Flatten bookmark tree to array for API sync
@@ -1508,7 +1518,8 @@ async function performSync(sourceId) {
       const { toAdd: newFromCloud, toUpdate: bookmarksToUpdate } = categorizeCloudBookmarks(
         cloudBookmarks,
         updatedLocalFlat,
-        mergedTombstones
+        mergedTombstones,
+        locallyModifiedBookmarkIds
       );
 
       console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
@@ -1589,6 +1600,7 @@ async function performSync(sourceId) {
       const hasLocalChangesToPush =
         localAdditions.length > 0 ||
         bookmarksToUpdate.length > 0 ||
+        locallyModifiedBookmarkIds.size > 0 ||
         localTombstones.length > cloudTombstones.length ||
         deletedLocally > 0;
 
@@ -1616,6 +1628,9 @@ async function performSync(sourceId) {
         // Reset failure count on success (even skipped syncs are successful)
         consecutiveSyncFailures = 0;
         lastSyncError = null;
+
+        // Clear locally modified tracking - changes are in sync
+        locallyModifiedBookmarkIds.clear();
 
         return {
           success: true,
@@ -1686,6 +1701,9 @@ async function performSync(sourceId) {
       // Reset failure count on success
       consecutiveSyncFailures = 0;
       lastSyncError = null;
+
+      // Clear locally modified tracking - changes have been pushed to cloud
+      locallyModifiedBookmarkIds.clear();
 
       return {
         success: true,
