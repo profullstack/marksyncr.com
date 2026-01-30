@@ -419,15 +419,17 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones, mo
     // Check tombstones - only add if bookmark is newer than tombstone
     const tombstone = tombstones.find((t) => t.url === cloudBm.url);
     if (tombstone) {
-      const bookmarkDate = cloudBm.dateAdded || 0;
+      // Normalize dateAdded to a number — cloud may return a string (ISO) or number
+      const rawDate = cloudBm.dateAdded;
+      const bookmarkDate = typeof rawDate === 'string' ? new Date(rawDate).getTime() : (rawDate || 0);
       const tombstoneDate = tombstone.deletedAt || 0;
-      if (bookmarkDate <= tombstoneDate) {
+      if (isNaN(bookmarkDate) || bookmarkDate <= tombstoneDate) {
         skippedByTombstone.push({
           bookmark: cloudBm,
           tombstone,
           reason: `dateAdded(${bookmarkDate}) <= deletedAt(${tombstoneDate})`,
         });
-        continue; // Skip - tombstone is newer
+        continue; // Skip - tombstone is newer (or dateAdded is invalid)
       }
     }
 
@@ -1218,23 +1220,23 @@ function setupBookmarkListeners() {
     // Always track locally modified bookmarks, even during sync
     locallyModifiedBookmarkIds.add(id);
 
-    if (isSyncInProgress) {
-      // During normal sync, user deletions should still be recorded
-      // Queue a follow-up sync to capture these changes
-      console.log('[MarkSyncr] Queuing pending sync (bookmark removed during sync)');
-      pendingSyncNeeded = true;
-      pendingSyncReasons.push('bookmark-removed-during-sync');
-      return;
-    }
-
-    // Get the URL of the removed bookmark from removeInfo.node
-    // Note: removeInfo.node contains the removed bookmark data
+    // ALWAYS create tombstones for deleted bookmarks, even during sync.
+    // Without a tombstone, the next sync will re-add the bookmark from cloud.
+    // The tombstone is the only way to signal "this bookmark was intentionally deleted."
     if (removeInfo.node?.url) {
       await addTombstone(removeInfo.node.url);
       console.log('[MarkSyncr] Added tombstone for deleted bookmark:', removeInfo.node.url);
     } else if (removeInfo.node?.children) {
       // It's a folder - add tombstones for all bookmarks in the folder
       await addTombstonesForFolder(removeInfo.node);
+    }
+
+    if (isSyncInProgress) {
+      // Queue a follow-up sync to capture these changes
+      console.log('[MarkSyncr] Queuing pending sync (bookmark removed during sync)');
+      pendingSyncNeeded = true;
+      pendingSyncReasons.push('bookmark-removed-during-sync');
+      return;
     }
 
     console.log(`[MarkSyncr] Tracked locally removed bookmark: ${id}`);

@@ -822,7 +822,7 @@ export async function POST(request) {
       url: bookmark.url,
       title: bookmark.title ?? '',
       folderPath: bookmark.folderPath || bookmark.folder_path || '',
-      dateAdded: bookmark.dateAdded || Date.now(),
+      dateAdded: (typeof bookmark.dateAdded === 'string' ? new Date(bookmark.dateAdded).getTime() : bookmark.dateAdded) || Date.now(),
       index: bookmark.index ?? 0, // Preserve index for ordering
       source,
     }));
@@ -884,26 +884,31 @@ export async function POST(request) {
     // Merge incoming bookmarks with existing
     const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
 
-    // IMPORTANT: Do NOT apply tombstones on the server side!
-    // The server should store ALL bookmarks and tombstones.
-    // Each browser extension applies tombstones locally when it receives them.
-    // This prevents the race condition where:
-    // 1. Browser A has bookmark X, Browser B deletes it
-    // 2. Browser B syncs, creating tombstone
-    // 3. Browser A syncs, sending bookmark X
-    // 4. If server applied tombstones, X would be deleted from cloud
-    // 5. But Browser A still has X locally, causing sync issues
+    // Apply tombstones server-side: remove bookmarks that have been deleted.
+    // This is safe because the extension always pulls cloud data (including tombstones)
+    // and applies deletions locally BEFORE pushing its merged bookmarks to the server.
+    // So by the time a push arrives, the extension has already excluded any bookmarks
+    // it knows are tombstoned. The server merge, however, re-adds them from existing
+    // data — so we must filter them out here.
     //
-    // Instead, the extension's applyTombstonesToLocal() handles deletion
-    // when it receives tombstones from the cloud.
-    const finalBookmarks = merged;
-    const deleted = 0; // Server doesn't delete, extensions do
+    // A bookmark is removed if it has a matching tombstone AND the tombstone is newer
+    // than (or equal to) the bookmark's dateAdded. If a user re-adds a bookmark after
+    // deleting it, the new dateAdded will be newer than the tombstone, so it survives.
+    const tombstoneMap = new Map(mergedTombstones.map((t) => [t.url, t.deletedAt || 0]));
+    const finalBookmarks = merged.filter((b) => {
+      if (!b.url) return true; // Keep folders
+      const tombstoneDate = tombstoneMap.get(b.url);
+      if (tombstoneDate === undefined) return true; // No tombstone
+      const bookmarkDate = typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : (b.dateAdded || 0);
+      return bookmarkDate > tombstoneDate; // Keep only if bookmark is newer than tombstone
+    });
+    const deleted = merged.length - finalBookmarks.length;
 
     console.log(
-      `[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated`
+      `[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated, ${deleted} removed by tombstones`
     );
     console.log(
-      `[Bookmarks API] Tombstones stored: ${mergedTombstones.length} (applied by extensions, not server)`
+      `[Bookmarks API] Tombstones: ${mergedTombstones.length} stored`
     );
 
     // Validate total bookmark count after merge to prevent data explosion
