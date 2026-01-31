@@ -508,19 +508,16 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
         bookmarkMap.set(incoming.url, incoming);
         added++;
       } else {
-        // Existing bookmark - check if incoming is newer
-        const existingDate = existing.dateAdded || 0;
-        const incomingDate = incoming.dateAdded || 0;
-
-        if (incomingDate > existingDate) {
-          // Incoming is newer - update
-          bookmarkMap.set(incoming.url, {
-            ...incoming,
-            id: existing.id || incoming.id,
-          });
-          updated++;
-        }
-        // If existing is newer or same, keep existing (do nothing)
+        // Existing bookmark - always use incoming version.
+        // The extension pulls from cloud first, merges locally (protecting
+        // locally modified bookmarks), then pushes. So the incoming data
+        // represents the user's latest intended state. The server should
+        // trust it rather than second-guessing with dateAdded comparison.
+        bookmarkMap.set(incoming.url, {
+          ...incoming,
+          id: existing.id || incoming.id,
+        });
+        updated++;
       }
     }
     // Skip items that are neither folders nor valid bookmarks

@@ -18,6 +18,7 @@ const DEFAULT_SYNC_INTERVAL = 5; // minutes - sync every 5 minutes by default
 const TOMBSTONES_STORAGE_KEY = 'marksyncr-tombstones';
 const LAST_CLOUD_CHECKSUM_KEY = 'marksyncr-last-cloud-checksum';
 const LAST_SYNC_TIME_KEY = 'marksyncr-last-sync-time';
+const LOCALLY_MODIFIED_IDS_KEY = 'marksyncr-locally-modified-ids';
 
 // Flag to disable tombstone creation during Force Pull operations
 let isForcePullInProgress = false;
@@ -146,6 +147,40 @@ async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
     await storeTombstones(filtered);
     console.log(`[MarkSyncr] Cleaned up ${tombstones.length - filtered.length} old tombstones`);
   }
+}
+
+/**
+ * Load persisted locally modified bookmark IDs from storage
+ * This survives service worker restarts in MV3
+ * @returns {Promise<Set<string>>}
+ */
+async function loadLocallyModifiedIds() {
+  const data = await browser.storage.local.get(LOCALLY_MODIFIED_IDS_KEY);
+  const ids = data[LOCALLY_MODIFIED_IDS_KEY] || [];
+  return new Set(ids);
+}
+
+/**
+ * Persist locally modified bookmark IDs to storage
+ * Called after every bookmark change to survive service worker restarts
+ */
+async function saveLocallyModifiedIds() {
+  await browser.storage.local.set({
+    [LOCALLY_MODIFIED_IDS_KEY]: Array.from(locallyModifiedBookmarkIds),
+  });
+}
+
+// Debounce saveLocallyModifiedIds to avoid excessive storage writes
+// when multiple bookmark changes happen rapidly (e.g., bulk import)
+let saveModifiedIdsTimeout = null;
+function debouncedSaveLocallyModifiedIds() {
+  if (saveModifiedIdsTimeout) {
+    clearTimeout(saveModifiedIdsTimeout);
+  }
+  saveModifiedIdsTimeout = setTimeout(() => {
+    saveModifiedIdsTimeout = null;
+    saveLocallyModifiedIds();
+  }, 500);
 }
 
 /**
@@ -1019,6 +1054,12 @@ async function initialize() {
   // Set up alarm for proactive token refresh (keeps session alive independent of sync)
   await setupTokenRefreshAlarm();
 
+  // Restore locally modified bookmark IDs from storage (survives service worker restarts)
+  locallyModifiedBookmarkIds = await loadLocallyModifiedIds();
+  console.log(
+    `[MarkSyncr] Restored ${locallyModifiedBookmarkIds.size} locally modified bookmark IDs from storage`
+  );
+
   // Listen for bookmark changes
   setupBookmarkListeners();
 
@@ -1187,6 +1228,7 @@ function setupBookmarkListeners() {
 
     // Always track locally modified bookmarks, even during sync
     locallyModifiedBookmarkIds.add(id);
+    debouncedSaveLocallyModifiedIds();
 
     // Skip processing during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1219,6 +1261,7 @@ function setupBookmarkListeners() {
 
     // Always track locally modified bookmarks, even during sync
     locallyModifiedBookmarkIds.add(id);
+    debouncedSaveLocallyModifiedIds();
 
     // ALWAYS create tombstones for deleted bookmarks, even during sync.
     // Without a tombstone, the next sync will re-add the bookmark from cloud.
@@ -1248,6 +1291,7 @@ function setupBookmarkListeners() {
 
     // Always track locally modified bookmarks, even during sync
     locallyModifiedBookmarkIds.add(id);
+    debouncedSaveLocallyModifiedIds();
 
     // Skip during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1267,6 +1311,7 @@ function setupBookmarkListeners() {
 
     // Always track locally modified bookmarks, even during sync
     locallyModifiedBookmarkIds.add(id);
+    debouncedSaveLocallyModifiedIds();
 
     // Skip during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1633,6 +1678,7 @@ async function performSync(sourceId) {
 
         // Clear locally modified tracking - changes are in sync
         locallyModifiedBookmarkIds.clear();
+        await saveLocallyModifiedIds();
 
         return {
           success: true,
@@ -1706,6 +1752,7 @@ async function performSync(sourceId) {
 
       // Clear locally modified tracking - changes have been pushed to cloud
       locallyModifiedBookmarkIds.clear();
+      await saveLocallyModifiedIds();
 
       return {
         success: true,
@@ -1817,6 +1864,15 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
 
   for (const bookmark of localBookmarks) {
     if (tombstonedUrls.has(bookmark.url)) {
+      // Skip if this bookmark was locally modified (e.g., user re-added it after deletion)
+      // The user's intent to have this bookmark takes priority over the cloud tombstone
+      if (locallyModifiedBookmarkIds.has(bookmark.id)) {
+        console.log(
+          `[MarkSyncr] 🏠 Skipping tombstone for locally modified bookmark: ${bookmark.url}`
+        );
+        continue;
+      }
+
       console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
 
       try {
