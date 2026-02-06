@@ -262,10 +262,6 @@ jobs:
       - name: Upload to Edge Add-ons
         id: upload
         run: |
-          echo "EDGE_CLIENT_ID length: ${#EDGE_CLIENT_ID}"
-          echo "EDGE_API_KEY length: ${#EDGE_API_KEY}"
-          echo "EDGE_PRODUCT_ID: $EDGE_PRODUCT_ID"
-
           RESPONSE=$(curl -sS -w "\n%{http_code}" \
             -X POST \
             -H "Authorization: ApiKey $EDGE_API_KEY" \
