@@ -491,6 +491,116 @@ describe('categorizeCloudBookmarks with locallyModifiedBookmarkIds', () => {
   });
 });
 
+describe('Bookmark move: sibling index protection', () => {
+  it('should protect all siblings from cloud index override when one bookmark is moved', () => {
+    // Scenario: User has bookmarks A(0), B(1), C(2), D(3) in a folder.
+    // User drags A to the end: B(0), C(1), D(2), A(3).
+    // Only A fires onMoved, but B, C, D all shifted indices.
+    // All siblings must be in locallyModifiedBookmarkIds to prevent cloud from
+    // reverting B, C, D to their old positions.
+
+    // Cloud still has OLD order
+    const cloudBookmarks = [
+      { url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Bar', index: 0 },
+      { url: 'https://b.com', title: 'B', folderPath: 'Bookmarks Bar', index: 1 },
+      { url: 'https://c.com', title: 'C', folderPath: 'Bookmarks Bar', index: 2 },
+      { url: 'https://d.com', title: 'D', folderPath: 'Bookmarks Bar', index: 3 },
+    ];
+
+    // Local has NEW order (user moved A to end)
+    const localBookmarks = [
+      { id: 'bm-b', url: 'https://b.com', title: 'B', folderPath: 'Bookmarks Bar', index: 0 },
+      { id: 'bm-c', url: 'https://c.com', title: 'C', folderPath: 'Bookmarks Bar', index: 1 },
+      { id: 'bm-d', url: 'https://d.com', title: 'D', folderPath: 'Bookmarks Bar', index: 2 },
+      { id: 'bm-a', url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Bar', index: 3 },
+    ];
+
+    // With the fix: ALL siblings are tracked as locally modified (not just A)
+    const modifiedLocalIds = new Set(['bm-a', 'bm-b', 'bm-c', 'bm-d']);
+
+    const { toAdd, toUpdate, skippedByLocalModification } = categorizeCloudBookmarks(
+      cloudBookmarks,
+      localBookmarks,
+      [],
+      modifiedLocalIds
+    );
+
+    // Nothing should be added or updated — all are protected
+    expect(toAdd).toHaveLength(0);
+    expect(toUpdate).toHaveLength(0);
+    // All 4 bookmarks should be skipped because they are locally modified
+    expect(skippedByLocalModification).toHaveLength(4);
+  });
+
+  it('should revert sibling order if only moved bookmark is tracked (demonstrates bug)', () => {
+    // This test demonstrates what WOULD happen without the sibling tracking fix:
+    // Only the explicitly moved bookmark is protected, siblings get overridden.
+
+    const cloudBookmarks = [
+      { url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Bar', index: 0 },
+      { url: 'https://b.com', title: 'B', folderPath: 'Bookmarks Bar', index: 1 },
+      { url: 'https://c.com', title: 'C', folderPath: 'Bookmarks Bar', index: 2 },
+    ];
+
+    const localBookmarks = [
+      { id: 'bm-b', url: 'https://b.com', title: 'B', folderPath: 'Bookmarks Bar', index: 0 },
+      { id: 'bm-c', url: 'https://c.com', title: 'C', folderPath: 'Bookmarks Bar', index: 1 },
+      { id: 'bm-a', url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Bar', index: 2 },
+    ];
+
+    // BUG scenario: only the moved bookmark (A) is tracked
+    const modifiedLocalIds = new Set(['bm-a']);
+
+    const { toUpdate, skippedByLocalModification } = categorizeCloudBookmarks(
+      cloudBookmarks,
+      localBookmarks,
+      [],
+      modifiedLocalIds
+    );
+
+    // A is protected (correct)
+    expect(skippedByLocalModification).toContain('https://a.com');
+
+    // B and C would get overridden with cloud indices (the bug!)
+    // B: cloud index 1 vs local index 0 → needs update
+    // C: cloud index 2 vs local index 1 → needs update
+    expect(toUpdate).toHaveLength(2);
+    expect(toUpdate[0].cloud.url).toBe('https://b.com');
+    expect(toUpdate[1].cloud.url).toBe('https://c.com');
+  });
+
+  it('should handle cross-folder move with siblings in both folders tracked', () => {
+    // User moves bookmark from Folder1 to Folder2
+    // Both source and destination folder siblings should be protected
+
+    const cloudBookmarks = [
+      { url: 'https://stay1.com', title: 'Stay1', folderPath: 'Bookmarks Bar/Folder1', index: 0 },
+      { url: 'https://moved.com', title: 'Moved', folderPath: 'Bookmarks Bar/Folder1', index: 1 },
+      { url: 'https://stay2.com', title: 'Stay2', folderPath: 'Bookmarks Bar/Folder2', index: 0 },
+    ];
+
+    const localBookmarks = [
+      { id: 'bm-stay1', url: 'https://stay1.com', title: 'Stay1', folderPath: 'Bookmarks Bar/Folder1', index: 0 },
+      { id: 'bm-stay2', url: 'https://stay2.com', title: 'Stay2', folderPath: 'Bookmarks Bar/Folder2', index: 0 },
+      { id: 'bm-moved', url: 'https://moved.com', title: 'Moved', folderPath: 'Bookmarks Bar/Folder2', index: 1 },
+    ];
+
+    // All siblings in both folders are tracked
+    const modifiedLocalIds = new Set(['bm-stay1', 'bm-stay2', 'bm-moved']);
+
+    const { toAdd, toUpdate, skippedByLocalModification } = categorizeCloudBookmarks(
+      cloudBookmarks,
+      localBookmarks,
+      [],
+      modifiedLocalIds
+    );
+
+    expect(toAdd).toHaveLength(0);
+    expect(toUpdate).toHaveLength(0);
+    expect(skippedByLocalModification).toHaveLength(3);
+  });
+});
+
 describe('Sync scenario: service worker restart', () => {
   it('should preserve local changes across service worker restarts via persisted IDs', async () => {
     // Simulate: user adds/modifies bookmarks → service worker restarts → sync runs

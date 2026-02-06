@@ -1306,11 +1306,35 @@ function setupBookmarkListeners() {
   });
 
   // Listen for bookmark moves
-  browser.bookmarks.onMoved.addListener((id, moveInfo) => {
+  browser.bookmarks.onMoved.addListener(async (id, moveInfo) => {
     console.log('[MarkSyncr] Bookmark moved:', id);
 
-    // Always track locally modified bookmarks, even during sync
+    // Always track the moved bookmark itself
     locallyModifiedBookmarkIds.add(id);
+
+    // CRITICAL: When a bookmark is moved, all siblings in the affected folder(s)
+    // have their indices shifted implicitly by the browser. We must mark them all
+    // as locally modified so the sync doesn't override their new positions with
+    // stale cloud indices. Without this, reordering a single bookmark causes the
+    // cloud's old order to be re-applied to all the un-tracked siblings.
+    try {
+      const foldersToMark = new Set([moveInfo.parentId]);
+      if (moveInfo.oldParentId && moveInfo.oldParentId !== moveInfo.parentId) {
+        foldersToMark.add(moveInfo.oldParentId);
+      }
+      for (const folderId of foldersToMark) {
+        const children = await browser.bookmarks.getChildren(folderId);
+        for (const child of children) {
+          locallyModifiedBookmarkIds.add(child.id);
+        }
+      }
+      console.log(
+        `[MarkSyncr] Tracked ${foldersToMark.size} folder(s) with all siblings as locally modified`
+      );
+    } catch (err) {
+      console.warn('[MarkSyncr] Failed to mark siblings as modified:', err.message);
+    }
+
     debouncedSaveLocallyModifiedIds();
 
     // Skip during sync operations to prevent sync loops
