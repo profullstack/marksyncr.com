@@ -263,7 +263,7 @@ jobs:
         id: auth
         run: |
           RESPONSE=$(curl -sS -X POST \
-            "https://login.microsoftonline.com/consumers/oauth2/v2.0/token" \
+            "https://login.microsoftonline.com/$EDGE_TENANT_ID/oauth2/v2.0/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "client_id=$EDGE_CLIENT_ID" \
             -d "client_secret=$EDGE_CLIENT_SECRET" \
