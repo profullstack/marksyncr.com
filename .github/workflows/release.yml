@@ -259,37 +259,15 @@ jobs:
         with:
           name: marksyncr-edge
 
-      - name: Authenticate with Edge Add-ons API
-        id: auth
-        run: |
-          RESPONSE=$(curl -sS -X POST \
-            "https://login.microsoftonline.com/$EDGE_TENANT_ID/oauth2/v2.0/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "client_id=$EDGE_CLIENT_ID" \
-            -d "client_secret=$EDGE_CLIENT_SECRET" \
-            -d "grant_type=client_credentials" \
-            -d "scope=https://api.addons.microsoftedge.microsoft.com/.default")
-
-          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
-
-          if [[ -z "$ACCESS_TOKEN" ]]; then
-            echo "::error::Failed to obtain Edge Add-ons access token"
-            echo "$RESPONSE" | jq '{error, error_description}' 2>/dev/null || echo "$RESPONSE"
-            exit 1
-          fi
-
-          echo "::add-mask::$ACCESS_TOKEN"
-          echo "token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
-          echo "Edge Add-ons authentication successful"
-
       - name: Upload to Edge Add-ons
         id: upload
         run: |
           RESPONSE=$(curl -sS -w "\n%{http_code}" \
             -X POST \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Authorization: ApiKey $EDGE_API_KEY" \
+            -H "X-ClientID: $EDGE_CLIENT_ID" \
             -H "Content-Type: application/zip" \
-            --data-binary @marksyncr-edge.zip \
+            -T marksyncr-edge.zip \
             "https://api.addons.microsoftedge.microsoft.com/v1/products/$EDGE_PRODUCT_ID/submissions/draft/package")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
@@ -322,7 +300,8 @@ jobs:
           for i in $(seq 1 30); do
             sleep 10
             RESPONSE=$(curl -sS \
-              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              -H "Authorization: ApiKey $EDGE_API_KEY" \
+              -H "X-ClientID: $EDGE_CLIENT_ID" \
               "https://api.addons.microsoftedge.microsoft.com/v1/products/$EDGE_PRODUCT_ID/submissions/draft/package/operations/$OPERATION_ID")
 
             STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
@@ -342,7 +321,8 @@ jobs:
         run: |
           RESPONSE=$(curl -sS -w "\n%{http_code}" \
             -X POST \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Authorization: ApiKey $EDGE_API_KEY" \
+            -H "X-ClientID: $EDGE_CLIENT_ID" \
             -H "Content-Type: application/json" \
             -d '{}' \
             "https://api.addons.microsoftedge.microsoft.com/v1/products/$EDGE_PRODUCT_ID/submissions")
