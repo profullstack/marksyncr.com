@@ -22,12 +22,14 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Load environment variables
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" | while IFS='=' read -r key value; do
+          while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
             echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
-          done
+          done <<< "$ENV_CONTENT"
 
       - uses: actions/checkout@v4
 
@@ -108,12 +110,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Load environment variables
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" | while IFS='=' read -r key value; do
+          while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
             echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
-          done
+          done <<< "$ENV_CONTENT"
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -192,12 +196,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Load environment variables
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" | while IFS='=' read -r key value; do
+          while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
             echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
-          done
+          done <<< "$ENV_CONTENT"
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -239,12 +245,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Load environment variables
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" | while IFS='=' read -r key value; do
+          while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
             echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
-          done
+          done <<< "$ENV_CONTENT"
 
       - name: Download artifact
         uses: actions/download-artifact@v4
