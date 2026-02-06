@@ -76,6 +76,7 @@ jobs:
           ls -lh apps/extension/dist/*.zip
           test -f apps/extension/dist/marksyncr-chrome.zip || { echo "::error::Chrome ZIP not found"; exit 1; }
           test -f apps/extension/dist/marksyncr-firefox.zip || { echo "::error::Firefox ZIP not found"; exit 1; }
+          cp apps/extension/dist/marksyncr-chrome.zip apps/extension/dist/marksyncr-edge.zip
 
       - name: Upload Chrome ZIP
         uses: actions/upload-artifact@v4
@@ -89,6 +90,13 @@ jobs:
         with:
           name: marksyncr-firefox
           path: apps/extension/dist/marksyncr-firefox.zip
+          retention-days: 30
+
+      - name: Upload Edge ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: marksyncr-edge
+          path: apps/extension/dist/marksyncr-edge.zip
           retention-days: 30
 
   chrome-release:
@@ -221,4 +229,126 @@ jobs:
             --approval-timeout 0
 
           echo "Firefox extension v${{ needs.build.outputs.version }} submitted to AMO"
+
+  edge-release:
+    name: Publish to Edge Add-ons
+    needs: build
+    if: |
+      github.ref_type == 'tag' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load environment variables
+        run: |
+          echo "${{ secrets.ENV_FILE }}" | while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" =~ ^# ]] && continue
+            echo "::add-mask::$value"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: marksyncr-edge
+
+      - name: Authenticate with Edge Add-ons API
+        id: auth
+        run: |
+          RESPONSE=$(curl -sS -X POST \
+            "https://login.microsoftonline.com/consumers/oauth2/v2.0/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "client_id=${{ env.EDGE_CLIENT_ID }}" \
+            -d "client_secret=${{ env.EDGE_CLIENT_SECRET }}" \
+            -d "grant_type=client_credentials" \
+            -d "scope=https://api.addons.microsoftedge.microsoft.com/.default")
+
+          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+
+          if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo "::error::Failed to obtain Edge Add-ons access token"
+            echo "$RESPONSE" | jq '{error, error_description}' 2>/dev/null || echo "$RESPONSE"
+            exit 1
+          fi
+
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "Edge Add-ons authentication successful"
+
+      - name: Upload to Edge Add-ons
+        id: upload
+        run: |
+          RESPONSE=$(curl -sS -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/zip" \
+            --data-binary @marksyncr-edge.zip \
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ env.EDGE_PRODUCT_ID }}/submissions/draft/package")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "Upload response (HTTP $HTTP_CODE):"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+
+          OPERATION_ID=$(echo "$BODY" | jq -r '.operationID // empty')
+          if [[ -z "$OPERATION_ID" ]]; then
+            OPERATION_ID=$(echo "$RESPONSE" | grep -oP '"operationID"\s*:\s*"\K[^"]+' || true)
+          fi
+
+          if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" ]]; then
+            echo "::error::Edge upload failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "operation_id=$OPERATION_ID" >> "$GITHUB_OUTPUT"
+          echo "Edge extension uploaded, operation: $OPERATION_ID"
+
+      - name: Wait for upload processing
+        run: |
+          OPERATION_ID="${{ steps.upload.outputs.operation_id }}"
+          if [[ -z "$OPERATION_ID" ]]; then
+            echo "No operation ID, skipping status check"
+            exit 0
+          fi
+
+          for i in $(seq 1 30); do
+            sleep 10
+            RESPONSE=$(curl -sS \
+              -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+              "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ env.EDGE_PRODUCT_ID }}/submissions/draft/package/operations/$OPERATION_ID")
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
+            echo "Attempt $i/30: status=$STATUS"
+
+            if [[ "$STATUS" == "Succeeded" ]]; then
+              echo "Upload processing complete"
+              break
+            elif [[ "$STATUS" == "Failed" ]]; then
+              echo "::error::Edge upload processing failed"
+              echo "$RESPONSE" | jq .
+              exit 1
+            fi
+          done
+
+      - name: Publish submission
+        run: |
+          RESPONSE=$(curl -sS -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ env.EDGE_PRODUCT_ID }}/submissions")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "Publish response (HTTP $HTTP_CODE):"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+
+          if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" ]]; then
+            echo "::error::Edge publish failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "Edge extension v${{ needs.build.outputs.version }} submitted for review"
 

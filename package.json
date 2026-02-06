@@ -1,6 +1,6 @@
 {
   "name": "marksyncr",
-  "version": "0.7.8",
+  "version": "0.8.0",
   "private": true,
   "description": "Cross-browser bookmark sync extension with cloud storage",
   "type": "module",
