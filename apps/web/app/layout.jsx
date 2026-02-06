@@ -2,6 +2,7 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata = {
+  metadataBase: new URL('https://marksyncr.com'),
   title: 'MarkSyncr - Sync Your Bookmarks Everywhere',
   description:
     'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
@@ -13,6 +14,14 @@ export const metadata = {
       'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
     url: 'https://marksyncr.com',
     siteName: 'MarkSyncr',
+    images: [
+      {
+        url: '/banner.png',
+        width: 1200,
+        height: 630,
+        alt: 'MarkSyncr - Sync Your Bookmarks Everywhere',
+      },
+    ],
     locale: 'en_US',
     type: 'website',
   },
@@ -21,6 +30,7 @@ export const metadata = {
     title: 'MarkSyncr - Sync Your Bookmarks Everywhere',
     description:
       'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
+    images: ['/banner.png'],
   },
   robots: {
     index: true,
