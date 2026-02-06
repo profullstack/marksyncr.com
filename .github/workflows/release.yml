@@ -128,9 +128,9 @@ jobs:
         id: auth
         run: |
           RESPONSE=$(curl -sS -X POST "https://oauth2.googleapis.com/token" \
-            -d "client_id=${{ env.CHROME_CLIENT_ID }}" \
-            -d "client_secret=${{ env.CHROME_CLIENT_SECRET }}" \
-            -d "refresh_token=${{ env.CHROME_REFRESH_TOKEN }}" \
+            -d "client_id=$CHROME_CLIENT_ID" \
+            -d "client_secret=$CHROME_CLIENT_SECRET" \
+            -d "refresh_token=$CHROME_REFRESH_TOKEN" \
             -d "grant_type=refresh_token")
 
           ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
@@ -152,7 +152,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "x-goog-api-version: 2" \
             -T marksyncr-chrome.zip \
-            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${{ env.CHROME_EXTENSION_ID }}")
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID")
 
           echo "Upload response:"
           echo "$RESPONSE" | jq .
@@ -173,7 +173,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "x-goog-api-version: 2" \
             -H "Content-Length: 0" \
-            "https://www.googleapis.com/chromewebstore/v1.1/items/${{ env.CHROME_EXTENSION_ID }}/publish")
+            "https://www.googleapis.com/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID/publish")
 
           echo "Publish response:"
           echo "$RESPONSE" | jq .
@@ -229,8 +229,8 @@ jobs:
           web-ext sign \
             --source-dir ./extension \
             --artifacts-dir ./artifacts \
-            --api-key "${{ env.FIREFOX_JWT_ISSUER }}" \
-            --api-secret "${{ env.FIREFOX_JWT_SECRET }}" \
+            --api-key "$FIREFOX_JWT_ISSUER" \
+            --api-secret "$FIREFOX_JWT_SECRET" \
             --channel listed \
             --approval-timeout 0
 
@@ -265,8 +265,8 @@ jobs:
           RESPONSE=$(curl -sS -X POST \
             "https://login.microsoftonline.com/consumers/oauth2/v2.0/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "client_id=${{ env.EDGE_CLIENT_ID }}" \
-            -d "client_secret=${{ env.EDGE_CLIENT_SECRET }}" \
+            -d "client_id=$EDGE_CLIENT_ID" \
+            -d "client_secret=$EDGE_CLIENT_SECRET" \
             -d "grant_type=client_credentials" \
             -d "scope=https://api.addons.microsoftedge.microsoft.com/.default")
 
@@ -290,7 +290,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/zip" \
             --data-binary @marksyncr-edge.zip \
-            "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ env.EDGE_PRODUCT_ID }}/submissions/draft/package")
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/$EDGE_PRODUCT_ID/submissions/draft/package")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
@@ -323,7 +323,7 @@ jobs:
             sleep 10
             RESPONSE=$(curl -sS \
               -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
-              "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ env.EDGE_PRODUCT_ID }}/submissions/draft/package/operations/$OPERATION_ID")
+              "https://api.addons.microsoftedge.microsoft.com/v1/products/$EDGE_PRODUCT_ID/submissions/draft/package/operations/$OPERATION_ID")
 
             STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
             echo "Attempt $i/30: status=$STATUS"
@@ -345,7 +345,7 @@ jobs:
             -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d '{}' \
-            "https://api.addons.microsoftedge.microsoft.com/v1/products/${{ env.EDGE_PRODUCT_ID }}/submissions")
+            "https://api.addons.microsoftedge.microsoft.com/v1/products/$EDGE_PRODUCT_ID/submissions")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
