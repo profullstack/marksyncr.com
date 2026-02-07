@@ -1331,6 +1331,30 @@ function setupBookmarkListeners() {
       console.log(
         `[MarkSyncr] Tracked ${foldersToMark.size} folder(s) with all siblings as locally modified`
       );
+
+      // CRITICAL: When a FOLDER is moved, the bookmarks inside it change their
+      // effective folderPath, but don't fire individual onMoved events. We must
+      // recursively mark all descendants as locally modified so the sync doesn't
+      // move them back to the cloud's old folder path.
+      const movedNodes = await browser.bookmarks.getSubTree(id);
+      if (movedNodes[0]?.children) {
+        let descendantCount = 0;
+        const markDescendants = (nodes) => {
+          for (const node of nodes) {
+            locallyModifiedBookmarkIds.add(node.id);
+            descendantCount++;
+            if (node.children) {
+              markDescendants(node.children);
+            }
+          }
+        };
+        markDescendants(movedNodes[0].children);
+        if (descendantCount > 0) {
+          console.log(
+            `[MarkSyncr] Tracked ${descendantCount} descendants of moved folder as locally modified`
+          );
+        }
+      }
     } catch (err) {
       console.warn('[MarkSyncr] Failed to mark siblings as modified:', err.message);
     }
