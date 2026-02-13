@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MarkSyncr",
-  "version": "0.8.18",
+  "version": "0.8.19",
   "description": "Sync your bookmarks across browsers using GitHub, Dropbox, Google Drive, or MarkSyncr Cloud",
   "icons": {
     "16": "icons/favicon-16.png",
