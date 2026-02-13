@@ -783,6 +783,7 @@ export async function POST(request) {
       bookmarks,
       tombstones: incomingTombstones = [],
       source = 'browser',
+      replace = false,
     } = await request.json();
 
     if (!Array.isArray(bookmarks)) {
@@ -878,31 +879,48 @@ export async function POST(request) {
       );
     }
 
-    // Merge incoming bookmarks with existing
-    const { merged, added, updated } = mergeBookmarks(existingBookmarks, normalizedBookmarks);
+    // When replace=true, the extension has already done a full two-way merge locally.
+    // The incoming bookmarks ARE the authoritative state — skip server-side re-merge.
+    // When replace=false (default), use the legacy merge for backward compatibility.
+    let finalBookmarks;
+    let added = 0;
+    let updated = 0;
+    let deleted = 0;
 
-    // Apply tombstones server-side: remove bookmarks that have been deleted.
-    // This is safe because the extension always pulls cloud data (including tombstones)
-    // and applies deletions locally BEFORE pushing its merged bookmarks to the server.
-    // So by the time a push arrives, the extension has already excluded any bookmarks
-    // it knows are tombstoned. The server merge, however, re-adds them from existing
-    // data — so we must filter them out here.
-    //
-    // A bookmark is removed if it has a matching tombstone AND the tombstone is newer
-    // than (or equal to) the bookmark's dateAdded. If a user re-adds a bookmark after
-    // deleting it, the new dateAdded will be newer than the tombstone, so it survives.
-    const tombstoneMap = new Map(mergedTombstones.map((t) => [t.url, t.deletedAt || 0]));
-    const finalBookmarks = merged.filter((b) => {
-      if (!b.url) return true; // Keep folders
-      const tombstoneDate = tombstoneMap.get(b.url);
-      if (tombstoneDate === undefined) return true; // No tombstone
-      const bookmarkDate = typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : (b.dateAdded || 0);
-      return bookmarkDate > tombstoneDate; // Keep only if bookmark is newer than tombstone
-    });
-    const deleted = merged.length - finalBookmarks.length;
+    if (replace) {
+      console.log(`[Bookmarks API] Replace mode: using incoming bookmarks directly (skipping merge)`);
+      // Apply tombstones to filter deleted bookmarks from incoming data
+      const tombstoneMap = new Map(mergedTombstones.map((t) => [t.url, t.deletedAt || 0]));
+      finalBookmarks = normalizedBookmarks.filter((b) => {
+        if (!b.url) return true; // Keep folders
+        const tombstoneDate = tombstoneMap.get(b.url);
+        if (tombstoneDate === undefined) return true; // No tombstone
+        const bookmarkDate = typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : (b.dateAdded || 0);
+        return bookmarkDate > tombstoneDate;
+      });
+      deleted = normalizedBookmarks.length - finalBookmarks.length;
+      added = finalBookmarks.length;
+    } else {
+      // Legacy merge behavior
+      const mergeResult = mergeBookmarks(existingBookmarks, normalizedBookmarks);
+      const merged = mergeResult.merged;
+      added = mergeResult.added;
+      updated = mergeResult.updated;
+
+      // Apply tombstones server-side
+      const tombstoneMap = new Map(mergedTombstones.map((t) => [t.url, t.deletedAt || 0]));
+      finalBookmarks = merged.filter((b) => {
+        if (!b.url) return true; // Keep folders
+        const tombstoneDate = tombstoneMap.get(b.url);
+        if (tombstoneDate === undefined) return true; // No tombstone
+        const bookmarkDate = typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : (b.dateAdded || 0);
+        return bookmarkDate > tombstoneDate;
+      });
+      deleted = merged.length - finalBookmarks.length;
+    }
 
     console.log(
-      `[Bookmarks API] After merge: ${merged.length} total, ${added} added, ${updated} updated, ${deleted} removed by tombstones`
+      `[Bookmarks API] After ${replace ? 'replace' : 'merge'}: ${finalBookmarks.length + deleted} total, ${added} added, ${updated} updated, ${deleted} removed by tombstones`
     );
     console.log(
       `[Bookmarks API] Tombstones: ${mergedTombstones.length} stored`

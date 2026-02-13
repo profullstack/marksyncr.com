@@ -27,5 +27,9 @@
   "packageManager": "pnpm@9.15.1",
   "engines": {
     "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "dotenv": "^17.3.1"
   }
 }

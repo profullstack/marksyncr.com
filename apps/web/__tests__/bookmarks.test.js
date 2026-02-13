@@ -3011,4 +3011,204 @@ describe('Server-Side Tombstone Cleanup', () => {
       expect(urls).not.toContain('https://deleted-31-days-ago.com');
     });
   });
+
+  describe('POST /api/bookmarks - Replace Mode', () => {
+    it('should store bookmarks in the exact order sent when replace=true', async () => {
+      // Bookmarks in a specific order
+      const bookmarksToSync = [
+        { id: '3', url: 'https://third.com', title: 'Third', index: 0 },
+        { id: '1', url: 'https://first.com', title: 'First', index: 1 },
+        { id: '2', url: 'https://second.com', title: 'Second', index: 2 },
+      ];
+
+      // Existing cloud data has a DIFFERENT order
+      const existingCloudBookmarks = [
+        { id: '1', url: 'https://first.com', title: 'First', index: 0, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
+        { id: '2', url: 'https://second.com', title: 'Second', index: 1, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
+        { id: '3', url: 'https://third.com', title: 'Third', index: 2, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
+      ];
+
+      let upsertedData = null;
+      const upsertMock = vi.fn().mockImplementation((data) => {
+        upsertedData = data;
+        return {
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { version: 2, checksum: 'newchecksum' },
+              error: null,
+            }),
+          }),
+        };
+      });
+
+      const usersSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+        }),
+      });
+
+      const bookmarksSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              bookmark_data: existingCloudBookmarks,
+              tombstones: [],
+              version: 1,
+              checksum: 'oldchecksum',
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      mockSupabase.from = vi.fn().mockImplementation((table) => {
+        if (table === 'users') return { select: usersSelectMock };
+        return { select: bookmarksSelectMock, upsert: upsertMock };
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync, replace: true },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      // Verify bookmarks are stored in the EXACT order sent (not re-merged/re-sorted)
+      const storedBookmarks = upsertedData.bookmark_data;
+      expect(storedBookmarks[0].url).toBe('https://third.com');
+      expect(storedBookmarks[1].url).toBe('https://first.com');
+      expect(storedBookmarks[2].url).toBe('https://second.com');
+    });
+
+    it('should still apply tombstone filtering when replace=true', async () => {
+      const now = Date.now();
+      const bookmarksToSync = [
+        { id: '1', url: 'https://keep.com', title: 'Keep', dateAdded: now - 10000 },
+        { id: '2', url: 'https://deleted.com', title: 'Deleted', dateAdded: now - 10000 },
+      ];
+
+      const incomingTombstones = [
+        { url: 'https://deleted.com', deletedAt: now - 5000 },
+      ];
+
+      let upsertedData = null;
+      const upsertMock = vi.fn().mockImplementation((data) => {
+        upsertedData = data;
+        return {
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { version: 2, checksum: 'newchecksum' },
+              error: null,
+            }),
+          }),
+        };
+      });
+
+      const usersSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+        }),
+      });
+
+      const bookmarksSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: { bookmark_data: [], tombstones: [], version: 1, checksum: 'oldchecksum' },
+            error: null,
+          }),
+        }),
+      });
+
+      mockSupabase.from = vi.fn().mockImplementation((table) => {
+        if (table === 'users') return { select: usersSelectMock };
+        return { select: bookmarksSelectMock, upsert: upsertMock };
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync, tombstones: incomingTombstones, replace: true },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      // Only the non-tombstoned bookmark should be stored
+      const storedBookmarks = upsertedData.bookmark_data;
+      expect(storedBookmarks).toHaveLength(1);
+      expect(storedBookmarks[0].url).toBe('https://keep.com');
+    });
+
+    it('should use legacy merge behavior when replace is not set', async () => {
+      const incomingBookmarks = [
+        { id: '2', url: 'https://new.com', title: 'New', dateAdded: 2000 },
+      ];
+
+      const existingCloudBookmarks = [
+        { id: '1', url: 'https://existing.com', title: 'Existing', index: 0, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
+      ];
+
+      let upsertedData = null;
+      const upsertMock = vi.fn().mockImplementation((data) => {
+        upsertedData = data;
+        return {
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { version: 2, checksum: 'newchecksum' },
+              error: null,
+            }),
+          }),
+        };
+      });
+
+      const usersSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+        }),
+      });
+
+      const bookmarksSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              bookmark_data: existingCloudBookmarks,
+              tombstones: [],
+              version: 1,
+              checksum: 'oldchecksum',
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      mockSupabase.from = vi.fn().mockImplementation((table) => {
+        if (table === 'users') return { select: usersSelectMock };
+        return { select: bookmarksSelectMock, upsert: upsertMock };
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      // No replace flag — should use legacy merge
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: incomingBookmarks },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      // Legacy merge should include BOTH existing and incoming bookmarks
+      const storedBookmarks = upsertedData.bookmark_data;
+      const urls = storedBookmarks.map((b) => b.url);
+      expect(urls).toContain('https://existing.com');
+      expect(urls).toContain('https://new.com');
+    });
+  });
 });

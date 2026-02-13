@@ -869,7 +869,7 @@ async function syncBookmarksToCloud(bookmarks, source = 'browser', tombstones = 
   try {
     const response = await apiRequest('/api/bookmarks', {
       method: 'POST',
-      body: JSON.stringify({ bookmarks, source, tombstones }),
+      body: JSON.stringify({ bookmarks, source, tombstones, replace: true }),
     });
 
     if (!response.ok) {
