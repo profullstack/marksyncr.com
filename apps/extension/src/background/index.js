@@ -1691,6 +1691,7 @@ async function performSync(sourceId) {
       // Step 7: Add new cloud bookmarks to local browser
       // Set isSyncDrivenChange so onCreated/onMoved listeners don't pollute
       // locallyModifiedBookmarkIds with sync-driven changes
+      let updatedLocally = 0;
       isSyncDrivenChange = true;
       try {
         if (newFromCloud.length > 0) {
@@ -1701,7 +1702,6 @@ async function performSync(sourceId) {
         // Step 7.5: Apply updates from cloud to local bookmarks
         // This is critical for proper two-way sync: if another browser modified
         // a bookmark's title, folder, or position, those changes should be pulled here.
-        let updatedLocally = 0;
         if (bookmarksToUpdate.length > 0) {
           console.log(`[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks to update from cloud`);
           updatedLocally = await updateLocalBookmarksFromCloud(bookmarksToUpdate);
