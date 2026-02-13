@@ -76,12 +76,27 @@ function normalizeItemsForChecksum(items) {
 
   return items
     .map((item) => {
+      // Normalize folder path for cross-browser consistency in checksum
+      // Without this, Firefox ("Bookmarks Toolbar") and Chrome ("Bookmarks Bar")
+      // always produce different checksums, causing unnecessary push-after-pull cycles
+      const rawPath = item.folderPath || item.folder_path || '';
+      const normalizedPath = rawPath
+        .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
+        .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
+        .replace(/^Speed Dial\/?/i, 'toolbar/')
+        .replace(/^Favourites Bar\/?/i, 'toolbar/')
+        .replace(/^Favorites Bar\/?/i, 'toolbar/')
+        .replace(/^Other Bookmarks\/?/i, 'other/')
+        .replace(/^Unsorted Bookmarks\/?/i, 'other/')
+        .replace(/^Bookmarks Menu\/?/i, 'menu/')
+        .replace(/\/+$/, '');
+
       if (item.type === 'folder') {
         // Folder entry
         return {
           type: 'folder',
           title: item.title ?? '',
-          folderPath: item.folderPath || item.folder_path || '',
+          folderPath: normalizedPath,
           index: item.index ?? 0,
         };
       } else {
@@ -91,7 +106,7 @@ function normalizeItemsForChecksum(items) {
           type: 'bookmark',
           url: item.url,
           title: item.title ?? '',
-          folderPath: item.folderPath || item.folder_path || '',
+          folderPath: normalizedPath,
           index: item.index ?? 0,
         };
       }

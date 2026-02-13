@@ -33,6 +33,11 @@ let pendingSyncReasons = [];
 // Track bookmarks modified locally since last sync - these take priority over cloud versions
 let locallyModifiedBookmarkIds = new Set();
 
+// Flag to suppress locallyModifiedBookmarkIds tracking during sync-driven moves/creates
+// When true, bookmark events from updateLocalBookmarksFromCloud / addCloudBookmarksToLocal
+// are NOT tracked as "locally modified" because they are cloud-driven, not user-driven.
+let isSyncDrivenChange = false;
+
 // Retry limiting for failed syncs
 const MAX_CONSECUTIVE_FAILURES = 3;
 let consecutiveSyncFailures = 0;
@@ -209,12 +214,27 @@ function normalizeItemsForChecksum(items) {
 
   return items
     .map((item) => {
+      // Normalize folder path for cross-browser consistency in checksum
+      // Without this, Firefox ("Bookmarks Toolbar") and Chrome ("Bookmarks Bar")
+      // always produce different checksums, causing unnecessary push-after-pull cycles
+      const rawPath = item.folderPath || item.folder_path || '';
+      const normalizedPath = rawPath
+        .replace(/^Bookmarks Bar\/?/i, 'toolbar/')
+        .replace(/^Bookmarks Toolbar\/?/i, 'toolbar/')
+        .replace(/^Speed Dial\/?/i, 'toolbar/')
+        .replace(/^Favourites Bar\/?/i, 'toolbar/')
+        .replace(/^Favorites Bar\/?/i, 'toolbar/')
+        .replace(/^Other Bookmarks\/?/i, 'other/')
+        .replace(/^Unsorted Bookmarks\/?/i, 'other/')
+        .replace(/^Bookmarks Menu\/?/i, 'menu/')
+        .replace(/\/+$/, '');
+
       if (item.type === 'folder') {
         // Folder entry
         return {
           type: 'folder',
           title: item.title ?? '',
-          folderPath: item.folderPath || item.folder_path || '',
+          folderPath: normalizedPath,
           index: item.index ?? 0,
         };
       } else {
@@ -224,7 +244,7 @@ function normalizeItemsForChecksum(items) {
           type: 'bookmark',
           url: item.url,
           title: item.title ?? '',
-          folderPath: item.folderPath || item.folder_path || '',
+          folderPath: normalizedPath,
           index: item.index ?? 0,
         };
       }
@@ -1226,9 +1246,12 @@ function setupBookmarkListeners() {
   browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
     console.log('[MarkSyncr] Bookmark created:', bookmark.title);
 
-    // Always track locally modified bookmarks, even during sync
-    locallyModifiedBookmarkIds.add(id);
-    debouncedSaveLocallyModifiedIds();
+    // Don't track sync-driven creates (from addCloudBookmarksToLocal) as locally modified
+    // Only track user-initiated bookmark creates
+    if (!isSyncDrivenChange) {
+      locallyModifiedBookmarkIds.add(id);
+      debouncedSaveLocallyModifiedIds();
+    }
 
     // Skip processing during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1289,9 +1312,11 @@ function setupBookmarkListeners() {
   browser.bookmarks.onChanged.addListener((id, changeInfo) => {
     console.log('[MarkSyncr] Bookmark changed:', id);
 
-    // Always track locally modified bookmarks, even during sync
-    locallyModifiedBookmarkIds.add(id);
-    debouncedSaveLocallyModifiedIds();
+    // Don't track sync-driven changes as locally modified
+    if (!isSyncDrivenChange) {
+      locallyModifiedBookmarkIds.add(id);
+      debouncedSaveLocallyModifiedIds();
+    }
 
     // Skip during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1309,57 +1334,63 @@ function setupBookmarkListeners() {
   browser.bookmarks.onMoved.addListener(async (id, moveInfo) => {
     console.log('[MarkSyncr] Bookmark moved:', id);
 
-    // Always track the moved bookmark itself
-    locallyModifiedBookmarkIds.add(id);
+    // Don't track sync-driven moves (from updateLocalBookmarksFromCloud) as locally modified.
+    // These are cloud-driven changes, not user-driven. Tracking them causes stale IDs to
+    // persist (via debounced save race condition), which makes the next sync skip cloud
+    // updates — breaking cross-browser order sync.
+    if (!isSyncDrivenChange) {
+      // Track the moved bookmark itself
+      locallyModifiedBookmarkIds.add(id);
 
-    // CRITICAL: When a bookmark is moved, all siblings in the affected folder(s)
-    // have their indices shifted implicitly by the browser. We must mark them all
-    // as locally modified so the sync doesn't override their new positions with
-    // stale cloud indices. Without this, reordering a single bookmark causes the
-    // cloud's old order to be re-applied to all the un-tracked siblings.
-    try {
-      const foldersToMark = new Set([moveInfo.parentId]);
-      if (moveInfo.oldParentId && moveInfo.oldParentId !== moveInfo.parentId) {
-        foldersToMark.add(moveInfo.oldParentId);
-      }
-      for (const folderId of foldersToMark) {
-        const children = await browser.bookmarks.getChildren(folderId);
-        for (const child of children) {
-          locallyModifiedBookmarkIds.add(child.id);
+      // CRITICAL: When a bookmark is moved, all siblings in the affected folder(s)
+      // have their indices shifted implicitly by the browser. We must mark them all
+      // as locally modified so the sync doesn't override their new positions with
+      // stale cloud indices. Without this, reordering a single bookmark causes the
+      // cloud's old order to be re-applied to all the un-tracked siblings.
+      try {
+        const foldersToMark = new Set([moveInfo.parentId]);
+        if (moveInfo.oldParentId && moveInfo.oldParentId !== moveInfo.parentId) {
+          foldersToMark.add(moveInfo.oldParentId);
         }
-      }
-      console.log(
-        `[MarkSyncr] Tracked ${foldersToMark.size} folder(s) with all siblings as locally modified`
-      );
-
-      // CRITICAL: When a FOLDER is moved, the bookmarks inside it change their
-      // effective folderPath, but don't fire individual onMoved events. We must
-      // recursively mark all descendants as locally modified so the sync doesn't
-      // move them back to the cloud's old folder path.
-      const movedNodes = await browser.bookmarks.getSubTree(id);
-      if (movedNodes[0]?.children) {
-        let descendantCount = 0;
-        const markDescendants = (nodes) => {
-          for (const node of nodes) {
-            locallyModifiedBookmarkIds.add(node.id);
-            descendantCount++;
-            if (node.children) {
-              markDescendants(node.children);
-            }
+        for (const folderId of foldersToMark) {
+          const children = await browser.bookmarks.getChildren(folderId);
+          for (const child of children) {
+            locallyModifiedBookmarkIds.add(child.id);
           }
-        };
-        markDescendants(movedNodes[0].children);
-        if (descendantCount > 0) {
-          console.log(
-            `[MarkSyncr] Tracked ${descendantCount} descendants of moved folder as locally modified`
-          );
         }
-      }
-    } catch (err) {
-      console.warn('[MarkSyncr] Failed to mark siblings as modified:', err.message);
-    }
+        console.log(
+          `[MarkSyncr] Tracked ${foldersToMark.size} folder(s) with all siblings as locally modified`
+        );
 
-    debouncedSaveLocallyModifiedIds();
+        // CRITICAL: When a FOLDER is moved, the bookmarks inside it change their
+        // effective folderPath, but don't fire individual onMoved events. We must
+        // recursively mark all descendants as locally modified so the sync doesn't
+        // move them back to the cloud's old folder path.
+        const movedNodes = await browser.bookmarks.getSubTree(id);
+        if (movedNodes[0]?.children) {
+          let descendantCount = 0;
+          const markDescendants = (nodes) => {
+            for (const node of nodes) {
+              locallyModifiedBookmarkIds.add(node.id);
+              descendantCount++;
+              if (node.children) {
+                markDescendants(node.children);
+              }
+            }
+          };
+          markDescendants(movedNodes[0].children);
+          if (descendantCount > 0) {
+            console.log(
+              `[MarkSyncr] Tracked ${descendantCount} descendants of moved folder as locally modified`
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('[MarkSyncr] Failed to mark siblings as modified:', err.message);
+      }
+
+      debouncedSaveLocallyModifiedIds();
+    }
 
     // Skip during sync operations to prevent sync loops
     // BUT mark that we need a follow-up sync after current sync completes
@@ -1658,19 +1689,26 @@ async function performSync(sourceId) {
       console.log(`[MarkSyncr] Local additions (not in cloud): ${localAdditions.length}`);
 
       // Step 7: Add new cloud bookmarks to local browser
-      if (newFromCloud.length > 0) {
-        await addCloudBookmarksToLocal(newFromCloud);
-        console.log(`[MarkSyncr] Added ${newFromCloud.length} bookmarks from cloud to local`);
-      }
+      // Set isSyncDrivenChange so onCreated/onMoved listeners don't pollute
+      // locallyModifiedBookmarkIds with sync-driven changes
+      isSyncDrivenChange = true;
+      try {
+        if (newFromCloud.length > 0) {
+          await addCloudBookmarksToLocal(newFromCloud);
+          console.log(`[MarkSyncr] Added ${newFromCloud.length} bookmarks from cloud to local`);
+        }
 
-      // Step 7.5: Apply updates from cloud to local bookmarks
-      // This is critical for proper two-way sync: if another browser modified
-      // a bookmark's title, folder, or position, those changes should be pulled here.
-      let updatedLocally = 0;
-      if (bookmarksToUpdate.length > 0) {
-        console.log(`[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks to update from cloud`);
-        updatedLocally = await updateLocalBookmarksFromCloud(bookmarksToUpdate);
-        console.log(`[MarkSyncr] Updated ${updatedLocally} local bookmarks from cloud`);
+        // Step 7.5: Apply updates from cloud to local bookmarks
+        // This is critical for proper two-way sync: if another browser modified
+        // a bookmark's title, folder, or position, those changes should be pulled here.
+        let updatedLocally = 0;
+        if (bookmarksToUpdate.length > 0) {
+          console.log(`[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks to update from cloud`);
+          updatedLocally = await updateLocalBookmarksFromCloud(bookmarksToUpdate);
+          console.log(`[MarkSyncr] Updated ${updatedLocally} local bookmarks from cloud`);
+        }
+      } finally {
+        isSyncDrivenChange = false;
       }
 
       // Step 8: Get final local bookmarks after all merges
@@ -1725,6 +1763,12 @@ async function performSync(sourceId) {
         lastSyncError = null;
 
         // Clear locally modified tracking - changes are in sync
+        // Cancel any pending debounced save to prevent race condition where
+        // sync-driven onMoved events persist stale IDs after this clear
+        if (saveModifiedIdsTimeout) {
+          clearTimeout(saveModifiedIdsTimeout);
+          saveModifiedIdsTimeout = null;
+        }
         locallyModifiedBookmarkIds.clear();
         await saveLocallyModifiedIds();
 
@@ -1799,6 +1843,12 @@ async function performSync(sourceId) {
       lastSyncError = null;
 
       // Clear locally modified tracking - changes have been pushed to cloud
+      // Cancel any pending debounced save to prevent race condition where
+      // sync-driven onMoved events persist stale IDs after this clear
+      if (saveModifiedIdsTimeout) {
+        clearTimeout(saveModifiedIdsTimeout);
+        saveModifiedIdsTimeout = null;
+      }
       locallyModifiedBookmarkIds.clear();
       await saveLocallyModifiedIds();
 
