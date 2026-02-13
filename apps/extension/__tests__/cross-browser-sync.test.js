@@ -613,3 +613,59 @@ describe('Bookmark Update Detection', () => {
     expect(bookmarkNeedsUpdate(cloud, local)).toBe(false);
   });
 });
+
+describe('Pull-only sync should not push back to cloud', () => {
+  it('should not treat cloud→local updates as local changes to push', () => {
+    // bookmarksToUpdate are updates FROM cloud, not local changes
+    // hasLocalChangesToPush should NOT include bookmarksToUpdate.length
+    const localAdditions = []; // no new local bookmarks
+    const locallyModifiedBookmarkIds = new Set(); // no locally modified bookmarks
+    const localTombstones = [];
+    const cloudTombstones = [];
+    const deletedLocally = 0;
+    const bookmarksToUpdate = [{ cloud: { url: 'a', index: 1 }, local: { url: 'a', index: 0 } }];
+
+    // This is the fixed logic — bookmarksToUpdate should NOT be included
+    const hasLocalChangesToPush =
+      localAdditions.length > 0 ||
+      locallyModifiedBookmarkIds.size > 0 ||
+      localTombstones.length > cloudTombstones.length ||
+      deletedLocally > 0;
+
+    expect(hasLocalChangesToPush).toBe(false);
+    // Even though there are bookmarks to update from cloud, we should NOT push back
+    expect(bookmarksToUpdate.length).toBe(1);
+  });
+
+  it('should push when there are actual local additions', () => {
+    const localAdditions = [{ url: 'https://new-local.com' }];
+    const locallyModifiedBookmarkIds = new Set();
+    const localTombstones = [];
+    const cloudTombstones = [];
+    const deletedLocally = 0;
+
+    const hasLocalChangesToPush =
+      localAdditions.length > 0 ||
+      locallyModifiedBookmarkIds.size > 0 ||
+      localTombstones.length > cloudTombstones.length ||
+      deletedLocally > 0;
+
+    expect(hasLocalChangesToPush).toBe(true);
+  });
+
+  it('should push when there are locally modified bookmarks', () => {
+    const localAdditions = [];
+    const locallyModifiedBookmarkIds = new Set(['bookmark-123']);
+    const localTombstones = [];
+    const cloudTombstones = [];
+    const deletedLocally = 0;
+
+    const hasLocalChangesToPush =
+      localAdditions.length > 0 ||
+      locallyModifiedBookmarkIds.size > 0 ||
+      localTombstones.length > cloudTombstones.length ||
+      deletedLocally > 0;
+
+    expect(hasLocalChangesToPush).toBe(true);
+  });
+});

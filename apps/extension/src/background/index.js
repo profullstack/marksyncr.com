@@ -1726,13 +1726,12 @@ async function performSync(sourceId) {
       console.log(`[MarkSyncr] Local checksum: ${localChecksum}`);
       console.log(`[MarkSyncr] Cloud checksum: ${cloudChecksum}`);
 
-      // Determine if we have local changes to push to cloud
-      // Local changes = bookmarks that exist locally but not in cloud (before this sync)
-      // OR bookmarks that differ from cloud (local-first model: local changes override cloud)
-      // OR tombstones that need to be synced
+      // Determine if we have LOCAL (user-initiated) changes to push to cloud
+      // NOTE: bookmarksToUpdate are cloud→local updates (received FROM cloud), NOT local changes.
+      // Including them here was causing the receiving browser to re-push cloud data back,
+      // overwriting the original browser's ordering changes.
       const hasLocalChangesToPush =
         localAdditions.length > 0 ||
-        bookmarksToUpdate.length > 0 ||
         locallyModifiedBookmarkIds.size > 0 ||
         localTombstones.length > cloudTombstones.length ||
         deletedLocally > 0;
@@ -1785,15 +1784,28 @@ async function performSync(sourceId) {
       }
 
       // Step 9: Push merged bookmarks and tombstones back to cloud
-      console.log(
-        `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`
-      );
-      const syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), mergedTombstones);
-      console.log('[MarkSyncr] Cloud sync result:', syncResult);
+      // ONLY push if we have actual local changes. If this was a pull-only sync
+      // (we just received updates from cloud), don't push back — that would overwrite
+      // the source browser's changes with our potentially different index ordering.
+      let syncResult = null;
+      if (hasLocalChangesToPush) {
+        console.log(
+          `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`
+        );
+        syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), mergedTombstones);
+        console.log('[MarkSyncr] Cloud sync result:', syncResult);
+      } else {
+        console.log(
+          '[MarkSyncr] Pull-only sync — skipping push to cloud (no local changes to push)'
+        );
+      }
 
       // Store the new checksum
-      if (syncResult.checksum) {
+      if (syncResult?.checksum) {
         await storeLastCloudChecksum(syncResult.checksum);
+      } else if (cloudChecksum) {
+        // Pull-only: store the cloud checksum so next sync knows we're in sync
+        await storeLastCloudChecksum(cloudChecksum);
       }
 
       // Step 10: Save version history ONLY when we have local changes being pushed to cloud
