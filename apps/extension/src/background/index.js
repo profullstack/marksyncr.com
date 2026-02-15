@@ -454,17 +454,19 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
  * @param {Array} tombstones - Merged tombstones
  * @returns {{toAdd: Array, toUpdate: Array, skippedByTombstone: Array}} - Categorized bookmarks
  */
-function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones, modifiedLocalIds) {
+function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
   const localByUrl = new Map(localBookmarks.filter((b) => b.url).map((b) => [b.url, b]));
 
   const toAdd = [];
   const toUpdate = [];
   const skippedByTombstone = [];
-  const skippedByLocalModification = [];
+  // NOTE: locallyModifiedBookmarkIds is intentionally NOT used here.
+  // Per design: cloud always wins on pull. The pushing browser's order is truth.
+  // Since sync happens immediately, there's no real conflict scenario.
   const alreadyExistsUnchanged = [];
 
   console.log(
-    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones, ${modifiedLocalIds?.size || 0} locally modified`
+    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones`
   );
 
   for (const cloudBm of cloudBookmarks) {
@@ -491,9 +493,6 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones, mo
     const localBm = localByUrl.get(cloudBm.url);
     if (!localBm) {
       toAdd.push(cloudBm);
-    } else if (modifiedLocalIds?.has(localBm.id)) {
-      // Local bookmark was modified by the user since last sync - local wins
-      skippedByLocalModification.push(cloudBm.url);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
@@ -511,15 +510,6 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones, mo
     }
   }
 
-  if (skippedByLocalModification.length > 0) {
-    console.log(
-      `[MarkSyncr] 🏠 Skipped ${skippedByLocalModification.length} cloud→local updates (locally modified, local wins):`
-    );
-    for (const url of skippedByLocalModification.slice(0, 5)) {
-      console.log(`  - ${url}`);
-    }
-  }
-
   if (alreadyExistsUnchanged.length > 0) {
     console.log(
       `[MarkSyncr] ✓ ${alreadyExistsUnchanged.length} cloud bookmarks already exist locally (unchanged)`
@@ -527,7 +517,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones, mo
   }
 
   console.log(
-    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, localWins=${skippedByLocalModification.length}, unchanged=${alreadyExistsUnchanged.length}`
+    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, unchanged=${alreadyExistsUnchanged.length}`
   );
 
   return { toAdd, toUpdate, skippedByTombstone };
@@ -1282,9 +1272,11 @@ function setupBookmarkListeners() {
       return;
     }
 
-    // Always track locally modified bookmarks, even during sync
-    locallyModifiedBookmarkIds.add(id);
-    debouncedSaveLocallyModifiedIds();
+    // Only track user-initiated removals, not sync-driven ones
+    if (!isSyncDrivenChange) {
+      locallyModifiedBookmarkIds.add(id);
+      debouncedSaveLocallyModifiedIds();
+    }
 
     // ALWAYS create tombstones for deleted bookmarks, even during sync.
     // Without a tombstone, the next sync will re-add the bookmark from cloud.
@@ -1644,8 +1636,7 @@ async function performSync(sourceId) {
       const { toAdd: newFromCloud, toUpdate: bookmarksToUpdate } = categorizeCloudBookmarks(
         cloudBookmarks,
         updatedLocalFlat,
-        mergedTombstones,
-        locallyModifiedBookmarkIds
+        mergedTombstones
       );
 
       console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
@@ -1741,15 +1732,11 @@ async function performSync(sourceId) {
       console.log(`[MarkSyncr] Local checksum: ${localChecksum}`);
       console.log(`[MarkSyncr] Cloud checksum: ${cloudChecksum}`);
 
-      // Determine if we have LOCAL (user-initiated) changes to push to cloud
-      // NOTE: bookmarksToUpdate are cloud→local updates (received FROM cloud), NOT local changes.
-      // Including them here was causing the receiving browser to re-push cloud data back,
-      // overwriting the original browser's ordering changes.
-      const hasLocalChangesToPush =
-        localAdditions.length > 0 ||
-        locallyModifiedBookmarkIds.size > 0 ||
-        localTombstones.length > cloudTombstones.length ||
-        deletedLocally > 0;
+      // Simplified push logic: push if local state differs from cloud.
+      // The pushing browser's order is truth. After pull+reorder, if our local
+      // state differs from cloud (new local bookmarks, tombstone deletions, etc.),
+      // push the current state. Checksum comparison handles this cleanly.
+      const hasLocalChangesToPush = localChecksum !== cloudChecksum;
 
       // Check if there were any changes during this sync
       const hasChanges =
