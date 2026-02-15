@@ -1,6 +1,6 @@
 {
   "name": "@marksyncr/sources",
-  "version": "0.8.19",
+  "version": "0.8.21",
   "private": true,
   "type": "module",
   "main": "./src/index.js",
