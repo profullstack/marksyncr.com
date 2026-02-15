@@ -1711,6 +1711,21 @@ async function performSync(sourceId) {
         isSyncDrivenChange = false;
       }
 
+      // Step 7.9: Reorder local bookmarks to match cloud ordering
+      // After individual adds/moves, the order can be wrong because each
+      // chrome.bookmarks.move(id, {index: N}) shifts siblings.
+      // Fix: read each modified parent's children, compare with cloud order,
+      // and move items to their correct positions (process last-to-first
+      // so earlier moves don't shift later targets).
+      isSyncDrivenChange = true;
+      try {
+        await reorderLocalToMatchCloud(cloudBookmarks);
+      } catch (reorderErr) {
+        console.warn('[MarkSyncr] Reorder pass failed (non-fatal):', reorderErr.message);
+      } finally {
+        isSyncDrivenChange = false;
+      }
+
       // Step 8: Get final local bookmarks after all merges
       const finalTree = await browser.bookmarks.getTree();
       const mergedFlat = flattenBookmarkTree(finalTree);
@@ -2342,6 +2357,136 @@ async function addCloudBookmarksToLocal(cloudItems) {
  * @param {Array<{cloud: Object, local: Object}>} bookmarksToUpdate - Array of {cloud, local} pairs
  * @returns {Promise<number>} - Number of bookmarks updated
  */
+/**
+ * Reorder local browser bookmarks to match cloud ordering.
+ * 
+ * After individual adds/moves, chrome.bookmarks.move(id, {index: N})
+ * shifts siblings, so the final order can be wrong.
+ * 
+ * Fix: For each parent folder that has cloud items with index info,
+ * read current children, determine desired order from cloud indices,
+ * and move items to their correct positions.
+ * 
+ * Process from LAST index to FIRST so earlier moves don't shift later targets.
+ *
+ * @param {Array} cloudBookmarks - Flat array of cloud bookmarks with folderPath and index
+ */
+async function reorderLocalToMatchCloud(cloudBookmarks) {
+  // Group cloud items by their normalized folder path
+  const cloudByFolder = new Map();
+  for (const cb of cloudBookmarks) {
+    if (cb.index === undefined || cb.index === null) continue;
+    const folder = normalizeFolderPath(cb.folderPath || '');
+    if (!cloudByFolder.has(folder)) cloudByFolder.set(folder, []);
+    cloudByFolder.get(folder).push(cb);
+  }
+
+  // Sort each folder's cloud items by index
+  for (const [, items] of cloudByFolder) {
+    items.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  }
+
+  // Get the browser tree to find local folder IDs
+  const tree = await browser.bookmarks.getTree();
+  const rootFolders = {};
+  if (tree[0]?.children) {
+    for (const root of tree[0].children) {
+      const title = root.title?.toLowerCase() || '';
+      const id = root.id;
+      if (title.includes('toolbar') || title.includes('bar') || id === '1') {
+        rootFolders.toolbar = root;
+      } else if (title.includes('menu') || id === 'menu________') {
+        rootFolders.menu = root;
+      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+        rootFolders.other = root;
+      }
+    }
+  }
+
+  // Build a map of local folder paths to their browser IDs
+  const folderIdMap = new Map();
+  
+  function walkTree(node, path) {
+    if (!node.url && node.title !== undefined) {
+      folderIdMap.set(path, node.id);
+    }
+    if (node.children) {
+      for (const child of node.children) {
+        if (!child.url) {
+          const childPath = path ? `${path}/${child.title}` : child.title;
+          walkTree(child, childPath);
+        }
+      }
+    }
+  }
+
+  // Map root folders
+  if (rootFolders.toolbar) { folderIdMap.set('toolbar', rootFolders.toolbar.id); walkTree(rootFolders.toolbar, 'toolbar'); }
+  if (rootFolders.menu) { folderIdMap.set('menu', rootFolders.menu.id); walkTree(rootFolders.menu, 'menu'); }
+  if (rootFolders.other) { folderIdMap.set('other', rootFolders.other.id); walkTree(rootFolders.other, 'other'); }
+
+  let reordered = 0;
+
+  for (const [folderPath, cloudItems] of cloudByFolder) {
+    // Find the local folder ID
+    const folderId = folderIdMap.get(folderPath);
+    if (!folderId) continue;
+
+    // Get current children
+    let children;
+    try {
+      children = await browser.bookmarks.getChildren(folderId);
+    } catch {
+      continue;
+    }
+
+    if (children.length < 2) continue;
+
+    // Build desired order: match cloud items to local children
+    // Create a map of URL/title -> desired index from cloud
+    const desiredOrder = new Map();
+    for (const ci of cloudItems) {
+      const key = ci.url || `folder:${ci.title}`;
+      desiredOrder.set(key, ci.index);
+    }
+
+    // Sort children by desired cloud index
+    const sortedChildren = [...children].sort((a, b) => {
+      const keyA = a.url || `folder:${a.title}`;
+      const keyB = b.url || `folder:${b.title}`;
+      const idxA = desiredOrder.get(keyA) ?? a.index ?? 999;
+      const idxB = desiredOrder.get(keyB) ?? b.index ?? 999;
+      return idxA - idxB;
+    });
+
+    // Check if already in correct order
+    let needsReorder = false;
+    for (let i = 0; i < children.length; i++) {
+      if (children[i].id !== sortedChildren[i]?.id) {
+        needsReorder = true;
+        break;
+      }
+    }
+
+    if (!needsReorder) continue;
+
+    // Move items to correct positions, LAST to FIRST to avoid index shifting
+    for (let i = sortedChildren.length - 1; i >= 0; i--) {
+      const item = sortedChildren[i];
+      try {
+        await browser.bookmarks.move(item.id, { parentId: folderId, index: i });
+        reordered++;
+      } catch (err) {
+        console.warn(`[MarkSyncr] Failed to reorder "${item.title}":`, err.message);
+      }
+    }
+  }
+
+  if (reordered > 0) {
+    console.log(`[MarkSyncr] Reordered ${reordered} bookmarks to match cloud ordering`);
+  }
+}
+
 async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
   if (!bookmarksToUpdate || bookmarksToUpdate.length === 0) {
     return 0;
