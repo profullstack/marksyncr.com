@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react';
 import { signOut } from '../actions/auth';
+import Link from 'next/link';
 
 export default function DashboardClient({ user }) {
   const [isPending, startTransition] = useTransition();
@@ -15,6 +16,12 @@ export default function DashboardClient({ user }) {
   return (
     <div className="flex items-center space-x-4">
       <span className="text-sm text-slate-600">{user?.email}</span>
+      <Link
+        href="/dashboard/settings"
+        className="text-sm text-slate-600 hover:text-slate-900"
+      >
+        Settings
+      </Link>
       <button
         onClick={handleSignOut}
         disabled={isPending}
