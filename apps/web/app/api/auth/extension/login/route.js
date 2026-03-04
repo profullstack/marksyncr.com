@@ -103,7 +103,7 @@ export async function POST(request) {
     const extensionToken = generateSecureToken();
     const extensionTokenHash = hashToken(extensionToken);
 
-    // Step 3: Calculate expiration (1 year from now)
+    // Step 3: Calculate expiration (2 years from now)
     const expiresAt = new Date(Date.now() + EXTENSION_SESSION_DURATION_MS);
 
     // Step 4: Store extension session in database using admin client
@@ -145,6 +145,10 @@ export async function POST(request) {
         access_token: session.access_token,
         // Expiration of the extension session (not the access token)
         expires_at: sessionData.expires_at,
+        // Expiration of the short-lived access token (typically 1 hour)
+        // Without this, the extension assumes the token is expired on first use
+        // and triggers an unnecessary refresh cycle on every sync
+        access_token_expires_at: session.expires_at,
         // Session metadata
         session_id: sessionData.id,
         created_at: sessionData.created_at,
