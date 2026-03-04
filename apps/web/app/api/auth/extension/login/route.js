@@ -148,7 +148,7 @@ export async function POST(request) {
         // Expiration of the short-lived access token (typically 1 hour)
         // Without this, the extension assumes the token is expired on first use
         // and triggers an unnecessary refresh cycle on every sync
-        access_token_expires_at: session.expires_at,
+        access_token_expires_at: new Date(session.expires_at * 1000).toISOString(),
         // Session metadata
         session_id: sessionData.id,
         created_at: sessionData.created_at,
