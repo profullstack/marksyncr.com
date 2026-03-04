@@ -2470,17 +2470,18 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
 
     if (children.length < 2) continue;
 
-    // Skip reordering for folders that contain locally modified bookmarks.
-    // When a user rearranges bookmarks locally, all siblings in the folder are
-    // marked as locally modified. If we reorder to match cloud, we overwrite
-    // the user's intended arrangement. The local order will be pushed to cloud
-    // in the push step instead.
-    const hasLocallyModifiedChildren = children.some((child) =>
-      locallyModifiedBookmarkIds.has(child.id)
+    // Skip reordering only when the pattern of local modifications looks like
+    // a local reorder. When a user rearranges bookmarks locally, multiple (often
+    // all) siblings in the folder are marked as locally modified. If we reorder
+    // to match cloud in that case, we overwrite the user's intended arrangement.
+    // The local order will be pushed to cloud in the push step instead.
+    const modifiedChildrenCount = children.reduce(
+      (count, child) => (locallyModifiedBookmarkIds.has(child.id) ? count + 1 : count),
+      0
     );
-    if (hasLocallyModifiedChildren) {
+    if (modifiedChildrenCount > 1) {
       console.log(
-        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains locally modified bookmarks`
+        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple locally modified bookmarks (${modifiedChildrenCount})`
       );
       continue;
     }
