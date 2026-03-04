@@ -851,24 +851,12 @@ async function ensureValidToken() {
     return true;
   }
 
-  // Token should be valid based on expiry, but validate to be sure
-  // Only do this if we haven't refreshed recently (avoid unnecessary network calls)
-  const isValid = await validateToken();
-  if (isValid) {
-    return true;
-  }
-
-  // Token validation failed despite not being expired - try refresh
-  console.log('[MarkSyncr] Token validation failed unexpectedly, attempting refresh...');
-  const refreshed = await tryRefreshToken();
-
-  if (!refreshed) {
-    // Don't clear — preserve extension_token for future retry.
-    // tryRefreshToken handles clearing on definitive 401 (session revoked/expired).
-    console.log('[MarkSyncr] Token refresh failed, will retry on next attempt');
-    return false;
-  }
-
+  // Token is not expired based on stored expiry — trust it.
+  // Don't make a network validation call on every sync; that wastes bandwidth
+  // and can cause spurious failures (timeouts, network blips) that trigger
+  // unnecessary refresh cascades. If the token turns out to be invalid
+  // (e.g. revoked server-side), apiRequest() handles the 401 by calling
+  // tryRefreshToken() and retrying the request once.
   return true;
 }
 
@@ -893,6 +881,25 @@ async function apiRequest(endpoint, options = {}) {
     ...options,
     headers,
   });
+
+  // Handle 401 - access token expired or revoked, try to refresh and retry once.
+  // This is critical because ensureValidToken() trusts the stored expiry and skips
+  // network validation, so a token that was revoked server-side (but not yet expired
+  // locally) would fail here without this retry path.
+  if (response.status === 401) {
+    console.log(`[MarkSyncr] API returned 401 for ${endpoint}, attempting token refresh...`);
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Retry with the new token
+      const newToken = await getAccessToken();
+      headers['Authorization'] = `Bearer ${newToken}`;
+      return fetch(`${baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    }
+    // tryRefreshToken clears the session on definitive 401 from the refresh endpoint
+  }
 
   return response;
 }
