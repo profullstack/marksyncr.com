@@ -460,13 +460,11 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
   const toAdd = [];
   const toUpdate = [];
   const skippedByTombstone = [];
-  // NOTE: locallyModifiedBookmarkIds is intentionally NOT used here.
-  // Per design: cloud always wins on pull. The pushing browser's order is truth.
-  // Since sync happens immediately, there's no real conflict scenario.
+  const skippedByLocalModification = [];
   const alreadyExistsUnchanged = [];
 
   console.log(
-    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones`
+    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones, ${locallyModifiedBookmarkIds.size} locally modified`
   );
 
   for (const cloudBm of cloudBookmarks) {
@@ -478,7 +476,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     if (tombstone) {
       // Normalize dateAdded to a number — cloud may return a string (ISO) or number
       const rawDate = cloudBm.dateAdded;
-      const bookmarkDate = typeof rawDate === 'string' ? new Date(rawDate).getTime() : (rawDate || 0);
+      const bookmarkDate = typeof rawDate === 'string' ? new Date(rawDate).getTime() : rawDate || 0;
       const tombstoneDate = tombstone.deletedAt || 0;
       if (isNaN(bookmarkDate) || bookmarkDate <= tombstoneDate) {
         skippedByTombstone.push({
@@ -494,6 +492,27 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     if (!localBm) {
       toAdd.push(cloudBm);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
+      // If this bookmark was locally modified (e.g., user reordered it), skip
+      // cloud-driven index/position updates. The local state takes priority and
+      // will be pushed to cloud. This prevents the "reorder then Sync Now resets
+      // order" bug where cloud's stale indices overwrite local changes.
+      // We still allow title and folder changes from cloud (meaningful edits),
+      // but skip index-only changes for locally modified bookmarks.
+      if (locallyModifiedBookmarkIds.has(localBm.id)) {
+        const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
+        const localFolder = normalizeFolderPath(localBm.folderPath);
+        const titleChanged = (cloudBm.title ?? '') !== (localBm.title ?? '');
+        const folderChanged = cloudFolder !== localFolder;
+
+        if (!titleChanged && !folderChanged) {
+          // Only the index differs — this is a reorder conflict.
+          // Local wins because the user just rearranged these bookmarks.
+          skippedByLocalModification.push(cloudBm.url);
+          continue;
+        }
+        // Title or folder changed in cloud — allow the update even for locally
+        // modified bookmarks (meaningful edit from another browser).
+      }
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
       alreadyExistsUnchanged.push(cloudBm.url);
@@ -510,6 +529,15 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     }
   }
 
+  if (skippedByLocalModification.length > 0) {
+    console.log(
+      `[MarkSyncr] 🏠 Skipped ${skippedByLocalModification.length} cloud bookmark updates (locally modified, index-only change):`
+    );
+    for (const url of skippedByLocalModification.slice(0, 5)) {
+      console.log(`  - ${url}`);
+    }
+  }
+
   if (alreadyExistsUnchanged.length > 0) {
     console.log(
       `[MarkSyncr] ✓ ${alreadyExistsUnchanged.length} cloud bookmarks already exist locally (unchanged)`
@@ -517,7 +545,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
   }
 
   console.log(
-    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, unchanged=${alreadyExistsUnchanged.length}`
+    `[MarkSyncr] Categorization result: toAdd=${toAdd.length}, toUpdate=${toUpdate.length}, skipped=${skippedByTombstone.length}, locallyModified=${skippedByLocalModification.length}, unchanged=${alreadyExistsUnchanged.length}`
   );
 
   return { toAdd, toUpdate, skippedByTombstone };
@@ -1220,9 +1248,7 @@ async function setupTokenRefreshAlarm() {
       delayInMinutes: TOKEN_REFRESH_INTERVAL,
       periodInMinutes: TOKEN_REFRESH_INTERVAL,
     });
-    console.log(
-      `[MarkSyncr] Token refresh alarm created: every ${TOKEN_REFRESH_INTERVAL} minutes`
-    );
+    console.log(`[MarkSyncr] Token refresh alarm created: every ${TOKEN_REFRESH_INTERVAL} minutes`);
   } catch (err) {
     console.error('[MarkSyncr] Failed to set up token refresh alarm:', err);
   }
@@ -1412,7 +1438,6 @@ async function addTombstonesForFolder(folder) {
     }
   }
 }
-
 
 /**
  * Flatten bookmark tree to array for API sync
@@ -1694,7 +1719,9 @@ async function performSync(sourceId) {
         // This is critical for proper two-way sync: if another browser modified
         // a bookmark's title, folder, or position, those changes should be pulled here.
         if (bookmarksToUpdate.length > 0) {
-          console.log(`[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks to update from cloud`);
+          console.log(
+            `[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks to update from cloud`
+          );
           updatedLocally = await updateLocalBookmarksFromCloud(bookmarksToUpdate);
           console.log(`[MarkSyncr] Updated ${updatedLocally} local bookmarks from cloud`);
         }
@@ -2346,14 +2373,14 @@ async function addCloudBookmarksToLocal(cloudItems) {
  */
 /**
  * Reorder local browser bookmarks to match cloud ordering.
- * 
+ *
  * After individual adds/moves, chrome.bookmarks.move(id, {index: N})
  * shifts siblings, so the final order can be wrong.
- * 
+ *
  * Fix: For each parent folder that has cloud items with index info,
  * read current children, determine desired order from cloud indices,
  * and move items to their correct positions.
- * 
+ *
  * Process from LAST index to FIRST so earlier moves don't shift later targets.
  *
  * @param {Array} cloudBookmarks - Flat array of cloud bookmarks with folderPath and index
@@ -2384,7 +2411,12 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
         rootFolders.toolbar = root;
       } else if (title.includes('menu') || id === 'menu________') {
         rootFolders.menu = root;
-      } else if (title.includes('other') || title.includes('unsorted') || id === '2' || id === 'unfiled_____') {
+      } else if (
+        title.includes('other') ||
+        title.includes('unsorted') ||
+        id === '2' ||
+        id === 'unfiled_____'
+      ) {
         rootFolders.other = root;
       }
     }
@@ -2392,7 +2424,7 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
 
   // Build a map of local folder paths to their browser IDs
   const folderIdMap = new Map();
-  
+
   function walkTree(node, path) {
     if (!node.url && node.title !== undefined) {
       folderIdMap.set(path, node.id);
@@ -2408,9 +2440,18 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
   }
 
   // Map root folders
-  if (rootFolders.toolbar) { folderIdMap.set('toolbar', rootFolders.toolbar.id); walkTree(rootFolders.toolbar, 'toolbar'); }
-  if (rootFolders.menu) { folderIdMap.set('menu', rootFolders.menu.id); walkTree(rootFolders.menu, 'menu'); }
-  if (rootFolders.other) { folderIdMap.set('other', rootFolders.other.id); walkTree(rootFolders.other, 'other'); }
+  if (rootFolders.toolbar) {
+    folderIdMap.set('toolbar', rootFolders.toolbar.id);
+    walkTree(rootFolders.toolbar, 'toolbar');
+  }
+  if (rootFolders.menu) {
+    folderIdMap.set('menu', rootFolders.menu.id);
+    walkTree(rootFolders.menu, 'menu');
+  }
+  if (rootFolders.other) {
+    folderIdMap.set('other', rootFolders.other.id);
+    walkTree(rootFolders.other, 'other');
+  }
 
   let reordered = 0;
 
@@ -2428,6 +2469,22 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
     }
 
     if (children.length < 2) continue;
+
+    // Skip reordering only when the pattern of local modifications looks like
+    // a local reorder. When a user rearranges bookmarks locally, multiple (often
+    // all) siblings in the folder are marked as locally modified. If we reorder
+    // to match cloud in that case, we overwrite the user's intended arrangement.
+    // The local order will be pushed to cloud in the push step instead.
+    const modifiedChildrenCount = children.reduce(
+      (count, child) => (locallyModifiedBookmarkIds.has(child.id) ? count + 1 : count),
+      0
+    );
+    if (modifiedChildrenCount > 1) {
+      console.log(
+        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple locally modified bookmarks (${modifiedChildrenCount})`
+      );
+      continue;
+    }
 
     // Build desired order: match cloud items to local children
     // Create a map of URL/title -> desired index from cloud
@@ -2582,6 +2639,21 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
       // Check if index needs updating
       const indexChanged =
         cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
+
+      // Skip index-only moves for locally modified bookmarks.
+      // This prevents the "reorder then Sync Now resets order" bug where
+      // cloud's stale indices overwrite local changes the user just made.
+      if (
+        locallyModifiedBookmarkIds.has(local.id) &&
+        !titleChanged &&
+        !folderChanged &&
+        indexChanged
+      ) {
+        console.log(
+          `[MarkSyncr] 🏠 Skipping index-only update for locally modified bookmark: ${cloud.url} (local index ${local.index} vs cloud index ${cloud.index})`
+        );
+        continue;
+      }
 
       // Update title if changed
       if (titleChanged) {
