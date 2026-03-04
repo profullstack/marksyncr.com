@@ -3,7 +3,7 @@
 -- 
 -- This table stores long-lived session tokens for browser extensions.
 -- Unlike Supabase's default JWT tokens (which expire in 1 hour with 7-day refresh tokens),
--- extension sessions are designed to last 1 year to avoid requiring frequent re-logins.
+-- extension sessions are designed to last 2 years to avoid requiring frequent re-logins.
 --
 -- Security considerations:
 -- - extension_token is a cryptographically secure random token (256 bits)
@@ -97,9 +97,9 @@ $$;
 GRANT EXECUTE ON FUNCTION cleanup_expired_extension_sessions() TO authenticated;
 
 -- Comment on table for documentation
-COMMENT ON TABLE extension_sessions IS 'Long-lived session tokens for browser extensions (1 year expiry)';
+COMMENT ON TABLE extension_sessions IS 'Long-lived session tokens for browser extensions (2 year expiry)';
 COMMENT ON COLUMN extension_sessions.extension_token_hash IS 'SHA-256 hash of the extension token for secure verification';
 COMMENT ON COLUMN extension_sessions.supabase_refresh_token IS 'Supabase refresh token for obtaining new access tokens';
 COMMENT ON COLUMN extension_sessions.device_id IS 'Unique identifier for the browser/device';
-COMMENT ON COLUMN extension_sessions.expires_at IS 'Session expiration (default: 1 year from creation)';
+COMMENT ON COLUMN extension_sessions.expires_at IS 'Session expiration (default: 2 years from creation)';
 COMMENT ON COLUMN extension_sessions.last_used_at IS 'Last time the session was used (for activity tracking)';

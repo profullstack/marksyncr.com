@@ -851,24 +851,12 @@ async function ensureValidToken() {
     return true;
   }
 
-  // Token should be valid based on expiry, but validate to be sure
-  // Only do this if we haven't refreshed recently (avoid unnecessary network calls)
-  const isValid = await validateToken();
-  if (isValid) {
-    return true;
-  }
-
-  // Token validation failed despite not being expired - try refresh
-  console.log('[MarkSyncr] Token validation failed unexpectedly, attempting refresh...');
-  const refreshed = await tryRefreshToken();
-
-  if (!refreshed) {
-    // Don't clear — preserve extension_token for future retry.
-    // tryRefreshToken handles clearing on definitive 401 (session revoked/expired).
-    console.log('[MarkSyncr] Token refresh failed, will retry on next attempt');
-    return false;
-  }
-
+  // Token is not expired based on stored expiry — trust it.
+  // Don't make a network validation call on every sync; that wastes bandwidth
+  // and can cause spurious failures (timeouts, network blips) that trigger
+  // unnecessary refresh cascades. The actual API call in performSync will
+  // naturally return 401 if the token is invalid, and apiRequest() already
+  // handles that by calling tryRefreshToken() and retrying.
   return true;
 }
 
