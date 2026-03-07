@@ -3579,3 +3579,47 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
+
+// =============================================================================
+// Test-only exports — these are used by integration tests to call real code
+// with mocked browser APIs, rather than copying/reimplementing functions.
+// Guarded behind VITEST so the production bundle tree-shakes them away.
+// =============================================================================
+export const __test__ = import.meta.env?.VITEST
+  ? {
+      performSync,
+      getTombstones,
+      storeTombstones,
+      addTombstone,
+      removeTombstone,
+      categorizeCloudBookmarks,
+      flattenBookmarkTree,
+      mergeTombstonesLocal,
+      addCloudBookmarksToLocal,
+      applyTombstonesToLocal,
+      filterTombstonesToApply,
+      setupBookmarkListeners,
+      initialize,
+      // State accessors (module-level let variables are not directly exportable)
+      getState: () => ({
+        isSyncInProgress,
+        isForcePullInProgress,
+        isSyncDrivenChange,
+        pendingSyncNeeded,
+        pendingSyncReasons,
+        locallyModifiedBookmarkIds,
+        consecutiveSyncFailures,
+        lastSyncError,
+      }),
+      resetState: () => {
+        isSyncInProgress = false;
+        isForcePullInProgress = false;
+        isSyncDrivenChange = false;
+        pendingSyncNeeded = false;
+        pendingSyncReasons = [];
+        locallyModifiedBookmarkIds = new Set();
+        consecutiveSyncFailures = 0;
+        lastSyncError = null;
+      },
+    }
+  : undefined;
