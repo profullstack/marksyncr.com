@@ -827,34 +827,6 @@ describe('Bug: Delete toolbar bookmark → auto-sync reverts it', () => {
 });
 
 describe('Full end-to-end sync simulation with mock browser APIs', () => {
-  let storage;
-  let bookmarkTree;
-  let nextId;
-
-  /**
-   * Simulates browser.storage.local
-   */
-  function createMockStorage() {
-    const data = {};
-    return {
-      get: async (keys) => {
-        if (typeof keys === 'string') return { [keys]: data[keys] };
-        if (Array.isArray(keys)) {
-          const result = {};
-          for (const k of keys) {
-            if (k in data) result[k] = data[k];
-          }
-          return result;
-        }
-        return { ...data };
-      },
-      set: async (items) => {
-        Object.assign(data, items);
-      },
-      _data: data,
-    };
-  }
-
   /**
    * Simulates the entire performSync flow with mock state.
    * Returns the final state after sync.
