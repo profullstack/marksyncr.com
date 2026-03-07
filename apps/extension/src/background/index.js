@@ -1652,9 +1652,17 @@ async function performSync(sourceId) {
       }
 
       // Step 4: Merge tombstones (keep the newest deletion time for each URL)
+      // IMPORTANT: Re-read current tombstones from storage before writing to avoid
+      // overwriting tombstones created by onRemoved during the sync.
+      // Race condition: if the user deletes a bookmark while sync is running,
+      // onRemoved writes a new tombstone to storage. If we blindly overwrite with
+      // mergedTombstones (computed from the old localTombstones read at step 1),
+      // the new tombstone is lost and the deletion gets reverted on the next sync.
       const mergedTombstones = mergeTombstonesLocal(localTombstones, cloudTombstones);
-      await storeTombstones(mergedTombstones);
-      console.log(`[MarkSyncr] Merged tombstones: ${mergedTombstones.length}`);
+      const currentTombstones = await getTombstones();
+      const safeMergedTombstones = mergeTombstonesLocal(currentTombstones, mergedTombstones);
+      await storeTombstones(safeMergedTombstones);
+      console.log(`[MarkSyncr] Merged tombstones: ${safeMergedTombstones.length}`);
 
       // Step 5: Get updated local bookmarks after applying tombstones
       const updatedTree = await browser.bookmarks.getTree();
@@ -1668,7 +1676,7 @@ async function performSync(sourceId) {
       const { toAdd: newFromCloud, toUpdate: bookmarksToUpdate } = categorizeCloudBookmarks(
         cloudBookmarks,
         updatedLocalFlat,
-        mergedTombstones
+        safeMergedTombstones
       );
 
       console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
@@ -1826,9 +1834,9 @@ async function performSync(sourceId) {
       let syncResult = null;
       if (hasLocalChangesToPush) {
         console.log(
-          `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`
+          `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${safeMergedTombstones.length} tombstones to cloud...`
         );
-        syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), mergedTombstones);
+        syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), safeMergedTombstones);
         console.log('[MarkSyncr] Cloud sync result:', syncResult);
       } else {
         console.log(
@@ -1860,7 +1868,7 @@ async function performSync(sourceId) {
               addedFromCloud: newFromCloud.length,
               deletedLocally,
               pushedToCloud: localAdditions.length,
-              tombstones: mergedTombstones.length,
+              tombstones: safeMergedTombstones.length,
             }
           );
           console.log('[MarkSyncr] Version saved:', versionResult);
@@ -3571,3 +3579,47 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
+
+// =============================================================================
+// Test-only exports — these are used by integration tests to call real code
+// with mocked browser APIs, rather than copying/reimplementing functions.
+// Guarded behind VITEST so the production bundle tree-shakes them away.
+// =============================================================================
+export const __test__ = import.meta.env?.VITEST
+  ? {
+      performSync,
+      getTombstones,
+      storeTombstones,
+      addTombstone,
+      removeTombstone,
+      categorizeCloudBookmarks,
+      flattenBookmarkTree,
+      mergeTombstonesLocal,
+      addCloudBookmarksToLocal,
+      applyTombstonesToLocal,
+      filterTombstonesToApply,
+      setupBookmarkListeners,
+      initialize,
+      // State accessors (module-level let variables are not directly exportable)
+      getState: () => ({
+        isSyncInProgress,
+        isForcePullInProgress,
+        isSyncDrivenChange,
+        pendingSyncNeeded,
+        pendingSyncReasons,
+        locallyModifiedBookmarkIds,
+        consecutiveSyncFailures,
+        lastSyncError,
+      }),
+      resetState: () => {
+        isSyncInProgress = false;
+        isForcePullInProgress = false;
+        isSyncDrivenChange = false;
+        pendingSyncNeeded = false;
+        pendingSyncReasons = [];
+        locallyModifiedBookmarkIds = new Set();
+        consecutiveSyncFailures = 0;
+        lastSyncError = null;
+      },
+    }
+  : undefined;
