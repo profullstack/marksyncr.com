@@ -1285,8 +1285,38 @@ function setupBookmarkListeners() {
       return;
     }
 
-    // If a bookmark is re-added, remove its tombstone
+    // If a bookmark is re-added, remove its tombstone — BUT only if the tombstone
+    // is old enough. If the tombstone was created very recently (within 30 seconds),
+    // this is likely an external sync (Chrome Sync, Firefox Sync) fighting the user's
+    // deletion. In that case, keep the tombstone and re-delete the bookmark.
     if (bookmark.url) {
+      const tombstones = await getTombstones();
+      const tombstone = tombstones.find((t) => t.url === bookmark.url);
+      if (tombstone) {
+        const tombstoneAge = Date.now() - tombstone.deletedAt;
+        const RECENT_TOMBSTONE_THRESHOLD = 30000; // 30 seconds
+        if (tombstoneAge < RECENT_TOMBSTONE_THRESHOLD) {
+          console.log(
+            `[MarkSyncr] Bookmark re-created for recently deleted URL (${Math.round(tombstoneAge / 1000)}s ago), ` +
+              `likely external sync — re-deleting to honor user deletion: ${bookmark.url}`
+          );
+          try {
+            // Re-delete the bookmark that was just created by external sync
+            // Use isSyncDrivenChange to prevent this deletion from being tracked
+            // as a user action (it's our corrective deletion)
+            isSyncDrivenChange = true;
+            try {
+              await browser.bookmarks.remove(id);
+            } finally {
+              isSyncDrivenChange = false;
+            }
+          } catch (removeErr) {
+            console.warn('[MarkSyncr] Failed to re-delete externally synced bookmark:', removeErr);
+          }
+          return; // Keep the tombstone — the user intended to delete this
+        }
+      }
+      // Tombstone is old or doesn't exist — this is a genuine user re-creation
       await removeTombstone(bookmark.url);
     }
 

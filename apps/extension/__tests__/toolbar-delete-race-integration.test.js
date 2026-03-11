@@ -798,4 +798,68 @@ describe('Integration: real performSync with mocked browser APIs', () => {
       expect(state.isSyncInProgress).toBe(false);
     });
   });
+
+  describe('external sync re-creation defense (Chrome Sync / Firefox Sync)', () => {
+    it('should re-delete a bookmark re-created within 30s of tombstone creation', async () => {
+      const deletedUrl = 'https://externally-restored.com';
+
+      setupSyncScenario({
+        localToolbarBookmarks: [],
+        cloudBookmarks: [],
+      });
+
+      // Simulate: user deletes a bookmark (tombstone created just now)
+      storageData['marksyncr-tombstones'] = [
+        { url: deletedUrl, deletedAt: Date.now() - 2000 }, // 2 seconds ago
+      ];
+
+      // Listeners were registered by initialize() on first import
+      const onCreatedCb = capturedListeners.onCreated;
+      expect(onCreatedCb).toBeTruthy();
+
+      // Simulate: Chrome Sync re-creates the bookmark within seconds
+      await onCreatedCb('ext-restored-1', {
+        id: 'ext-restored-1',
+        title: 'Externally Restored',
+        url: deletedUrl,
+      });
+
+      // The bookmark should have been re-deleted
+      expect(mockBrowser.bookmarks.remove).toHaveBeenCalledWith('ext-restored-1');
+
+      // The tombstone should still exist (NOT removed)
+      const tombstones = storageData['marksyncr-tombstones'] || [];
+      expect(tombstones.find((t) => t.url === deletedUrl)).toBeTruthy();
+    });
+
+    it('should allow re-creation of a bookmark if tombstone is old (>30s)', async () => {
+      const oldUrl = 'https://intentionally-re-added.com';
+
+      setupSyncScenario({
+        localToolbarBookmarks: [],
+        cloudBookmarks: [],
+      });
+
+      // Tombstone is old (60 seconds ago) — user genuinely re-added the bookmark
+      storageData['marksyncr-tombstones'] = [
+        { url: oldUrl, deletedAt: Date.now() - 60000 }, // 60 seconds ago
+      ];
+
+      const onCreatedCb = capturedListeners.onCreated;
+
+      // Simulate: user manually re-creates the bookmark
+      await onCreatedCb('user-readd-1', {
+        id: 'user-readd-1',
+        title: 'Intentionally Re-Added',
+        url: oldUrl,
+      });
+
+      // The bookmark should NOT have been re-deleted
+      expect(mockBrowser.bookmarks.remove).not.toHaveBeenCalledWith('user-readd-1');
+
+      // The tombstone should have been removed (user intended to re-add)
+      const tombstones = storageData['marksyncr-tombstones'] || [];
+      expect(tombstones.find((t) => t.url === oldUrl)).toBeFalsy();
+    });
+  });
 });
