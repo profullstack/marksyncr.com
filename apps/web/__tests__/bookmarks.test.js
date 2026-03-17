@@ -3023,9 +3023,36 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       // Existing cloud data has a DIFFERENT order
       const existingCloudBookmarks = [
-        { id: '1', url: 'https://first.com', title: 'First', index: 0, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
-        { id: '2', url: 'https://second.com', title: 'Second', index: 1, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
-        { id: '3', url: 'https://third.com', title: 'Third', index: 2, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
+        {
+          id: '1',
+          url: 'https://first.com',
+          title: 'First',
+          index: 0,
+          type: 'bookmark',
+          folderPath: '',
+          dateAdded: 1000,
+          source: 'browser',
+        },
+        {
+          id: '2',
+          url: 'https://second.com',
+          title: 'Second',
+          index: 1,
+          type: 'bookmark',
+          folderPath: '',
+          dateAdded: 1000,
+          source: 'browser',
+        },
+        {
+          id: '3',
+          url: 'https://third.com',
+          title: 'Third',
+          index: 2,
+          type: 'bookmark',
+          folderPath: '',
+          dateAdded: 1000,
+          source: 'browser',
+        },
       ];
 
       let upsertedData = null;
@@ -3084,16 +3111,16 @@ describe('Server-Side Tombstone Cleanup', () => {
       expect(storedBookmarks[2].url).toBe('https://second.com');
     });
 
-    it('should still apply tombstone filtering when replace=true', async () => {
+    it('should trust incoming bookmarks as-is when replace=true (extension handles tombstone filtering)', async () => {
       const now = Date.now();
+      // In replace mode, the extension has already performed tombstone filtering
+      // client-side. The server should store whatever the extension sends.
       const bookmarksToSync = [
         { id: '1', url: 'https://keep.com', title: 'Keep', dateAdded: now - 10000 },
-        { id: '2', url: 'https://deleted.com', title: 'Deleted', dateAdded: now - 10000 },
+        { id: '2', url: 'https://also-keep.com', title: 'Also Keep', dateAdded: now - 10000 },
       ];
 
-      const incomingTombstones = [
-        { url: 'https://deleted.com', deletedAt: now - 5000 },
-      ];
+      const incomingTombstones = [{ url: 'https://already-deleted.com', deletedAt: now - 5000 }];
 
       let upsertedData = null;
       const upsertMock = vi.fn().mockImplementation((data) => {
@@ -3139,10 +3166,13 @@ describe('Server-Side Tombstone Cleanup', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      // Only the non-tombstoned bookmark should be stored
+      // Both bookmarks should be stored — server trusts the extension in replace mode
       const storedBookmarks = upsertedData.bookmark_data;
-      expect(storedBookmarks).toHaveLength(1);
-      expect(storedBookmarks[0].url).toBe('https://keep.com');
+      expect(storedBookmarks).toHaveLength(2);
+      expect(storedBookmarks.map((b) => b.url).sort()).toEqual([
+        'https://also-keep.com',
+        'https://keep.com',
+      ]);
     });
 
     it('should use legacy merge behavior when replace is not set', async () => {
@@ -3151,7 +3181,16 @@ describe('Server-Side Tombstone Cleanup', () => {
       ];
 
       const existingCloudBookmarks = [
-        { id: '1', url: 'https://existing.com', title: 'Existing', index: 0, type: 'bookmark', folderPath: '', dateAdded: 1000, source: 'browser' },
+        {
+          id: '1',
+          url: 'https://existing.com',
+          title: 'Existing',
+          index: 0,
+          type: 'bookmark',
+          folderPath: '',
+          dateAdded: 1000,
+          source: 'browser',
+        },
       ];
 
       let upsertedData = null;

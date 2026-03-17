@@ -673,7 +673,9 @@ async function tryRefreshDropboxToken(supabase, source) {
   const clientSecret = process.env.DROPBOX_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    console.error('[Dropbox Sync] Cannot refresh token: DROPBOX_CLIENT_ID or DROPBOX_CLIENT_SECRET not configured');
+    console.error(
+      '[Dropbox Sync] Cannot refresh token: DROPBOX_CLIENT_ID or DROPBOX_CLIENT_SECRET not configured'
+    );
     return null;
   }
 
@@ -754,7 +756,8 @@ async function syncToDropbox(supabase, source, bookmarks, tombstones, checksum) 
     });
   } catch (error) {
     // If the error indicates an expired token, try refreshing and retrying once
-    const isExpiredToken = error.message?.includes('expired_access_token') ||
+    const isExpiredToken =
+      error.message?.includes('expired_access_token') ||
       error.message?.includes('invalid_access_token');
 
     if (isExpiredToken) {
@@ -829,13 +832,23 @@ export async function POST(request) {
     // Normalize bookmarks structure
     // Preserve empty titles - don't replace with URL
     // IMPORTANT: Preserve type and index fields for proper checksum comparison
+    //
+    // NOTE on dateAdded: We preserve the original value (or 0 if falsy) instead
+    // of falling back to Date.now(). The old Date.now() fallback was dangerous:
+    // when dateAdded was falsy, the server would assign the current timestamp,
+    // making the bookmark appear "brand new." This caused the tombstone filter
+    // (bookmarkDate > tombstoneDate) to incorrectly keep bookmarks that should
+    // have been deleted — the bookmark looked newer than its tombstone.
     const normalizedBookmarks = bookmarks.map((bookmark) => ({
       id: bookmark.id,
       type: bookmark.type || 'bookmark', // Preserve type (bookmark or folder)
       url: bookmark.url,
       title: bookmark.title ?? '',
       folderPath: bookmark.folderPath || bookmark.folder_path || '',
-      dateAdded: (typeof bookmark.dateAdded === 'string' ? new Date(bookmark.dateAdded).getTime() : bookmark.dateAdded) || Date.now(),
+      dateAdded:
+        (typeof bookmark.dateAdded === 'string'
+          ? new Date(bookmark.dateAdded).getTime()
+          : bookmark.dateAdded) || 0,
       index: bookmark.index ?? 0, // Preserve index for ordering
       source,
     }));
@@ -903,17 +916,20 @@ export async function POST(request) {
     let deleted = 0;
 
     if (replace) {
-      console.log(`[Bookmarks API] Replace mode: using incoming bookmarks directly (skipping merge)`);
-      // Apply tombstones to filter deleted bookmarks from incoming data
-      const tombstoneMap = new Map(mergedTombstones.map((t) => [t.url, t.deletedAt || 0]));
-      finalBookmarks = normalizedBookmarks.filter((b) => {
-        if (!b.url) return true; // Keep folders
-        const tombstoneDate = tombstoneMap.get(b.url);
-        if (tombstoneDate === undefined) return true; // No tombstone
-        const bookmarkDate = typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : (b.dateAdded || 0);
-        return bookmarkDate > tombstoneDate;
-      });
-      deleted = normalizedBookmarks.length - finalBookmarks.length;
+      console.log(
+        `[Bookmarks API] Replace mode: using incoming bookmarks directly (skipping merge and tombstone filter)`
+      );
+      // In replace mode, the extension has already performed a full two-way merge
+      // INCLUDING tombstone filtering on the client side. The incoming bookmarks
+      // are the authoritative state — we trust them as-is.
+      //
+      // IMPORTANT: We no longer re-apply tombstone filtering here because:
+      // 1. The extension already filtered tombstoned bookmarks before pushing
+      // 2. Re-filtering with dateAdded comparisons was causing bookmarks with
+      //    falsy/stale dateAdded to be incorrectly removed from the cloud
+      // 3. The extension is the source of truth in replace mode
+      finalBookmarks = normalizedBookmarks;
+      deleted = 0;
       added = finalBookmarks.length;
     } else {
       // Legacy merge behavior
@@ -928,7 +944,8 @@ export async function POST(request) {
         if (!b.url) return true; // Keep folders
         const tombstoneDate = tombstoneMap.get(b.url);
         if (tombstoneDate === undefined) return true; // No tombstone
-        const bookmarkDate = typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : (b.dateAdded || 0);
+        const bookmarkDate =
+          typeof b.dateAdded === 'string' ? new Date(b.dateAdded).getTime() : b.dateAdded || 0;
         return bookmarkDate > tombstoneDate;
       });
       deleted = merged.length - finalBookmarks.length;
@@ -937,9 +954,7 @@ export async function POST(request) {
     console.log(
       `[Bookmarks API] After ${replace ? 'replace' : 'merge'}: ${finalBookmarks.length + deleted} total, ${added} added, ${updated} updated, ${deleted} removed by tombstones`
     );
-    console.log(
-      `[Bookmarks API] Tombstones: ${mergedTombstones.length} stored`
-    );
+    console.log(`[Bookmarks API] Tombstones: ${mergedTombstones.length} stored`);
 
     // Validate total bookmark count after merge to prevent data explosion
     if (finalBookmarks.length > MAX_BOOKMARKS_PER_USER) {
