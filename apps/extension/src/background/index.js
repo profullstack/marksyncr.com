@@ -1627,6 +1627,12 @@ async function performSync(sourceId) {
 
     // Two-way sync with tombstone support
     try {
+      // Snapshot user-modified bookmark IDs BEFORE the pull phase.
+      // This snapshot is passed to reorderLocalToMatchCloud so it only skips
+      // reordering for folders the USER rearranged, not folders where
+      // sync-driven creates/moves/deletes happened to trigger onMoved events.
+      const userModifiedIdsSnapshot = new Set(locallyModifiedBookmarkIds);
+
       // Step 1: Get current local bookmarks and tombstones
       const bookmarkTree = await browser.bookmarks.getTree();
       const localFlat = flattenBookmarkTree(bookmarkTree);
@@ -1782,7 +1788,7 @@ async function performSync(sourceId) {
       // so earlier moves don't shift later targets).
       isSyncDrivenChange = true;
       try {
-        await reorderLocalToMatchCloud(cloudBookmarks);
+        await reorderLocalToMatchCloud(cloudBookmarks, userModifiedIdsSnapshot);
       } catch (reorderErr) {
         console.warn('[MarkSyncr] Reorder pass failed (non-fatal):', reorderErr.message);
       } finally {
@@ -2340,43 +2346,28 @@ async function addCloudBookmarksToLocal(cloudItems) {
         const targetFolderId = await getOrCreateFolderPath(item._folderPath, rootFolder.id);
 
         if (item.type === 'folder') {
-          // It's a folder entry - create the folder at the correct index
-          // First check if folder already exists
+          // It's a folder entry - create the folder WITHOUT specifying index.
+          // Index-based positioning is handled by reorderLocalToMatchCloud after
+          // all items are created. Setting index here causes cascading shifts:
+          // each insertion at index N shifts all items at N+ to the right, so
+          // subsequent inserts land at the wrong position. When the cloud index
+          // exceeds the local folder's item count, the browser clamps it to the
+          // end — the main cause of "bookmarks end up at the END of toolbar."
           const children = await browser.bookmarks.getChildren(targetFolderId);
           const existingFolder = children.find((c) => !c.url && c.title === item.title);
 
           if (existingFolder) {
-            // Folder exists - check if it's at the correct index
-            if (typeof item.index === 'number' && existingFolder.index !== item.index) {
-              // Move to correct position
-              try {
-                await browser.bookmarks.move(existingFolder.id, {
-                  parentId: targetFolderId,
-                  index: item.index,
-                });
-                console.log(
-                  `[MarkSyncr] Moved existing folder "${item.title}" to index ${item.index}`
-                );
-              } catch (moveErr) {
-                console.warn(`[MarkSyncr] Failed to move folder "${item.title}":`, moveErr);
-              }
-            }
-            // Cache the folder ID
+            // Folder already exists - just cache it, reorder pass will fix position
             const folderFullPath = item._folderPath
               ? `${item._folderPath}/${item.title}`
               : item.title;
             folderCache.set(`${rootFolder.id}:${folderFullPath}`, existingFolder.id);
           } else {
-            // Create new folder at the correct index
+            // Create new folder without index — reorder pass will position it
             const createOptions = {
               parentId: targetFolderId,
               title: item.title || 'Untitled Folder',
             };
-
-            // Set index if available
-            if (typeof item.index === 'number' && item.index >= 0) {
-              createOptions.index = item.index;
-            }
 
             const newFolder = await browser.bookmarks.create(createOptions);
             addedFolders++;
@@ -2387,20 +2378,18 @@ async function addCloudBookmarksToLocal(cloudItems) {
               : item.title;
             folderCache.set(`${rootFolder.id}:${folderFullPath}`, newFolder.id);
 
-            console.log(`[MarkSyncr] Created folder "${item.title}" at index ${item.index}`);
+            console.log(
+              `[MarkSyncr] Created folder "${item.title}" (reorder pass will set position)`
+            );
           }
         } else if (item.url) {
-          // It's a bookmark - create at the correct index
+          // It's a bookmark - create WITHOUT index.
+          // Reorder pass will position it correctly afterward.
           const createOptions = {
             parentId: targetFolderId,
             title: item.title ?? '',
             url: item.url,
           };
-
-          // Set index if available
-          if (typeof item.index === 'number' && item.index >= 0) {
-            createOptions.index = item.index;
-          }
 
           await browser.bookmarks.create(createOptions);
           addedBookmarks++;
@@ -2439,7 +2428,7 @@ async function addCloudBookmarksToLocal(cloudItems) {
  *
  * @param {Array} cloudBookmarks - Flat array of cloud bookmarks with folderPath and index
  */
-async function reorderLocalToMatchCloud(cloudBookmarks) {
+async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) {
   // Group cloud items by their normalized folder path
   const cloudByFolder = new Map();
   for (const cb of cloudBookmarks) {
@@ -2524,18 +2513,22 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
 
     if (children.length < 2) continue;
 
-    // Skip reordering only when the pattern of local modifications looks like
-    // a local reorder. When a user rearranges bookmarks locally, multiple (often
-    // all) siblings in the folder are marked as locally modified. If we reorder
-    // to match cloud in that case, we overwrite the user's intended arrangement.
-    // The local order will be pushed to cloud in the push step instead.
+    // Skip reordering only when the user manually rearranged bookmarks
+    // before this sync started. We use `userModifiedIds` — a snapshot of
+    // locallyModifiedBookmarkIds taken at the START of performSync, before
+    // any sync-driven creates/moves/deletes. This ensures that sync-driven
+    // changes (adds, folder moves, tombstone deletions) don't accidentally
+    // trigger the skip, which was the root cause of "bookmarks end up at
+    // the end of the toolbar" — the reorder pass was being skipped because
+    // sync-driven onMoved events polluted locallyModifiedBookmarkIds.
+    const idsToCheck = userModifiedIds || locallyModifiedBookmarkIds;
     const modifiedChildrenCount = children.reduce(
-      (count, child) => (locallyModifiedBookmarkIds.has(child.id) ? count + 1 : count),
+      (count, child) => (idsToCheck.has(child.id) ? count + 1 : count),
       0
     );
     if (modifiedChildrenCount > 1) {
       console.log(
-        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple locally modified bookmarks (${modifiedChildrenCount})`
+        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple user-modified bookmarks (${modifiedChildrenCount})`
       );
       continue;
     }
@@ -2717,27 +2710,22 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
         );
       }
 
-      // Move to new folder or position if needed
-      if (folderChanged || indexChanged) {
+      // Move to new folder if the folder changed. Index-only changes are
+      // handled by the reorderLocalToMatchCloud pass, which processes all
+      // children of each folder in one go (last-to-first) to avoid the
+      // cascading index shift problem caused by sequential moves.
+      if (folderChanged) {
         const rootFolder = rootFolders[cloudRootKey] || rootFolders.other || rootFolders.toolbar;
 
         if (rootFolder) {
           const targetFolderId = await getOrCreateFolderPath(cloudRelativePath, rootFolder.id);
 
-          const moveOptions = { parentId: targetFolderId };
-          if (cloud.index !== undefined && cloud.index >= 0) {
-            moveOptions.index = cloud.index;
-          }
+          // Move to new folder without specifying index — reorder pass will position it
+          await browser.bookmarks.move(local.id, { parentId: targetFolderId });
 
-          await browser.bookmarks.move(local.id, moveOptions);
-
-          if (folderChanged) {
-            console.log(
-              `[MarkSyncr] Moved ${cloud.url} from "${local.folderPath}" to "${cloud.folderPath}"`
-            );
-          } else {
-            console.log(`[MarkSyncr] Repositioned ${cloud.url} to index ${cloud.index}`);
-          }
+          console.log(
+            `[MarkSyncr] Moved ${cloud.url} from "${local.folderPath}" to "${cloud.folderPath}" (reorder pass will set position)`
+          );
         }
       }
 
