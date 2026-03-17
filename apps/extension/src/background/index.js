@@ -2046,27 +2046,36 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
   }
   console.log(`[MarkSyncr] Found ${matchCount} local bookmarks that match tombstones`);
 
-  for (const bookmark of localBookmarks) {
-    if (tombstonedUrls.has(bookmark.url)) {
-      // Skip if this bookmark was locally modified (e.g., user re-added it after deletion)
-      // The user's intent to have this bookmark takes priority over the cloud tombstone
-      if (locallyModifiedBookmarkIds.has(bookmark.id)) {
-        console.log(
-          `[MarkSyncr] 🏠 Skipping tombstone for locally modified bookmark: ${bookmark.url}`
-        );
-        continue;
-      }
+  // Set isSyncDrivenChange so that onRemoved doesn't track these cloud-driven
+  // deletions as locally modified. Without this flag, each tombstone-driven
+  // removal was incorrectly added to locallyModifiedBookmarkIds and triggered
+  // an unnecessary follow-up sync via pendingSyncNeeded.
+  isSyncDrivenChange = true;
+  try {
+    for (const bookmark of localBookmarks) {
+      if (tombstonedUrls.has(bookmark.url)) {
+        // Skip if this bookmark was locally modified (e.g., user re-added it after deletion)
+        // The user's intent to have this bookmark takes priority over the cloud tombstone
+        if (locallyModifiedBookmarkIds.has(bookmark.id)) {
+          console.log(
+            `[MarkSyncr] 🏠 Skipping tombstone for locally modified bookmark: ${bookmark.url}`
+          );
+          continue;
+        }
 
-      console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
+        console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
 
-      try {
-        await browser.bookmarks.remove(bookmark.id);
-        deletedCount++;
-        console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
-      } catch (err) {
-        console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
+        try {
+          await browser.bookmarks.remove(bookmark.id);
+          deletedCount++;
+          console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
+        } catch (err) {
+          console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
+        }
       }
     }
+  } finally {
+    isSyncDrivenChange = false;
   }
 
   console.log(`[MarkSyncr] applyTombstonesToLocal complete: deleted ${deletedCount} bookmarks`);
@@ -2911,9 +2920,13 @@ async function forcePush() {
     // Pass the bookmark count as synced count since we're pushing all to cloud
     const stats = countBookmarks(bookmarkTree, flatBookmarks.filter((b) => b.url).length);
 
+    // Get current local tombstones to push alongside bookmarks
+    // Force push should include tombstones so the cloud knows about deletions
+    const localTombstones = await getTombstones();
+
     // Force push to cloud (overwrite)
     console.log(`[MarkSyncr] Force pushing ${flatBookmarks.length} bookmarks to cloud...`);
-    const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
+    const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser(), localTombstones);
     console.log('[MarkSyncr] Force push sync result:', syncResult);
 
     // Save version with force push marker (non-blocking)
@@ -2930,10 +2943,25 @@ async function forcePush() {
       console.warn('[MarkSyncr] Force push version save failed (continuing):', versionErr.message);
     }
 
-    // Update last sync time
+    // Update last sync time (both ISO string for display and timestamp for tombstone safeguard)
+    const syncTimestamp = Date.now();
     await browser.storage.local.set({
-      lastSync: new Date().toISOString(),
+      lastSync: new Date(syncTimestamp).toISOString(),
     });
+    await storeLastSyncTime(syncTimestamp);
+
+    // Store the cloud checksum so the next performSync knows the baseline
+    if (syncResult?.checksum) {
+      await storeLastCloudChecksum(syncResult.checksum);
+    }
+
+    // Clear locally modified tracking — force push overwrites cloud, so everything is in sync
+    if (saveModifiedIdsTimeout) {
+      clearTimeout(saveModifiedIdsTimeout);
+      saveModifiedIdsTimeout = null;
+    }
+    locallyModifiedBookmarkIds.clear();
+    await saveLocallyModifiedIds();
 
     return { success: true, stats, message: 'Successfully force pushed bookmarks to cloud' };
   } catch (err) {
@@ -3096,16 +3124,26 @@ async function forcePull() {
         `[MarkSyncr] Force Pull: Created ${importedCount} bookmarks, ${foldersCreated} folders`
       );
 
-      // Update last sync time
+      // Update last sync time (both ISO string for display and timestamp for tombstone safeguard)
+      const syncTimestamp = Date.now();
       await browser.storage.local.set({
-        lastSync: new Date().toISOString(),
+        lastSync: new Date(syncTimestamp).toISOString(),
       });
+      await storeLastSyncTime(syncTimestamp);
 
       const stats = { total: importedCount, folders: foldersCreated, synced: importedCount };
 
       console.log(
         `[MarkSyncr] Force Pull complete: ${importedCount} bookmarks, ${foldersCreated} folders`
       );
+
+      // Clear locally modified tracking — force pull overwrites local, so everything is in sync
+      if (saveModifiedIdsTimeout) {
+        clearTimeout(saveModifiedIdsTimeout);
+        saveModifiedIdsTimeout = null;
+      }
+      locallyModifiedBookmarkIds.clear();
+      await saveLocallyModifiedIds();
 
       // CRITICAL: After Force Pull, sync the pulled bookmarks back to cloud_bookmarks
       // This ensures the next regular sync sees matching data and doesn't revert changes.
