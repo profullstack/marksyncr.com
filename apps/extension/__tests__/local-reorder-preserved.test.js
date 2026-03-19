@@ -5,13 +5,13 @@
  * the sync pulls the cloud's old order and applies it locally, reverting the
  * user's changes. The cloud's stale indices overwrite local modifications.
  *
- * Fix: Skip cloud-to-local index updates and reordering for bookmarks that are
- * in the locallyModifiedBookmarkIds set. The local order takes priority and
- * gets pushed to cloud instead.
+ * Fix: Skip ALL cloud-to-local updates (title, folder, index) for bookmarks
+ * that are in the locallyModifiedBookmarkIds set. The local state takes
+ * priority and gets pushed to cloud instead.
  *
  * Three fix points tested:
- * 1. categorizeCloudBookmarks() - skips index-only updates for locally modified bookmarks
- * 2. updateLocalBookmarksFromCloud() - skips index-only moves for locally modified bookmarks
+ * 1. categorizeCloudBookmarks() - skips ALL cloud updates for locally modified bookmarks
+ * 2. updateLocalBookmarksFromCloud() - skips ALL cloud updates for locally modified bookmarks
  * 3. reorderLocalToMatchCloud() - skips reorder for folders with locally modified children
  */
 
@@ -46,7 +46,8 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
 }
 
 /**
- * categorizeCloudBookmarks WITH the fix: skip index-only updates for locally modified bookmarks
+ * categorizeCloudBookmarks WITH the fix: skip ALL cloud updates for locally modified bookmarks.
+ * Local state takes priority and will be pushed to cloud in the push phase.
  */
 function categorizeCloudBookmarks(
   cloudBookmarks,
@@ -80,17 +81,11 @@ function categorizeCloudBookmarks(
     if (!localBm) {
       toAdd.push(cloudBm);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
-      // FIX: Skip index-only updates for locally modified bookmarks
+      // FIX: Skip ALL cloud updates for locally modified bookmarks.
+      // Local wins for title, folder, AND index changes.
       if (locallyModifiedBookmarkIds.has(localBm.id)) {
-        const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
-        const localFolder = normalizeFolderPath(localBm.folderPath);
-        const titleChanged = (cloudBm.title ?? '') !== (localBm.title ?? '');
-        const folderChanged = cloudFolder !== localFolder;
-
-        if (!titleChanged && !folderChanged) {
-          skippedByLocalModification.push(cloudBm.url);
-          continue;
-        }
+        skippedByLocalModification.push(cloudBm.url);
+        continue;
       }
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
@@ -178,7 +173,7 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
       expect(result.skippedByLocalModification.length).toBe(5);
     });
 
-    it('should still allow title changes from cloud even for locally modified bookmarks', () => {
+    it('should skip cloud title changes for locally modified bookmarks (local wins)', () => {
       const cloudBookmarks = [
         {
           url: 'https://github.com',
@@ -207,12 +202,13 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
         locallyModifiedBookmarkIds
       );
 
-      // Title changed in cloud - should still be updated
-      expect(result.toUpdate.length).toBe(1);
-      expect(result.skippedByLocalModification.length).toBe(0);
+      // Locally modified bookmark — local wins, cloud title change is skipped.
+      // The local state will be pushed to cloud in the push phase.
+      expect(result.toUpdate.length).toBe(0);
+      expect(result.skippedByLocalModification.length).toBe(1);
     });
 
-    it('should still allow folder changes from cloud even for locally modified bookmarks', () => {
+    it('should skip cloud folder changes for locally modified bookmarks (local wins)', () => {
       const cloudBookmarks = [
         { url: 'https://github.com', title: 'GitHub', folderPath: 'Bookmarks Bar/Work', index: 0 },
       ];
@@ -236,9 +232,10 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
         locallyModifiedBookmarkIds
       );
 
-      // Folder changed in cloud - should still be updated
-      expect(result.toUpdate.length).toBe(1);
-      expect(result.skippedByLocalModification.length).toBe(0);
+      // Locally modified bookmark — local wins, cloud folder change is skipped.
+      // The local state will be pushed to cloud in the push phase.
+      expect(result.toUpdate.length).toBe(0);
+      expect(result.skippedByLocalModification.length).toBe(1);
     });
 
     it('should update bookmarks normally when they are NOT locally modified', () => {
@@ -303,9 +300,9 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
         locallyModifiedBookmarkIds
       );
 
-      // bm-1: locally modified, index-only change -> skip
-      // bm-2: locally modified, index-only change -> skip
-      // bm-3: NOT locally modified, title changed -> update
+      // bm-1: locally modified -> skip (local wins)
+      // bm-2: locally modified -> skip (local wins)
+      // bm-3: NOT locally modified, title changed -> update from cloud
       expect(result.skippedByLocalModification.length).toBe(2);
       expect(result.toUpdate.length).toBe(1);
       expect(result.toUpdate[0].cloud.url).toBe('https://c.com');
@@ -313,7 +310,7 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
   });
 
   describe('updateLocalBookmarksFromCloud - skip index-only moves for locally modified', () => {
-    it('should skip index-only moves for locally modified bookmarks', () => {
+    it('should skip ALL cloud updates for locally modified bookmarks', () => {
       const locallyModifiedBookmarkIds = new Set(['bm-1', 'bm-2', 'bm-3']);
 
       const bookmarksToUpdate = [
@@ -344,19 +341,8 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
       const updated = [];
 
       for (const { cloud, local } of bookmarksToUpdate) {
-        const titleChanged = (cloud.title ?? '') !== (local.title ?? '');
-        const folderChanged =
-          normalizeFolderPath(cloud.folderPath) !== normalizeFolderPath(local.folderPath);
-        const indexChanged =
-          cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
-
-        // FIX: skip index-only moves for locally modified bookmarks
-        if (
-          locallyModifiedBookmarkIds.has(local.id) &&
-          !titleChanged &&
-          !folderChanged &&
-          indexChanged
-        ) {
+        // FIX: skip ALL cloud updates for locally modified bookmarks
+        if (locallyModifiedBookmarkIds.has(local.id)) {
           skipped.push(cloud.url);
           continue;
         }
@@ -364,12 +350,12 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
         updated.push(cloud.url);
       }
 
-      // Both bookmarks have index-only changes and are locally modified
+      // Both bookmarks are locally modified — local wins
       expect(skipped).toEqual(['https://a.com', 'https://b.com']);
       expect(updated).toEqual([]);
     });
 
-    it('should still update title even for locally modified bookmarks', () => {
+    it('should skip ALL cloud updates for locally modified bookmarks (including title)', () => {
       const locallyModifiedBookmarkIds = new Set(['bm-1']);
 
       const bookmarksToUpdate = [
@@ -394,18 +380,8 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
       const updated = [];
 
       for (const { cloud, local } of bookmarksToUpdate) {
-        const titleChanged = (cloud.title ?? '') !== (local.title ?? '');
-        const folderChanged =
-          normalizeFolderPath(cloud.folderPath) !== normalizeFolderPath(local.folderPath);
-        const indexChanged =
-          cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
-
-        if (
-          locallyModifiedBookmarkIds.has(local.id) &&
-          !titleChanged &&
-          !folderChanged &&
-          indexChanged
-        ) {
+        // FIX: skip ALL cloud updates for locally modified bookmarks
+        if (locallyModifiedBookmarkIds.has(local.id)) {
           skipped.push(cloud.url);
           continue;
         }
@@ -413,9 +389,9 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
         updated.push(cloud.url);
       }
 
-      // Title changed - should NOT be skipped
-      expect(skipped).toEqual([]);
-      expect(updated).toEqual(['https://a.com']);
+      // Locally modified — local wins, cloud title change is skipped
+      expect(skipped).toEqual(['https://a.com']);
+      expect(updated).toEqual([]);
     });
   });
 
@@ -697,8 +673,8 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
       expect(result.skippedByLocalModification.length).toBe(1);
     });
 
-    it('should detect actual folder changes even after normalization', () => {
-      // Cloud moved bookmark to a subfolder - this is a real change
+    it('should skip cloud folder changes for locally modified bookmarks even after normalization', () => {
+      // Cloud moved bookmark to a subfolder - but bookmark is locally modified, so local wins
       const cloudBookmarks = [
         { url: 'https://a.com', title: 'A', folderPath: 'Bookmarks Bar/Work', index: 0 },
       ];
@@ -716,9 +692,9 @@ describe('Bug Fix: Bookmark reorder should NOT reset on Sync Now', () => {
         locallyModifiedBookmarkIds
       );
 
-      // Folder changed (toolbar/ vs toolbar/Work) - should be updated
-      expect(result.toUpdate.length).toBe(1);
-      expect(result.skippedByLocalModification.length).toBe(0);
+      // Locally modified — local wins, cloud folder change is skipped
+      expect(result.toUpdate.length).toBe(0);
+      expect(result.skippedByLocalModification.length).toBe(1);
     });
   });
 });

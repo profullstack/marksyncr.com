@@ -493,21 +493,13 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
       toAdd.push(cloudBm);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
       // If this bookmark was locally modified (e.g., user renamed or reordered
-      // it), we only skip cloud-driven updates that are *pure* reorders
-      // (index-only changes). Cloud title/folder updates are still allowed
-      // so existing behavior and tests remain valid.
+      // it), skip ALL cloud-driven updates. The local state takes priority and
+      // will be pushed to cloud in the push phase. Previously we only skipped
+      // index-only changes, which caused local title/folder edits to be
+      // overwritten by stale cloud data.
       if (locallyModifiedBookmarkIds.has(localBm.id)) {
-        const titleChanged = cloudBm.title !== localBm.title;
-        const parentChanged = cloudBm.parentId !== localBm.parentId;
-        const indexChanged = cloudBm.index !== localBm.index;
-
-        // If the only difference is index (i.e., a reorder), skip applying
-        // the cloud change and let the local ordering win. Otherwise (title
-        // or folder differences), proceed with the cloud update.
-        if (!titleChanged && !parentChanged && indexChanged) {
-          skippedByLocalModification.push(cloudBm.url);
-          continue;
-        }
+        skippedByLocalModification.push(cloudBm.url);
+        continue;
       }
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
