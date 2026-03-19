@@ -2337,12 +2337,11 @@ async function addCloudBookmarksToLocal(cloudItems) {
 
         if (item.type === 'folder') {
           // It's a folder entry - create the folder WITHOUT specifying index.
-          // Index-based positioning is handled by reorderLocalToMatchCloud after
-          // all items are created. Setting index here causes cascading shifts:
-          // each insertion at index N shifts all items at N+ to the right, so
-          // subsequent inserts land at the wrong position. When the cloud index
-          // exceeds the local folder's item count, the browser clamps it to the
-          // end — the main cause of "bookmarks end up at the END of toolbar."
+          // Contract: creation only establishes parent/identity; index/ordering
+          // are applied later by reorderLocalToMatchCloud once all items exist.
+          // Setting index during creation can cause cascading shifts (each insert
+          // at index N pushes items at N+ to the right) and lead to incorrect
+          // positions when the cloud index exceeds the current local item count.
           const children = await browser.bookmarks.getChildren(targetFolderId);
           const existingFolder = children.find((c) => !c.url && c.title === item.title);
 
