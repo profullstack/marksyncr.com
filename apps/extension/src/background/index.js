@@ -492,26 +492,16 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     if (!localBm) {
       toAdd.push(cloudBm);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
-      // If this bookmark was locally modified (e.g., user reordered it), skip
-      // cloud-driven index/position updates. The local state takes priority and
-      // will be pushed to cloud. This prevents the "reorder then Sync Now resets
-      // order" bug where cloud's stale indices overwrite local changes.
-      // We still allow title and folder changes from cloud (meaningful edits),
-      // but skip index-only changes for locally modified bookmarks.
+      // If this bookmark was locally modified (e.g., user renamed or reordered
+      // it), skip ALL cloud-driven updates. The local state takes priority and
+      // will be pushed to cloud in the push phase.
       if (locallyModifiedBookmarkIds.has(localBm.id)) {
-        const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
-        const localFolder = normalizeFolderPath(localBm.folderPath);
-        const titleChanged = (cloudBm.title ?? '') !== (localBm.title ?? '');
-        const folderChanged = cloudFolder !== localFolder;
-
-        if (!titleChanged && !folderChanged) {
-          // Only the index differs — this is a reorder conflict.
-          // Local wins because the user just rearranged these bookmarks.
-          skippedByLocalModification.push(cloudBm.url);
-          continue;
-        }
-        // Title or folder changed in cloud — allow the update even for locally
-        // modified bookmarks (meaningful edit from another browser).
+        // Local wins for ALL changes (title, folder, index) when the bookmark
+        // was locally modified. The local state will be pushed to cloud in the
+        // push phase. Previously we only skipped index-only changes, which
+        // caused local title/folder edits to be overwritten by stale cloud data.
+        skippedByLocalModification.push(cloudBm.url);
+        continue;
       }
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
@@ -2687,17 +2677,13 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
       const indexChanged =
         cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
 
-      // Skip index-only moves for locally modified bookmarks.
-      // This prevents the "reorder then Sync Now resets order" bug where
-      // cloud's stale indices overwrite local changes the user just made.
-      if (
-        locallyModifiedBookmarkIds.has(local.id) &&
-        !titleChanged &&
-        !folderChanged &&
-        indexChanged
-      ) {
+      // Skip ALL cloud-driven updates for locally modified bookmarks.
+      // Local state takes priority and will be pushed to cloud in the push phase.
+      // This prevents stale cloud data (title, folder, index) from overwriting
+      // local changes the user just made.
+      if (locallyModifiedBookmarkIds.has(local.id)) {
         console.log(
-          `[MarkSyncr] 🏠 Skipping index-only update for locally modified bookmark: ${cloud.url} (local index ${local.index} vs cloud index ${cloud.index})`
+          `[MarkSyncr] 🏠 Skipping cloud update for locally modified bookmark: ${cloud.url} (title: "${local.title}" vs cloud "${cloud.title}", index: ${local.index} vs cloud ${cloud.index})`
         );
         continue;
       }
