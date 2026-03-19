@@ -1285,8 +1285,38 @@ function setupBookmarkListeners() {
       return;
     }
 
-    // If a bookmark is re-added, remove its tombstone
+    // If a bookmark is re-added, remove its tombstone — BUT only if the tombstone
+    // is old enough. If the tombstone was created very recently (within 30 seconds),
+    // this is likely an external sync (Chrome Sync, Firefox Sync) fighting the user's
+    // deletion. In that case, keep the tombstone and re-delete the bookmark.
     if (bookmark.url) {
+      const tombstones = await getTombstones();
+      const tombstone = tombstones.find((t) => t.url === bookmark.url);
+      if (tombstone) {
+        const tombstoneAge = Date.now() - tombstone.deletedAt;
+        const RECENT_TOMBSTONE_THRESHOLD = 30000; // 30 seconds
+        if (tombstoneAge < RECENT_TOMBSTONE_THRESHOLD) {
+          console.log(
+            `[MarkSyncr] Bookmark re-created for recently deleted URL (${Math.round(tombstoneAge / 1000)}s ago), ` +
+              `likely external sync — re-deleting to honor user deletion: ${bookmark.url}`
+          );
+          try {
+            // Re-delete the bookmark that was just created by external sync
+            // Use isSyncDrivenChange to prevent this deletion from being tracked
+            // as a user action (it's our corrective deletion)
+            isSyncDrivenChange = true;
+            try {
+              await browser.bookmarks.remove(id);
+            } finally {
+              isSyncDrivenChange = false;
+            }
+          } catch (removeErr) {
+            console.warn('[MarkSyncr] Failed to re-delete externally synced bookmark:', removeErr);
+          }
+          return; // Keep the tombstone — the user intended to delete this
+        }
+      }
+      // Tombstone is old or doesn't exist — this is a genuine user re-creation
       await removeTombstone(bookmark.url);
     }
 
@@ -1597,6 +1627,12 @@ async function performSync(sourceId) {
 
     // Two-way sync with tombstone support
     try {
+      // Snapshot user-modified bookmark IDs BEFORE the pull phase.
+      // This snapshot is passed to reorderLocalToMatchCloud so it only skips
+      // reordering for folders the USER rearranged, not folders where
+      // sync-driven creates/moves/deletes happened to trigger onMoved events.
+      const userModifiedIdsSnapshot = new Set(locallyModifiedBookmarkIds);
+
       // Step 1: Get current local bookmarks and tombstones
       const bookmarkTree = await browser.bookmarks.getTree();
       const localFlat = flattenBookmarkTree(bookmarkTree);
@@ -1652,9 +1688,17 @@ async function performSync(sourceId) {
       }
 
       // Step 4: Merge tombstones (keep the newest deletion time for each URL)
+      // IMPORTANT: Re-read current tombstones from storage before writing to avoid
+      // overwriting tombstones created by onRemoved during the sync.
+      // Race condition: if the user deletes a bookmark while sync is running,
+      // onRemoved writes a new tombstone to storage. If we blindly overwrite with
+      // mergedTombstones (computed from the old localTombstones read at step 1),
+      // the new tombstone is lost and the deletion gets reverted on the next sync.
       const mergedTombstones = mergeTombstonesLocal(localTombstones, cloudTombstones);
-      await storeTombstones(mergedTombstones);
-      console.log(`[MarkSyncr] Merged tombstones: ${mergedTombstones.length}`);
+      const currentTombstones = await getTombstones();
+      const safeMergedTombstones = mergeTombstonesLocal(currentTombstones, mergedTombstones);
+      await storeTombstones(safeMergedTombstones);
+      console.log(`[MarkSyncr] Merged tombstones: ${safeMergedTombstones.length}`);
 
       // Step 5: Get updated local bookmarks after applying tombstones
       const updatedTree = await browser.bookmarks.getTree();
@@ -1668,7 +1712,7 @@ async function performSync(sourceId) {
       const { toAdd: newFromCloud, toUpdate: bookmarksToUpdate } = categorizeCloudBookmarks(
         cloudBookmarks,
         updatedLocalFlat,
-        mergedTombstones
+        safeMergedTombstones
       );
 
       console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
@@ -1744,7 +1788,7 @@ async function performSync(sourceId) {
       // so earlier moves don't shift later targets).
       isSyncDrivenChange = true;
       try {
-        await reorderLocalToMatchCloud(cloudBookmarks);
+        await reorderLocalToMatchCloud(cloudBookmarks, userModifiedIdsSnapshot);
       } catch (reorderErr) {
         console.warn('[MarkSyncr] Reorder pass failed (non-fatal):', reorderErr.message);
       } finally {
@@ -1826,9 +1870,9 @@ async function performSync(sourceId) {
       let syncResult = null;
       if (hasLocalChangesToPush) {
         console.log(
-          `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${mergedTombstones.length} tombstones to cloud...`
+          `[MarkSyncr] Pushing ${mergedFlat.length} merged bookmarks and ${safeMergedTombstones.length} tombstones to cloud...`
         );
-        syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), mergedTombstones);
+        syncResult = await syncBookmarksToCloud(mergedFlat, detectBrowser(), safeMergedTombstones);
         console.log('[MarkSyncr] Cloud sync result:', syncResult);
       } else {
         console.log(
@@ -1860,7 +1904,7 @@ async function performSync(sourceId) {
               addedFromCloud: newFromCloud.length,
               deletedLocally,
               pushedToCloud: localAdditions.length,
-              tombstones: mergedTombstones.length,
+              tombstones: safeMergedTombstones.length,
             }
           );
           console.log('[MarkSyncr] Version saved:', versionResult);
@@ -2008,27 +2052,36 @@ async function applyTombstonesToLocal(tombstones, localBookmarks) {
   }
   console.log(`[MarkSyncr] Found ${matchCount} local bookmarks that match tombstones`);
 
-  for (const bookmark of localBookmarks) {
-    if (tombstonedUrls.has(bookmark.url)) {
-      // Skip if this bookmark was locally modified (e.g., user re-added it after deletion)
-      // The user's intent to have this bookmark takes priority over the cloud tombstone
-      if (locallyModifiedBookmarkIds.has(bookmark.id)) {
-        console.log(
-          `[MarkSyncr] 🏠 Skipping tombstone for locally modified bookmark: ${bookmark.url}`
-        );
-        continue;
-      }
+  // Set isSyncDrivenChange so that onRemoved doesn't track these cloud-driven
+  // deletions as locally modified. Without this flag, each tombstone-driven
+  // removal was incorrectly added to locallyModifiedBookmarkIds and triggered
+  // an unnecessary follow-up sync via pendingSyncNeeded.
+  isSyncDrivenChange = true;
+  try {
+    for (const bookmark of localBookmarks) {
+      if (tombstonedUrls.has(bookmark.url)) {
+        // Skip if this bookmark was locally modified (e.g., user re-added it after deletion)
+        // The user's intent to have this bookmark takes priority over the cloud tombstone
+        if (locallyModifiedBookmarkIds.has(bookmark.id)) {
+          console.log(
+            `[MarkSyncr] 🏠 Skipping tombstone for locally modified bookmark: ${bookmark.url}`
+          );
+          continue;
+        }
 
-      console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
+        console.log(`[MarkSyncr] Tombstone match found for: ${bookmark.url}`);
 
-      try {
-        await browser.bookmarks.remove(bookmark.id);
-        deletedCount++;
-        console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
-      } catch (err) {
-        console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
+        try {
+          await browser.bookmarks.remove(bookmark.id);
+          deletedCount++;
+          console.log(`[MarkSyncr] ✓ Deleted local bookmark (tombstoned): ${bookmark.url}`);
+        } catch (err) {
+          console.warn(`[MarkSyncr] ✗ Failed to delete tombstoned bookmark: ${bookmark.url}`, err);
+        }
       }
     }
+  } finally {
+    isSyncDrivenChange = false;
   }
 
   console.log(`[MarkSyncr] applyTombstonesToLocal complete: deleted ${deletedCount} bookmarks`);
@@ -2293,43 +2346,28 @@ async function addCloudBookmarksToLocal(cloudItems) {
         const targetFolderId = await getOrCreateFolderPath(item._folderPath, rootFolder.id);
 
         if (item.type === 'folder') {
-          // It's a folder entry - create the folder at the correct index
-          // First check if folder already exists
+          // It's a folder entry - create the folder WITHOUT specifying index.
+          // Index-based positioning is handled by reorderLocalToMatchCloud after
+          // all items are created. Setting index here causes cascading shifts:
+          // each insertion at index N shifts all items at N+ to the right, so
+          // subsequent inserts land at the wrong position. When the cloud index
+          // exceeds the local folder's item count, the browser clamps it to the
+          // end — the main cause of "bookmarks end up at the END of toolbar."
           const children = await browser.bookmarks.getChildren(targetFolderId);
           const existingFolder = children.find((c) => !c.url && c.title === item.title);
 
           if (existingFolder) {
-            // Folder exists - check if it's at the correct index
-            if (typeof item.index === 'number' && existingFolder.index !== item.index) {
-              // Move to correct position
-              try {
-                await browser.bookmarks.move(existingFolder.id, {
-                  parentId: targetFolderId,
-                  index: item.index,
-                });
-                console.log(
-                  `[MarkSyncr] Moved existing folder "${item.title}" to index ${item.index}`
-                );
-              } catch (moveErr) {
-                console.warn(`[MarkSyncr] Failed to move folder "${item.title}":`, moveErr);
-              }
-            }
-            // Cache the folder ID
+            // Folder already exists - just cache it, reorder pass will fix position
             const folderFullPath = item._folderPath
               ? `${item._folderPath}/${item.title}`
               : item.title;
             folderCache.set(`${rootFolder.id}:${folderFullPath}`, existingFolder.id);
           } else {
-            // Create new folder at the correct index
+            // Create new folder without index — reorder pass will position it
             const createOptions = {
               parentId: targetFolderId,
               title: item.title || 'Untitled Folder',
             };
-
-            // Set index if available
-            if (typeof item.index === 'number' && item.index >= 0) {
-              createOptions.index = item.index;
-            }
 
             const newFolder = await browser.bookmarks.create(createOptions);
             addedFolders++;
@@ -2340,20 +2378,18 @@ async function addCloudBookmarksToLocal(cloudItems) {
               : item.title;
             folderCache.set(`${rootFolder.id}:${folderFullPath}`, newFolder.id);
 
-            console.log(`[MarkSyncr] Created folder "${item.title}" at index ${item.index}`);
+            console.log(
+              `[MarkSyncr] Created folder "${item.title}" (reorder pass will set position)`
+            );
           }
         } else if (item.url) {
-          // It's a bookmark - create at the correct index
+          // It's a bookmark - create WITHOUT index.
+          // Reorder pass will position it correctly afterward.
           const createOptions = {
             parentId: targetFolderId,
             title: item.title ?? '',
             url: item.url,
           };
-
-          // Set index if available
-          if (typeof item.index === 'number' && item.index >= 0) {
-            createOptions.index = item.index;
-          }
 
           await browser.bookmarks.create(createOptions);
           addedBookmarks++;
@@ -2392,7 +2428,7 @@ async function addCloudBookmarksToLocal(cloudItems) {
  *
  * @param {Array} cloudBookmarks - Flat array of cloud bookmarks with folderPath and index
  */
-async function reorderLocalToMatchCloud(cloudBookmarks) {
+async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) {
   // Group cloud items by their normalized folder path
   const cloudByFolder = new Map();
   for (const cb of cloudBookmarks) {
@@ -2477,18 +2513,22 @@ async function reorderLocalToMatchCloud(cloudBookmarks) {
 
     if (children.length < 2) continue;
 
-    // Skip reordering only when the pattern of local modifications looks like
-    // a local reorder. When a user rearranges bookmarks locally, multiple (often
-    // all) siblings in the folder are marked as locally modified. If we reorder
-    // to match cloud in that case, we overwrite the user's intended arrangement.
-    // The local order will be pushed to cloud in the push step instead.
+    // Skip reordering only when the user manually rearranged bookmarks
+    // before this sync started. We use `userModifiedIds` — a snapshot of
+    // locallyModifiedBookmarkIds taken at the START of performSync, before
+    // any sync-driven creates/moves/deletes. This ensures that sync-driven
+    // changes (adds, folder moves, tombstone deletions) don't accidentally
+    // trigger the skip, which was the root cause of "bookmarks end up at
+    // the end of the toolbar" — the reorder pass was being skipped because
+    // sync-driven onMoved events polluted locallyModifiedBookmarkIds.
+    const idsToCheck = userModifiedIds || locallyModifiedBookmarkIds;
     const modifiedChildrenCount = children.reduce(
-      (count, child) => (locallyModifiedBookmarkIds.has(child.id) ? count + 1 : count),
+      (count, child) => (idsToCheck.has(child.id) ? count + 1 : count),
       0
     );
     if (modifiedChildrenCount > 1) {
       console.log(
-        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple locally modified bookmarks (${modifiedChildrenCount})`
+        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple user-modified bookmarks (${modifiedChildrenCount})`
       );
       continue;
     }
@@ -2670,27 +2710,22 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
         );
       }
 
-      // Move to new folder or position if needed
-      if (folderChanged || indexChanged) {
+      // Move to new folder if the folder changed. Index-only changes are
+      // handled by the reorderLocalToMatchCloud pass, which processes all
+      // children of each folder in one go (last-to-first) to avoid the
+      // cascading index shift problem caused by sequential moves.
+      if (folderChanged) {
         const rootFolder = rootFolders[cloudRootKey] || rootFolders.other || rootFolders.toolbar;
 
         if (rootFolder) {
           const targetFolderId = await getOrCreateFolderPath(cloudRelativePath, rootFolder.id);
 
-          const moveOptions = { parentId: targetFolderId };
-          if (cloud.index !== undefined && cloud.index >= 0) {
-            moveOptions.index = cloud.index;
-          }
+          // Move to new folder without specifying index — reorder pass will position it
+          await browser.bookmarks.move(local.id, { parentId: targetFolderId });
 
-          await browser.bookmarks.move(local.id, moveOptions);
-
-          if (folderChanged) {
-            console.log(
-              `[MarkSyncr] Moved ${cloud.url} from "${local.folderPath}" to "${cloud.folderPath}"`
-            );
-          } else {
-            console.log(`[MarkSyncr] Repositioned ${cloud.url} to index ${cloud.index}`);
-          }
+          console.log(
+            `[MarkSyncr] Moved ${cloud.url} from "${local.folderPath}" to "${cloud.folderPath}" (reorder pass will set position)`
+          );
         }
       }
 
@@ -2873,9 +2908,13 @@ async function forcePush() {
     // Pass the bookmark count as synced count since we're pushing all to cloud
     const stats = countBookmarks(bookmarkTree, flatBookmarks.filter((b) => b.url).length);
 
+    // Get current local tombstones to push alongside bookmarks
+    // Force push should include tombstones so the cloud knows about deletions
+    const localTombstones = await getTombstones();
+
     // Force push to cloud (overwrite)
     console.log(`[MarkSyncr] Force pushing ${flatBookmarks.length} bookmarks to cloud...`);
-    const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser());
+    const syncResult = await syncBookmarksToCloud(flatBookmarks, detectBrowser(), localTombstones);
     console.log('[MarkSyncr] Force push sync result:', syncResult);
 
     // Save version with force push marker (non-blocking)
@@ -2892,10 +2931,25 @@ async function forcePush() {
       console.warn('[MarkSyncr] Force push version save failed (continuing):', versionErr.message);
     }
 
-    // Update last sync time
+    // Update last sync time (both ISO string for display and timestamp for tombstone safeguard)
+    const syncTimestamp = Date.now();
     await browser.storage.local.set({
-      lastSync: new Date().toISOString(),
+      lastSync: new Date(syncTimestamp).toISOString(),
     });
+    await storeLastSyncTime(syncTimestamp);
+
+    // Store the cloud checksum so the next performSync knows the baseline
+    if (syncResult?.checksum) {
+      await storeLastCloudChecksum(syncResult.checksum);
+    }
+
+    // Clear locally modified tracking — force push overwrites cloud, so everything is in sync
+    if (saveModifiedIdsTimeout) {
+      clearTimeout(saveModifiedIdsTimeout);
+      saveModifiedIdsTimeout = null;
+    }
+    locallyModifiedBookmarkIds.clear();
+    await saveLocallyModifiedIds();
 
     return { success: true, stats, message: 'Successfully force pushed bookmarks to cloud' };
   } catch (err) {
@@ -3058,16 +3112,26 @@ async function forcePull() {
         `[MarkSyncr] Force Pull: Created ${importedCount} bookmarks, ${foldersCreated} folders`
       );
 
-      // Update last sync time
+      // Update last sync time (both ISO string for display and timestamp for tombstone safeguard)
+      const syncTimestamp = Date.now();
       await browser.storage.local.set({
-        lastSync: new Date().toISOString(),
+        lastSync: new Date(syncTimestamp).toISOString(),
       });
+      await storeLastSyncTime(syncTimestamp);
 
       const stats = { total: importedCount, folders: foldersCreated, synced: importedCount };
 
       console.log(
         `[MarkSyncr] Force Pull complete: ${importedCount} bookmarks, ${foldersCreated} folders`
       );
+
+      // Clear locally modified tracking — force pull overwrites local, so everything is in sync
+      if (saveModifiedIdsTimeout) {
+        clearTimeout(saveModifiedIdsTimeout);
+        saveModifiedIdsTimeout = null;
+      }
+      locallyModifiedBookmarkIds.clear();
+      await saveLocallyModifiedIds();
 
       // CRITICAL: After Force Pull, sync the pulled bookmarks back to cloud_bookmarks
       // This ensures the next regular sync sees matching data and doesn't revert changes.
@@ -3571,3 +3635,47 @@ console.log('[MarkSyncr] Event listeners registered');
 
 // Initialize (async operations)
 initialize();
+
+// =============================================================================
+// Test-only exports — these are used by integration tests to call real code
+// with mocked browser APIs, rather than copying/reimplementing functions.
+// Guarded behind VITEST so the production bundle tree-shakes them away.
+// =============================================================================
+export const __test__ = import.meta.env?.VITEST
+  ? {
+      performSync,
+      getTombstones,
+      storeTombstones,
+      addTombstone,
+      removeTombstone,
+      categorizeCloudBookmarks,
+      flattenBookmarkTree,
+      mergeTombstonesLocal,
+      addCloudBookmarksToLocal,
+      applyTombstonesToLocal,
+      filterTombstonesToApply,
+      setupBookmarkListeners,
+      initialize,
+      // State accessors (module-level let variables are not directly exportable)
+      getState: () => ({
+        isSyncInProgress,
+        isForcePullInProgress,
+        isSyncDrivenChange,
+        pendingSyncNeeded,
+        pendingSyncReasons,
+        locallyModifiedBookmarkIds,
+        consecutiveSyncFailures,
+        lastSyncError,
+      }),
+      resetState: () => {
+        isSyncInProgress = false;
+        isForcePullInProgress = false;
+        isSyncDrivenChange = false;
+        pendingSyncNeeded = false;
+        pendingSyncReasons = [];
+        locallyModifiedBookmarkIds = new Set();
+        consecutiveSyncFailures = 0;
+        lastSyncError = null;
+      },
+    }
+  : undefined;
