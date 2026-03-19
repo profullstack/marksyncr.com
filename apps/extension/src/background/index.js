@@ -492,26 +492,14 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
     if (!localBm) {
       toAdd.push(cloudBm);
     } else if (bookmarkNeedsUpdate(cloudBm, localBm)) {
-      // If this bookmark was locally modified (e.g., user reordered it), skip
-      // cloud-driven index/position updates. The local state takes priority and
-      // will be pushed to cloud. This prevents the "reorder then Sync Now resets
-      // order" bug where cloud's stale indices overwrite local changes.
-      // We still allow title and folder changes from cloud (meaningful edits),
-      // but skip index-only changes for locally modified bookmarks.
+      // If this bookmark was locally modified (e.g., user renamed or reordered
+      // it), skip ALL cloud-driven updates. The local state takes priority and
+      // will be pushed to cloud in the push phase. Previously we only skipped
+      // index-only changes, which caused local title/folder edits to be
+      // overwritten by stale cloud data.
       if (locallyModifiedBookmarkIds.has(localBm.id)) {
-        const cloudFolder = normalizeFolderPath(cloudBm.folderPath);
-        const localFolder = normalizeFolderPath(localBm.folderPath);
-        const titleChanged = (cloudBm.title ?? '') !== (localBm.title ?? '');
-        const folderChanged = cloudFolder !== localFolder;
-
-        if (!titleChanged && !folderChanged) {
-          // Only the index differs — this is a reorder conflict.
-          // Local wins because the user just rearranged these bookmarks.
-          skippedByLocalModification.push(cloudBm.url);
-          continue;
-        }
-        // Title or folder changed in cloud — allow the update even for locally
-        // modified bookmarks (meaningful edit from another browser).
+        skippedByLocalModification.push(cloudBm.url);
+        continue;
       }
       toUpdate.push({ cloud: cloudBm, local: localBm });
     } else {
@@ -2347,12 +2335,11 @@ async function addCloudBookmarksToLocal(cloudItems) {
 
         if (item.type === 'folder') {
           // It's a folder entry - create the folder WITHOUT specifying index.
-          // Index-based positioning is handled by reorderLocalToMatchCloud after
-          // all items are created. Setting index here causes cascading shifts:
-          // each insertion at index N shifts all items at N+ to the right, so
-          // subsequent inserts land at the wrong position. When the cloud index
-          // exceeds the local folder's item count, the browser clamps it to the
-          // end — the main cause of "bookmarks end up at the END of toolbar."
+          // Contract: creation only establishes parent/identity; index/ordering
+          // are applied later by reorderLocalToMatchCloud once all items exist.
+          // Setting index during creation can cause cascading shifts (each insert
+          // at index N pushes items at N+ to the right) and lead to incorrect
+          // positions when the cloud index exceeds the current local item count.
           const children = await browser.bookmarks.getChildren(targetFolderId);
           const existingFolder = children.find((c) => !c.url && c.title === item.title);
 
@@ -2513,14 +2500,19 @@ async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) 
 
     if (children.length < 2) continue;
 
-    // Skip reordering only when the user manually rearranged bookmarks
-    // before this sync started. We use `userModifiedIds` — a snapshot of
-    // locallyModifiedBookmarkIds taken at the START of performSync, before
-    // any sync-driven creates/moves/deletes. This ensures that sync-driven
-    // changes (adds, folder moves, tombstone deletions) don't accidentally
+    // Skip auto-reordering when a folder appears to have multiple
+    // *locally modified* children before this sync started. This is a
+    // conservative heuristic that treats "more than one modified child"
+    // as a signal that the user may have intentionally rearranged or
+    // otherwise edited that folder and we should not override it.
+    //
+    // We use `userModifiedIds` — a snapshot of locallyModifiedBookmarkIds
+    // taken at the START of performSync, before any sync-driven
+    // creates/moves/deletes. This ensures that sync-driven changes
+    // (adds, folder moves, tombstone deletions) don't accidentally
     // trigger the skip, which was the root cause of "bookmarks end up at
-    // the end of the toolbar" — the reorder pass was being skipped because
-    // sync-driven onMoved events polluted locallyModifiedBookmarkIds.
+    // the end of the toolbar" — the reorder pass was being skipped
+    // because sync-driven onMoved events polluted locallyModifiedBookmarkIds.
     const idsToCheck = userModifiedIds || locallyModifiedBookmarkIds;
     const modifiedChildrenCount = children.reduce(
       (count, child) => (idsToCheck.has(child.id) ? count + 1 : count),
@@ -2687,17 +2679,13 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
       const indexChanged =
         cloud.index !== undefined && local.index !== undefined && cloud.index !== local.index;
 
-      // Skip index-only moves for locally modified bookmarks.
-      // This prevents the "reorder then Sync Now resets order" bug where
-      // cloud's stale indices overwrite local changes the user just made.
-      if (
-        locallyModifiedBookmarkIds.has(local.id) &&
-        !titleChanged &&
-        !folderChanged &&
-        indexChanged
-      ) {
+      // Skip ALL cloud-driven updates for locally modified bookmarks.
+      // Local state takes priority and will be pushed to cloud in the push phase.
+      // This prevents stale cloud data (title, folder, index) from overwriting
+      // local changes the user just made.
+      if (locallyModifiedBookmarkIds.has(local.id)) {
         console.log(
-          `[MarkSyncr] 🏠 Skipping index-only update for locally modified bookmark: ${cloud.url} (local index ${local.index} vs cloud index ${cloud.index})`
+          `[MarkSyncr] 🏠 Skipping cloud update for locally modified bookmark: ${cloud.url} (title: "${local.title}" vs cloud "${cloud.title}", index: ${local.index} vs cloud ${cloud.index})`
         );
         continue;
       }
