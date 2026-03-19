@@ -2508,14 +2508,19 @@ async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) 
 
     if (children.length < 2) continue;
 
-    // Skip reordering only when the user manually rearranged bookmarks
-    // before this sync started. We use `userModifiedIds` — a snapshot of
-    // locallyModifiedBookmarkIds taken at the START of performSync, before
-    // any sync-driven creates/moves/deletes. This ensures that sync-driven
-    // changes (adds, folder moves, tombstone deletions) don't accidentally
+    // Skip auto-reordering when a folder appears to have multiple
+    // *locally modified* children before this sync started. This is a
+    // conservative heuristic that treats "more than one modified child"
+    // as a signal that the user may have intentionally rearranged or
+    // otherwise edited that folder and we should not override it.
+    //
+    // We use `userModifiedIds` — a snapshot of locallyModifiedBookmarkIds
+    // taken at the START of performSync, before any sync-driven
+    // creates/moves/deletes. This ensures that sync-driven changes
+    // (adds, folder moves, tombstone deletions) don't accidentally
     // trigger the skip, which was the root cause of "bookmarks end up at
-    // the end of the toolbar" — the reorder pass was being skipped because
-    // sync-driven onMoved events polluted locallyModifiedBookmarkIds.
+    // the end of the toolbar" — the reorder pass was being skipped
+    // because sync-driven onMoved events polluted locallyModifiedBookmarkIds.
     const idsToCheck = userModifiedIds || locallyModifiedBookmarkIds;
     const modifiedChildrenCount = children.reduce(
       (count, child) => (idsToCheck.has(child.id) ? count + 1 : count),
