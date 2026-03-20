@@ -452,9 +452,19 @@ function bookmarkNeedsUpdate(cloudBm, localBm) {
  * @param {Array} cloudBookmarks - Bookmarks from cloud
  * @param {Array} localBookmarks - Local bookmarks
  * @param {Array} tombstones - Merged tombstones
+ * @param {Set|null} userModifiedIds - Snapshot of locally modified IDs taken before sync started.
+ *   Using a snapshot (instead of the live global) ensures sync-driven changes during the pull phase
+ *   don't pollute the set and cause false positives/negatives. Falls back to the live global for
+ *   backward compatibility if not provided.
  * @returns {{toAdd: Array, toUpdate: Array, skippedByTombstone: Array}} - Categorized bookmarks
  */
-function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
+function categorizeCloudBookmarks(
+  cloudBookmarks,
+  localBookmarks,
+  tombstones,
+  userModifiedIds = null
+) {
+  const modifiedIds = userModifiedIds || locallyModifiedBookmarkIds;
   const localByUrl = new Map(localBookmarks.filter((b) => b.url).map((b) => [b.url, b]));
 
   const toAdd = [];
@@ -464,7 +474,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
   const alreadyExistsUnchanged = [];
 
   console.log(
-    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones, ${locallyModifiedBookmarkIds.size} locally modified`
+    `[MarkSyncr] categorizeCloudBookmarks: ${cloudBookmarks.length} cloud, ${localBookmarks.length} local, ${tombstones.length} tombstones, ${modifiedIds.size} locally modified (snapshot: ${userModifiedIds !== null})`
   );
 
   for (const cloudBm of cloudBookmarks) {
@@ -497,7 +507,7 @@ function categorizeCloudBookmarks(cloudBookmarks, localBookmarks, tombstones) {
       // will be pushed to cloud in the push phase. Previously we only skipped
       // index-only changes, which caused local title/folder edits to be
       // overwritten by stale cloud data.
-      if (locallyModifiedBookmarkIds.has(localBm.id)) {
+      if (modifiedIds.has(localBm.id)) {
         skippedByLocalModification.push(cloudBm.url);
         continue;
       }
@@ -1697,10 +1707,13 @@ async function performSync(sourceId) {
       // - New bookmarks (URL not in local)
       // - Updated bookmarks (URL exists but title/folder/index differs)
       // - Tombstone filtering (only add if bookmark is newer than tombstone)
+      // IMPORTANT: Pass the pre-sync snapshot of locally modified IDs so that
+      // sync-driven changes during steps 3-5 don't pollute the check.
       const { toAdd: newFromCloud, toUpdate: bookmarksToUpdate } = categorizeCloudBookmarks(
         cloudBookmarks,
         updatedLocalFlat,
-        safeMergedTombstones
+        safeMergedTombstones,
+        userModifiedIdsSnapshot
       );
 
       console.log(`[MarkSyncr] 🔍 New bookmarks from cloud: ${newFromCloud.length}`);
@@ -1761,7 +1774,10 @@ async function performSync(sourceId) {
           console.log(
             `[MarkSyncr] Found ${bookmarksToUpdate.length} bookmarks to update from cloud`
           );
-          updatedLocally = await updateLocalBookmarksFromCloud(bookmarksToUpdate);
+          updatedLocally = await updateLocalBookmarksFromCloud(
+            bookmarksToUpdate,
+            userModifiedIdsSnapshot
+          );
           console.log(`[MarkSyncr] Updated ${updatedLocally} local bookmarks from cloud`);
         }
       } finally {
@@ -1829,14 +1845,19 @@ async function performSync(sourceId) {
         consecutiveSyncFailures = 0;
         lastSyncError = null;
 
-        // Clear locally modified tracking - changes are in sync
-        // Cancel any pending debounced save to prevent race condition where
-        // sync-driven onMoved events persist stale IDs after this clear
+        // Clear locally modified tracking - changes are in sync.
+        // IMPORTANT: Only remove IDs that were in the pre-sync snapshot.
+        // Any IDs added by the user DURING the sync (genuine user actions
+        // while isSyncDrivenChange was false) must be preserved, otherwise
+        // the follow-up sync would treat those changes as non-local and
+        // revert them with stale cloud data.
         if (saveModifiedIdsTimeout) {
           clearTimeout(saveModifiedIdsTimeout);
           saveModifiedIdsTimeout = null;
         }
-        locallyModifiedBookmarkIds.clear();
+        for (const id of userModifiedIdsSnapshot) {
+          locallyModifiedBookmarkIds.delete(id);
+        }
         await saveLocallyModifiedIds();
 
         return {
@@ -1922,14 +1943,19 @@ async function performSync(sourceId) {
       consecutiveSyncFailures = 0;
       lastSyncError = null;
 
-      // Clear locally modified tracking - changes have been pushed to cloud
-      // Cancel any pending debounced save to prevent race condition where
-      // sync-driven onMoved events persist stale IDs after this clear
+      // Clear locally modified tracking - changes have been pushed to cloud.
+      // IMPORTANT: Only remove IDs that were in the pre-sync snapshot.
+      // Any IDs added by the user DURING the sync (genuine user actions
+      // while isSyncDrivenChange was false) must be preserved, otherwise
+      // the follow-up sync would treat those changes as non-local and
+      // revert them with stale cloud data.
       if (saveModifiedIdsTimeout) {
         clearTimeout(saveModifiedIdsTimeout);
         saveModifiedIdsTimeout = null;
       }
-      locallyModifiedBookmarkIds.clear();
+      for (const id of userModifiedIdsSnapshot) {
+        locallyModifiedBookmarkIds.delete(id);
+      }
       await saveLocallyModifiedIds();
 
       return {
@@ -2500,11 +2526,11 @@ async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) 
 
     if (children.length < 2) continue;
 
-    // Skip auto-reordering when a folder appears to have multiple
-    // *locally modified* children before this sync started. This is a
-    // conservative heuristic that treats "more than one modified child"
-    // as a signal that the user may have intentionally rearranged or
-    // otherwise edited that folder and we should not override it.
+    // Skip auto-reordering when a folder has ANY *locally modified* children
+    // before this sync started. If the user touched anything in this folder
+    // (moved, created, edited a bookmark), their local ordering takes priority
+    // and will be pushed to cloud. Applying cloud order here would revert
+    // the user's changes.
     //
     // We use `userModifiedIds` — a snapshot of locallyModifiedBookmarkIds
     // taken at the START of performSync, before any sync-driven
@@ -2513,14 +2539,20 @@ async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) 
     // trigger the skip, which was the root cause of "bookmarks end up at
     // the end of the toolbar" — the reorder pass was being skipped
     // because sync-driven onMoved events polluted locallyModifiedBookmarkIds.
+    //
+    // The previous threshold of `> 1` was too lenient — when the user moved
+    // a bookmark into an otherwise empty folder, only 1 child was marked as
+    // modified, so the reorder was NOT skipped and cloud order was applied,
+    // reverting the user's move. With the snapshot approach excluding
+    // sync-driven pollution, `>= 1` is safe.
     const idsToCheck = userModifiedIds || locallyModifiedBookmarkIds;
     const modifiedChildrenCount = children.reduce(
       (count, child) => (idsToCheck.has(child.id) ? count + 1 : count),
       0
     );
-    if (modifiedChildrenCount > 1) {
+    if (modifiedChildrenCount >= 1) {
       console.log(
-        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains multiple user-modified bookmarks (${modifiedChildrenCount})`
+        `[MarkSyncr] 🏠 Skipping reorder for folder "${folderPath}" — contains ${modifiedChildrenCount} user-modified bookmark(s)`
       );
       continue;
     }
@@ -2570,10 +2602,15 @@ async function reorderLocalToMatchCloud(cloudBookmarks, userModifiedIds = null) 
   }
 }
 
-async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
+async function updateLocalBookmarksFromCloud(bookmarksToUpdate, userModifiedIds = null) {
   if (!bookmarksToUpdate || bookmarksToUpdate.length === 0) {
     return 0;
   }
+
+  // Use the pre-sync snapshot of locally modified IDs if provided.
+  // This prevents sync-driven changes during the pull phase from polluting
+  // the check, ensuring only genuine user modifications are protected.
+  const modifiedIds = userModifiedIds || locallyModifiedBookmarkIds;
 
   // Get current browser bookmarks to find root folders
   const currentTree = await browser.bookmarks.getTree();
@@ -2683,7 +2720,9 @@ async function updateLocalBookmarksFromCloud(bookmarksToUpdate) {
       // Local state takes priority and will be pushed to cloud in the push phase.
       // This prevents stale cloud data (title, folder, index) from overwriting
       // local changes the user just made.
-      if (locallyModifiedBookmarkIds.has(local.id)) {
+      // Uses the pre-sync snapshot (modifiedIds) instead of the live global to
+      // avoid race conditions with sync-driven changes.
+      if (modifiedIds.has(local.id)) {
         console.log(
           `[MarkSyncr] 🏠 Skipping cloud update for locally modified bookmark: ${cloud.url} (title: "${local.title}" vs cloud "${cloud.title}", index: ${local.index} vs cloud ${cloud.index})`
         );
