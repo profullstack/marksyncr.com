@@ -340,7 +340,12 @@ async function storeLastSyncTime(timestamp) {
  * @param {number|null} lastSyncTime - Timestamp of last successful sync (null if never synced)
  * @returns {Array<{url: string, deletedAt: number}>} - Filtered tombstones to apply
  */
-function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime) {
+function filterTombstonesToApply(
+  cloudTombstones,
+  localTombstones,
+  lastSyncTime,
+  cloudBookmarkUrls = null
+) {
   if (!cloudTombstones || cloudTombstones.length === 0) {
     return [];
   }
@@ -365,6 +370,21 @@ function filterTombstonesToApply(cloudTombstones, localTombstones, lastSyncTime)
     // If the tombstone was created AFTER our last sync, it's a new deletion
     // from another browser that we should apply
     if (tombstone.deletedAt > lastSyncTime) {
+      return true;
+    }
+
+    // CRITICAL FIX: If the cloud bookmark data no longer contains this URL,
+    // the deletion has already been applied to the cloud by the browser that
+    // pushed the tombstone. Even though the tombstone's deletedAt predates
+    // our lastSyncTime (a timing race between browsers syncing), the absence
+    // of the bookmark from cloud data confirms the deletion is intentional.
+    // Without this check, the local browser keeps the bookmark, treats it as
+    // a "local addition", and pushes it back to cloud — undoing the deletion
+    // in an infinite loop.
+    if (cloudBookmarkUrls && !cloudBookmarkUrls.has(tombstone.url)) {
+      console.log(
+        `[MarkSyncr] Applying tombstone confirmed by cloud data (bookmark absent from cloud): ${tombstone.url}`
+      );
       return true;
     }
 
@@ -1668,11 +1688,18 @@ async function performSync(sourceId) {
       // when local storage was cleared but cloud still has old tombstones
       let deletedLocally = 0;
       if (cloudTombstones.length > 0) {
+        // Build a set of URLs present in cloud bookmark data for the tombstone
+        // staleness check. If a tombstone exists but the bookmark is absent from
+        // cloud data, the deletion was confirmed — apply the tombstone even if
+        // it appears "stale" by timestamp comparison.
+        const cloudBookmarkUrls = new Set(cloudBookmarks.filter((b) => b.url).map((b) => b.url));
+
         // Filter tombstones using the safeguard
         const tombstonesToApply = filterTombstonesToApply(
           cloudTombstones,
           localTombstones,
-          lastSyncTime
+          lastSyncTime,
+          cloudBookmarkUrls
         );
 
         if (tombstonesToApply.length > 0) {
@@ -1746,13 +1773,27 @@ async function performSync(sourceId) {
       // Step 6.5: Find local bookmarks that are not in cloud (local additions to push)
       // This is used to determine if we have local changes that need to be pushed
       const cloudUrls = new Set(cloudBookmarks.filter((b) => b.url).map((b) => b.url));
+      // Build a set of cloud tombstone URLs so we can exclude tombstoned bookmarks
+      // from local additions. Without this, a bookmark deleted on another browser
+      // (and removed from cloud data) would still exist locally and be treated as
+      // a "local addition" — pushing it right back to cloud and undoing the deletion.
+      const cloudTombstoneUrls = new Set(cloudTombstones.map((t) => t.url));
       const localAdditions = updatedLocalFlat.filter((lb) => {
         // Skip folders (they don't have URLs)
         if (!lb.url) {
           return false;
         }
         // Check if this local bookmark exists in cloud
-        return !cloudUrls.has(lb.url);
+        if (cloudUrls.has(lb.url)) {
+          return false;
+        }
+        // CRITICAL: Don't treat a bookmark as a "local addition" if the cloud
+        // has a tombstone for it. The tombstone means another browser deleted
+        // it intentionally. Pushing it back would undo the deletion.
+        if (cloudTombstoneUrls.has(lb.url)) {
+          return false;
+        }
+        return true;
       });
       console.log(`[MarkSyncr] Local additions (not in cloud): ${localAdditions.length}`);
 
