@@ -633,8 +633,7 @@ describe('Integration: real performSync with mocked browser APIs', () => {
       const url2 = 'https://cloud-deleted.com';
       const urlBoth = 'https://both-deleted.com';
 
-      // Use recent timestamps so tombstones pass the safeguard filter
-      // and don't get cleaned up by cleanupOldTombstones (30 day TTL)
+      // Use recent timestamps so tombstones pass the safeguard filter.
       const now = Date.now();
       const localTs1 = now - 60000; // 1 minute ago
       const localTsBoth = now - 30000; // 30 seconds ago

@@ -564,7 +564,7 @@ describe('Sync Integration Tests', () => {
       expect(merged).toHaveLength(2);
     });
 
-    it('should respect tombstone age for cleanup', async () => {
+    it('should keep tombstones regardless of age', async () => {
       const now = Date.now();
       const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
       const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
@@ -575,14 +575,10 @@ describe('Sync Integration Tests', () => {
         { url: 'https://too-old.com', deletedAt: thirtyOneDaysAgo },
       ];
 
-      // Cleanup tombstones older than 30 days
-      const cutoff = now - 30 * 24 * 60 * 60 * 1000;
-      const cleaned = tombstones.filter((t) => t.deletedAt > cutoff);
-
-      expect(cleaned).toHaveLength(2);
-      expect(cleaned.map((t) => t.url)).toContain('https://recent.com');
-      expect(cleaned.map((t) => t.url)).toContain('https://old-but-ok.com');
-      expect(cleaned.map((t) => t.url)).not.toContain('https://too-old.com');
+      expect(tombstones).toHaveLength(3);
+      expect(tombstones.map((t) => t.url)).toContain('https://recent.com');
+      expect(tombstones.map((t) => t.url)).toContain('https://old-but-ok.com');
+      expect(tombstones.map((t) => t.url)).toContain('https://too-old.com');
     });
 
     it('should handle re-add after delete correctly', async () => {

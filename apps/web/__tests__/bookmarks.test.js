@@ -536,6 +536,12 @@ describe('Bookmarks API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data.message).toBe('Bookmark deleted successfully');
+      const updatePayload = updateMock.mock.calls[0][0];
+      expect(updatePayload.bookmark_data).toHaveLength(1);
+      expect(updatePayload.bookmark_data[0].url).toBe('https://test.com');
+      expect(updatePayload.tombstones).toHaveLength(1);
+      expect(updatePayload.tombstones[0].url).toBe('https://example.com');
+      expect(updatePayload.tombstones[0].deletedAt).toBeGreaterThan(0);
     });
 
     it('should delete bookmark by ID', async () => {
@@ -1491,10 +1497,7 @@ describe('Tombstone Tracking for Deletion Sync', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should NOT remove bookmarks on server - tombstones are applied by extensions only', async () => {
-      // IMPORTANT: Server should NOT apply tombstones to bookmarks.
-      // Tombstones are stored and merged, but only browser extensions apply them locally.
-      // This prevents the bug where bookmarks were being deleted automatically.
+    it('should remove tombstoned bookmarks from the server master record', async () => {
       const existingBookmarks = [
         { id: '1', url: 'https://to-delete.com', title: 'To Delete', dateAdded: 1000 },
         { id: '2', url: 'https://keep.com', title: 'Keep', dateAdded: 3000 },
@@ -1516,9 +1519,7 @@ describe('Tombstone Tracking for Deletion Sync', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // Server should keep ALL bookmarks - tombstones are NOT applied server-side
-      // Extensions will apply tombstones locally when they sync
-      expect(data.merged).toBe(2);
+      expect(data.merged).toBe(1);
     });
 
     it('should NOT remove bookmarks if tombstone is older than dateAdded', async () => {
@@ -2704,14 +2705,14 @@ describe('Bookmark Count Limits', () => {
   });
 });
 
-describe('Server-Side Tombstone Cleanup', () => {
+describe('Server-Side Tombstone Retention', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSupabase = createMockSupabase();
   });
 
   /**
-   * Helper to create a mock that handles tombstone cleanup testing
+   * Helper to create a mock that handles tombstone retention testing
    */
   function createTombstoneCleanupMockSupabase(options = {}) {
     const {
@@ -2799,8 +2800,8 @@ describe('Server-Side Tombstone Cleanup', () => {
     };
   }
 
-  describe('POST /api/bookmarks - Tombstone Cleanup', () => {
-    it('should remove tombstones older than 30 days from existing data', async () => {
+  describe('POST /api/bookmarks - Tombstone Retention', () => {
+    it('should keep old tombstones from existing data', async () => {
       const now = Date.now();
       const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
       const twentyNineDaysAgo = now - 29 * 24 * 60 * 60 * 1000;
@@ -2827,14 +2828,15 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       expect(response.status).toBe(200);
 
-      // Check that the old tombstone was cleaned up
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData).not.toBeNull();
-      expect(upsertedData.tombstones).toHaveLength(1);
-      expect(upsertedData.tombstones[0].url).toBe('https://recent-deleted.com');
+      expect(upsertedData.tombstones).toHaveLength(2);
+      const urls = upsertedData.tombstones.map((t) => t.url);
+      expect(urls).toContain('https://old-deleted.com');
+      expect(urls).toContain('https://recent-deleted.com');
     });
 
-    it('should remove tombstones older than 30 days from incoming data', async () => {
+    it('should keep old tombstones from incoming data', async () => {
       const now = Date.now();
       const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
       const twentyNineDaysAgo = now - 29 * 24 * 60 * 60 * 1000;
@@ -2858,11 +2860,12 @@ describe('Server-Side Tombstone Cleanup', () => {
 
       expect(response.status).toBe(200);
 
-      // Check that the old tombstone was cleaned up
       const upsertedData = mockSupabase.getUpsertedData();
       expect(upsertedData).not.toBeNull();
-      expect(upsertedData.tombstones).toHaveLength(1);
-      expect(upsertedData.tombstones[0].url).toBe('https://recent-incoming.com');
+      expect(upsertedData.tombstones).toHaveLength(2);
+      const urls = upsertedData.tombstones.map((t) => t.url);
+      expect(urls).toContain('https://old-incoming.com');
+      expect(urls).toContain('https://recent-incoming.com');
     });
 
     it('should keep tombstones exactly 30 days old', async () => {
@@ -2893,7 +2896,7 @@ describe('Server-Side Tombstone Cleanup', () => {
       expect(upsertedData.tombstones).toHaveLength(1);
     });
 
-    it('should clean up old tombstones during merge', async () => {
+    it('should keep old tombstones during merge', async () => {
       const now = Date.now();
       const fortyDaysAgo = now - 40 * 24 * 60 * 60 * 1000;
       const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
@@ -2923,14 +2926,13 @@ describe('Server-Side Tombstone Cleanup', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      // Should have 2 tombstones (the two recent ones)
       const upsertedData = mockSupabase.getUpsertedData();
-      expect(upsertedData.tombstones).toHaveLength(2);
+      expect(upsertedData.tombstones).toHaveLength(3);
 
       const urls = upsertedData.tombstones.map((t) => t.url);
+      expect(urls).toContain('https://very-old.com');
       expect(urls).toContain('https://existing-recent.com');
       expect(urls).toContain('https://incoming-recent.com');
-      expect(urls).not.toContain('https://very-old.com');
     });
 
     it('should handle tombstones without deletedAt timestamp', async () => {
@@ -2961,12 +2963,8 @@ describe('Server-Side Tombstone Cleanup', () => {
     });
   });
 
-  describe('Tombstone Cleanup - Root Cause Fix', () => {
-    it('should prevent stale tombstones from accumulating in cloud', async () => {
-      // This test verifies the ROOT CAUSE fix:
-      // Before: Tombstones accumulated forever in the cloud
-      // After: Tombstones older than 30 days are automatically cleaned up
-
+  describe('Tombstone Retention - Root Cause Fix', () => {
+    it('should preserve deletion tombstones so stale bookmarks cannot reappear later', async () => {
       const now = Date.now();
 
       // Simulate a scenario where tombstones have been accumulating for months
@@ -2995,20 +2993,17 @@ describe('Server-Side Tombstone Cleanup', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      // Only tombstones from the last 30 days should remain
       const upsertedData = mockSupabase.getUpsertedData();
-      expect(upsertedData.tombstones).toHaveLength(3); // 29 days, 7 days, today
+      expect(upsertedData.tombstones).toHaveLength(7);
 
       const urls = upsertedData.tombstones.map((t) => t.url);
+      expect(urls).toContain('https://deleted-90-days-ago.com');
+      expect(urls).toContain('https://deleted-60-days-ago.com');
+      expect(urls).toContain('https://deleted-45-days-ago.com');
+      expect(urls).toContain('https://deleted-31-days-ago.com');
       expect(urls).toContain('https://deleted-29-days-ago.com');
       expect(urls).toContain('https://deleted-7-days-ago.com');
       expect(urls).toContain('https://deleted-today.com');
-
-      // Old tombstones should be gone
-      expect(urls).not.toContain('https://deleted-90-days-ago.com');
-      expect(urls).not.toContain('https://deleted-60-days-ago.com');
-      expect(urls).not.toContain('https://deleted-45-days-ago.com');
-      expect(urls).not.toContain('https://deleted-31-days-ago.com');
     });
   });
 
@@ -3173,6 +3168,127 @@ describe('Server-Side Tombstone Cleanup', () => {
         'https://also-keep.com',
         'https://keep.com',
       ]);
+    });
+
+    it('should infer tombstones for URLs missing from a replace=true master snapshot', async () => {
+      const existingCloudBookmarks = [
+        { id: '1', url: 'https://keep.com', title: 'Keep', dateAdded: 1000 },
+        { id: '2', url: 'https://deleted.com', title: 'Deleted', dateAdded: 1000 },
+      ];
+      const bookmarksToSync = [{ id: '1', url: 'https://keep.com', title: 'Keep', dateAdded: 1000 }];
+
+      let upsertedData = null;
+      const upsertMock = vi.fn().mockImplementation((data) => {
+        upsertedData = data;
+        return {
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { version: 2, checksum: 'newchecksum' },
+              error: null,
+            }),
+          }),
+        };
+      });
+
+      const usersSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+        }),
+      });
+
+      const bookmarksSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              bookmark_data: existingCloudBookmarks,
+              tombstones: [],
+              version: 1,
+              checksum: 'oldchecksum',
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      mockSupabase.from = vi.fn().mockImplementation((table) => {
+        if (table === 'users') return { select: usersSelectMock };
+        return { select: bookmarksSelectMock, upsert: upsertMock };
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync, tombstones: [], replace: true },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(upsertedData.bookmark_data).toHaveLength(1);
+      expect(upsertedData.bookmark_data[0].url).toBe('https://keep.com');
+      expect(upsertedData.tombstones).toHaveLength(1);
+      expect(upsertedData.tombstones[0].url).toBe('https://deleted.com');
+      expect(upsertedData.tombstones[0].deletedAt).toBeGreaterThan(0);
+    });
+
+    it('should not store a replace=true bookmark when a newer tombstone exists', async () => {
+      const bookmarksToSync = [
+        { id: '1', url: 'https://deleted.com', title: 'Deleted', dateAdded: 1000 },
+      ];
+      const existingTombstones = [{ url: 'https://deleted.com', deletedAt: 2000 }];
+
+      let upsertedData = null;
+      const upsertMock = vi.fn().mockImplementation((data) => {
+        upsertedData = data;
+        return {
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { version: 2, checksum: 'newchecksum' },
+              error: null,
+            }),
+          }),
+        };
+      });
+
+      const usersSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+        }),
+      });
+
+      const bookmarksSelectMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              bookmark_data: [],
+              tombstones: existingTombstones,
+              version: 1,
+              checksum: 'oldchecksum',
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      mockSupabase.from = vi.fn().mockImplementation((table) => {
+        if (table === 'users') return { select: usersSelectMock };
+        return { select: bookmarksSelectMock, upsert: upsertMock };
+      });
+
+      getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: mockSupabase });
+
+      const request = createMockRequest({
+        method: 'POST',
+        headers: { authorization: 'Bearer valid-token' },
+        body: { bookmarks: bookmarksToSync, tombstones: [], replace: true },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(upsertedData.bookmark_data).toHaveLength(0);
+      expect(upsertedData.tombstones).toHaveLength(1);
+      expect(upsertedData.tombstones[0].url).toBe('https://deleted.com');
     });
 
     it('should use legacy merge behavior when replace is not set', async () => {

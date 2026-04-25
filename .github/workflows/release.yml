@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -219,7 +219,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
 
       - name: Install web-ext
         run: npm install -g web-ext
@@ -339,4 +339,3 @@ jobs:
           fi
 
           echo "Edge extension v${{ needs.build.outputs.version }} submitted for review"
-

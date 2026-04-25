@@ -342,79 +342,78 @@ function extractBookmarksFromNested(data) {
 }
 
 /**
- * Maximum age for tombstones in milliseconds (30 days)
- * Tombstones older than this are cleaned up to prevent stale deletion issues
- *
- * WHY THIS MATTERS:
- * Without cleanup, tombstones accumulate forever. If a user clears their
- * extension storage (or reinstalls), the next sync would receive ALL old
- * tombstones and delete bookmarks that may have been re-added.
- *
- * With cleanup, tombstones only persist for 30 days - enough time for all
- * browsers to sync and receive the deletion, but not so long that they
- * cause problems when storage is cleared.
- *
- * WHY 30 DAYS (not shorter):
- * - Users may not open all their browsers frequently
- * - 30 days gives ample time for deletions to propagate
- * - After 30 days, if a bookmark still exists locally, the user probably wants it
- *
- * NOTE: The PRIMARY protection against unintended deletions is the
- * extension-side safeguard (filterTombstonesToApply) which only applies
- * tombstones created after the last sync time. This server-side cleanup
- * is a SECONDARY protection to prevent tombstone accumulation.
- */
-const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-/**
  * Merge tombstones (deleted bookmark records) and clean up old ones
  * Uses URL as unique identifier
  * Newer deletions (by deletedAt) win
- * Tombstones older than TOMBSTONE_MAX_AGE_MS are removed
  */
 function mergeTombstones(existingTombstones, incomingTombstones) {
   const tombstoneMap = new Map();
-  const now = Date.now();
-  const cutoffTime = now - TOMBSTONE_MAX_AGE_MS;
 
   // Ensure arrays
   const existingArray = Array.isArray(existingTombstones) ? existingTombstones : [];
   const incomingArray = Array.isArray(incomingTombstones) ? incomingTombstones : [];
 
-  // Add existing tombstones (skip old ones)
-  let cleanedUp = 0;
+  // Add existing tombstones. Tombstones do not expire by age; they are the durable
+  // proof that a URL was deleted and prevent stale external/browser copies from
+  // resurrecting it later.
   for (const tombstone of existingArray) {
     if (tombstone && tombstone.url) {
-      // Skip tombstones older than the cutoff
-      if (tombstone.deletedAt && tombstone.deletedAt < cutoffTime) {
-        cleanedUp++;
-        continue;
-      }
       tombstoneMap.set(tombstone.url, tombstone);
     }
   }
 
-  // Merge incoming tombstones (newer wins, skip old ones)
+  // Merge incoming tombstones (newer wins)
   for (const incoming of incomingArray) {
     if (!incoming || !incoming.url) continue;
 
-    // Skip tombstones older than the cutoff
-    if (incoming.deletedAt && incoming.deletedAt < cutoffTime) {
-      cleanedUp++;
-      continue;
-    }
-
     const existing = tombstoneMap.get(incoming.url);
-    if (!existing || incoming.deletedAt > existing.deletedAt) {
+    const incomingTime = incoming.deletedAt || 0;
+    const existingTime = existing?.deletedAt || 0;
+    if (!existing || incomingTime > existingTime) {
       tombstoneMap.set(incoming.url, incoming);
     }
   }
 
-  if (cleanedUp > 0) {
-    console.log(`[Bookmarks API] Cleaned up ${cleanedUp} old tombstones (older than 30 days)`);
+  return Array.from(tombstoneMap.values());
+}
+
+function getBookmarkTimestamp(bookmark) {
+  if (!bookmark) return 0;
+  const rawDate = bookmark.dateAdded;
+  const timestamp = typeof rawDate === 'string' ? new Date(rawDate).getTime() : rawDate || 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+/**
+ * Remove tombstones only when a later bookmark proves the URL was intentionally re-added.
+ */
+function pruneTombstonesSupersededByBookmarks(tombstones, bookmarks) {
+  if (!Array.isArray(tombstones) || tombstones.length === 0) return [];
+
+  const newestBookmarkByUrl = new Map();
+  for (const bookmark of Array.isArray(bookmarks) ? bookmarks : []) {
+    if (!bookmark?.url) continue;
+    const timestamp = getBookmarkTimestamp(bookmark);
+    const existing = newestBookmarkByUrl.get(bookmark.url) || 0;
+    if (timestamp > existing) {
+      newestBookmarkByUrl.set(bookmark.url, timestamp);
+    }
   }
 
-  return Array.from(tombstoneMap.values());
+  const pruned = tombstones.filter((tombstone) => {
+    if (!tombstone?.url) return false;
+    const bookmarkTimestamp = newestBookmarkByUrl.get(tombstone.url) || 0;
+    const tombstoneTimestamp = tombstone.deletedAt || 0;
+    return bookmarkTimestamp <= tombstoneTimestamp;
+  });
+
+  if (pruned.length !== tombstones.length) {
+    console.log(
+      `[Bookmarks API] Removed ${tombstones.length - pruned.length} tombstones superseded by newer bookmarks`
+    );
+  }
+
+  return pruned;
 }
 
 /**
@@ -890,7 +889,7 @@ export async function POST(request) {
     console.log(`[Bookmarks API] Existing version: ${existingVersion}`);
 
     // Merge tombstones first
-    const mergedTombstones = mergeTombstones(existingTombstones, incomingTombstones);
+    let mergedTombstones = mergeTombstones(existingTombstones, incomingTombstones);
     console.log(`[Bookmarks API] Merged tombstones: ${mergedTombstones.length}`);
 
     // Debug: Log sample incoming and merged tombstones
@@ -951,10 +950,40 @@ export async function POST(request) {
       deleted = merged.length - finalBookmarks.length;
     }
 
+    if (replace) {
+      const existingUrls = new Set(
+        extractBookmarksFromNested(existingBookmarks)
+          .filter((bookmark) => bookmark?.url)
+          .map((bookmark) => bookmark.url)
+      );
+      const finalUrls = new Set(
+        finalBookmarks.filter((bookmark) => bookmark?.url).map((bookmark) => bookmark.url)
+      );
+      const now = Date.now();
+      const inferredTombstones = Array.from(existingUrls)
+        .filter((existingUrl) => !finalUrls.has(existingUrl))
+        .map((removedUrl) => ({ url: removedUrl, deletedAt: now }));
+
+      if (inferredTombstones.length > 0) {
+        console.log(
+          `[Bookmarks API] Replace mode inferred ${inferredTombstones.length} deletion tombstones from missing URLs`
+        );
+        mergedTombstones = mergeTombstones(mergedTombstones, inferredTombstones);
+      }
+
+      const beforeTombstoneFilter = finalBookmarks.length;
+      finalBookmarks = applyTombstones(finalBookmarks, mergedTombstones);
+      deleted += beforeTombstoneFilter - finalBookmarks.length;
+    }
+
+    const finalTombstones = pruneTombstonesSupersededByBookmarks(
+      mergedTombstones,
+      finalBookmarks
+    );
     console.log(
       `[Bookmarks API] After ${replace ? 'replace' : 'merge'}: ${finalBookmarks.length + deleted} total, ${added} added, ${updated} updated, ${deleted} removed by tombstones`
     );
-    console.log(`[Bookmarks API] Tombstones: ${mergedTombstones.length} stored`);
+    console.log(`[Bookmarks API] Tombstones: ${finalTombstones.length} stored`);
 
     // Validate total bookmark count after merge to prevent data explosion
     if (finalBookmarks.length > MAX_BOOKMARKS_PER_USER) {
@@ -983,7 +1012,7 @@ export async function POST(request) {
       existingTombstones.sort((a, b) => a.url.localeCompare(b.url))
     );
     const mergedTombstonesJson = JSON.stringify(
-      mergedTombstones.sort((a, b) => a.url.localeCompare(b.url))
+      finalTombstones.sort((a, b) => a.url.localeCompare(b.url))
     );
     const tombstonesChanged = existingTombstonesJson !== mergedTombstonesJson;
 
@@ -1006,7 +1035,7 @@ export async function POST(request) {
           added: 0,
           updated: 0,
           deleted: 0,
-          tombstones: mergedTombstones.length,
+          tombstones: finalTombstones.length,
           total: finalBookmarks.length,
           version: existingVersion,
           checksum: existingChecksum,
@@ -1026,7 +1055,7 @@ export async function POST(request) {
         {
           user_id: user.id,
           bookmark_data: finalBookmarks,
-          tombstones: mergedTombstones,
+          tombstones: finalTombstones,
           checksum,
           version: newVersion,
           last_modified: new Date().toISOString(),
@@ -1045,7 +1074,7 @@ export async function POST(request) {
 
     // Sync to external sources (GitHub, Dropbox, etc.) asynchronously
     // This runs in the background and doesn't block the response
-    syncToExternalSources(supabase, user.id, finalBookmarks, mergedTombstones, checksum).catch(
+    syncToExternalSources(supabase, user.id, finalBookmarks, finalTombstones, checksum).catch(
       (err) => console.error('[External Sync] Background sync failed:', err)
     );
 
@@ -1056,7 +1085,7 @@ export async function POST(request) {
         added,
         updated,
         deleted,
-        tombstones: mergedTombstones.length,
+        tombstones: finalTombstones.length,
         total: finalBookmarks.length,
         version: data.version,
         checksum: data.checksum,
@@ -1102,11 +1131,16 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'No bookmarks found' }, { status: 404, headers });
     }
 
-    // Filter out the bookmark to delete
+    // Filter out the bookmark to delete and leave a durable tombstone so old
+    // browser/external copies cannot resurrect it on a later sync.
     const bookmarks = existing.bookmark_data;
+    let deletedBookmark = null;
     const filteredBookmarks = bookmarks.filter((b) => {
-      if (id) return b.id !== id;
-      if (url) return b.url !== url;
+      const shouldDelete = id ? b.id === id : url ? b.url === url : false;
+      if (shouldDelete) {
+        deletedBookmark = b;
+        return false;
+      }
       return true;
     });
 
@@ -1114,12 +1148,19 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'Bookmark not found' }, { status: 404, headers });
     }
 
+    const tombstoneUrl = deletedBookmark?.url || url;
+    const existingTombstones = Array.isArray(existing.tombstones) ? existing.tombstones : [];
+    const updatedTombstones = tombstoneUrl
+      ? mergeTombstones(existingTombstones, [{ url: tombstoneUrl, deletedAt: Date.now() }])
+      : existingTombstones;
+
     // Update with filtered bookmarks
     const checksum = generateChecksum(filteredBookmarks);
     const { error: updateError } = await supabase
       .from('cloud_bookmarks')
       .update({
         bookmark_data: filteredBookmarks,
+        tombstones: updatedTombstones,
         checksum,
         version: existing.version + 1,
         last_modified: new Date().toISOString(),

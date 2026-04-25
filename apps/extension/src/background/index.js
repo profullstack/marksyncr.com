@@ -139,19 +139,44 @@ async function removeTombstone(url) {
   }
 }
 
-/**
- * Clear tombstones that are older than a certain age (cleanup)
- * @param {number} maxAgeMs - Maximum age in milliseconds (default: 30 days)
- */
-async function cleanupOldTombstones(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
-  const tombstones = await getTombstones();
-  const cutoff = Date.now() - maxAgeMs;
-  const filtered = tombstones.filter((t) => t.deletedAt > cutoff);
+function getBookmarkTimestamp(bookmark) {
+  if (!bookmark) return 0;
+  const rawDate = bookmark.dateAdded;
+  const timestamp = typeof rawDate === 'string' ? new Date(rawDate).getTime() : rawDate || 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
 
-  if (filtered.length !== tombstones.length) {
-    await storeTombstones(filtered);
-    console.log(`[MarkSyncr] Cleaned up ${tombstones.length - filtered.length} old tombstones`);
+/**
+ * Remove tombstones only when a later bookmark proves the URL was intentionally re-added.
+ * Tombstones must not expire by age, or stale cloud/external copies can resurrect deleted bookmarks.
+ */
+function pruneTombstonesSupersededByBookmarks(tombstones, bookmarks) {
+  if (!Array.isArray(tombstones) || tombstones.length === 0) return [];
+
+  const newestBookmarkByUrl = new Map();
+  for (const bookmark of Array.isArray(bookmarks) ? bookmarks : []) {
+    if (!bookmark?.url) continue;
+    const timestamp = getBookmarkTimestamp(bookmark);
+    const existing = newestBookmarkByUrl.get(bookmark.url) || 0;
+    if (timestamp > existing) {
+      newestBookmarkByUrl.set(bookmark.url, timestamp);
+    }
   }
+
+  const pruned = tombstones.filter((tombstone) => {
+    if (!tombstone?.url) return false;
+    const bookmarkTimestamp = newestBookmarkByUrl.get(tombstone.url) || 0;
+    const tombstoneTimestamp = tombstone.deletedAt || 0;
+    return bookmarkTimestamp <= tombstoneTimestamp;
+  });
+
+  if (pruned.length !== tombstones.length) {
+    console.log(
+      `[MarkSyncr] Removed ${tombstones.length - pruned.length} tombstones superseded by newer bookmarks`
+    );
+  }
+
+  return pruned;
 }
 
 /**
@@ -1663,6 +1688,84 @@ async function performSync(sourceId) {
         `[MarkSyncr] Last sync time: ${lastSyncTime ? new Date(lastSyncTime).toISOString() : 'never'}`
       );
 
+      const localChecksumBeforePull = await generateChecksum(localFlat);
+      const lastSyncedCloudChecksum = await getLastCloudChecksum();
+      const localChangedSinceLastSync =
+        !!lastSyncedCloudChecksum && localChecksumBeforePull !== lastSyncedCloudChecksum;
+
+      console.log(`[MarkSyncr] Last synced cloud checksum: ${lastSyncedCloudChecksum || 'none'}`);
+      console.log(`[MarkSyncr] Local checksum before pull: ${localChecksumBeforePull}`);
+      console.log(`[MarkSyncr] Local changed since last sync: ${localChangedSinceLastSync}`);
+
+      // Simple master-record rule:
+      // - If this browser changed locally since its last successful sync, push the
+      //   full local snapshot as the new server master.
+      // - Otherwise, pull the server master below.
+      //
+      // This prevents stale cloud/external copies from being pulled first and
+      // resurrecting bookmarks the user just deleted locally.
+      if (localChangedSinceLastSync) {
+        const tombstonesToPush = pruneTombstonesSupersededByBookmarks(
+          mergeTombstonesLocal(localTombstones, cloudTombstones),
+          localFlat
+        );
+        await storeTombstones(tombstonesToPush);
+
+        console.log(
+          `[MarkSyncr] Local changes detected - pushing ${localFlat.length} bookmarks and ${tombstonesToPush.length} tombstones as server master`
+        );
+        const syncResult = await syncBookmarksToCloud(localFlat, detectBrowser(), tombstonesToPush);
+        console.log('[MarkSyncr] Master push result:', syncResult);
+
+        const mergedData = convertBrowserBookmarks(bookmarkTree);
+        const stats = countBookmarks(bookmarkTree, localFlat.filter((b) => b.url).length);
+
+        try {
+          const versionResult = await saveVersionToCloud(
+            mergedData,
+            detectBrowser(),
+            `${detectBrowser()}-extension`,
+            {
+              type: 'master_snapshot_push',
+              pushedToCloud: localFlat.filter((b) => b.url).length,
+              tombstones: tombstonesToPush.length,
+            }
+          );
+          console.log('[MarkSyncr] Version saved:', versionResult);
+        } catch (versionErr) {
+          console.warn('[MarkSyncr] Version save failed (sync will continue):', versionErr.message);
+        }
+
+        const syncTimestamp = Date.now();
+        await browser.storage.local.set({
+          lastSync: new Date(syncTimestamp).toISOString(),
+        });
+        await storeLastSyncTime(syncTimestamp);
+        await storeLastCloudChecksum(syncResult?.checksum || localChecksumBeforePull);
+
+        consecutiveSyncFailures = 0;
+        lastSyncError = null;
+
+        if (saveModifiedIdsTimeout) {
+          clearTimeout(saveModifiedIdsTimeout);
+          saveModifiedIdsTimeout = null;
+        }
+        for (const id of userModifiedIdsSnapshot) {
+          locallyModifiedBookmarkIds.delete(id);
+        }
+        await saveLocallyModifiedIds();
+
+        return {
+          success: true,
+          stats,
+          addedFromCloud: 0,
+          updatedLocally: 0,
+          deletedLocally: 0,
+          pushedToCloud: localFlat.filter((b) => b.url).length,
+          message: 'Local changes pushed to server master',
+        };
+      }
+
       // Step 3: Apply cloud tombstones to local bookmarks (delete locally if deleted elsewhere)
       // IMPORTANT: Use the tombstone safeguard to prevent unintended deletions
       // when local storage was cleared but cloud still has old tombstones
@@ -1692,9 +1795,16 @@ async function performSync(sourceId) {
       // onRemoved writes a new tombstone to storage. If we blindly overwrite with
       // mergedTombstones (computed from the old localTombstones read at step 1),
       // the new tombstone is lost and the deletion gets reverted on the next sync.
-      const mergedTombstones = mergeTombstonesLocal(localTombstones, cloudTombstones);
+      const bookmarkStateForTombstones = [...localFlat, ...cloudBookmarks];
+      const mergedTombstones = pruneTombstonesSupersededByBookmarks(
+        mergeTombstonesLocal(localTombstones, cloudTombstones),
+        bookmarkStateForTombstones
+      );
       const currentTombstones = await getTombstones();
-      const safeMergedTombstones = mergeTombstonesLocal(currentTombstones, mergedTombstones);
+      let safeMergedTombstones = pruneTombstonesSupersededByBookmarks(
+        mergeTombstonesLocal(currentTombstones, mergedTombstones),
+        bookmarkStateForTombstones
+      );
       await storeTombstones(safeMergedTombstones);
       console.log(`[MarkSyncr] Merged tombstones: ${safeMergedTombstones.length}`);
 
@@ -1802,6 +1912,11 @@ async function performSync(sourceId) {
       // Step 8: Get final local bookmarks after all merges
       const finalTree = await browser.bookmarks.getTree();
       const mergedFlat = flattenBookmarkTree(finalTree);
+      safeMergedTombstones = pruneTombstonesSupersededByBookmarks(
+        safeMergedTombstones,
+        mergedFlat
+      );
+      await storeTombstones(safeMergedTombstones);
       const mergedData = convertBrowserBookmarks(finalTree);
       // Pass the merged bookmark count as synced count since we're syncing to cloud
       const stats = countBookmarks(finalTree, mergedFlat.filter((b) => b.url).length);
@@ -1926,9 +2041,6 @@ async function performSync(sourceId) {
           '[MarkSyncr] Skipping version history (only pulled from cloud, no local changes pushed)'
         );
       }
-
-      // Step 11: Cleanup old tombstones (older than 30 days)
-      await cleanupOldTombstones();
 
       console.log('[MarkSyncr] Two-way sync with tombstones completed:', stats);
 
@@ -2113,13 +2225,17 @@ function mergeTombstonesLocal(localTombstones, cloudTombstones) {
 
   // Add local tombstones
   for (const t of localTombstones) {
+    if (!t?.url) continue;
     tombstoneMap.set(t.url, t.deletedAt);
   }
 
   // Merge cloud tombstones (keep newest)
   for (const t of cloudTombstones) {
+    if (!t?.url) continue;
     const existing = tombstoneMap.get(t.url);
-    if (!existing || t.deletedAt > existing) {
+    const incomingTime = t.deletedAt || 0;
+    const existingTime = existing || 0;
+    if (!existing || incomingTime > existingTime) {
       tombstoneMap.set(t.url, t.deletedAt);
     }
   }
