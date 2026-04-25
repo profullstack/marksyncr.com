@@ -6,10 +6,11 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [build.env]
-NODE_VERSION = "20"
+NODE_VERSION = "22"
 
 [deploy]
 numReplicas = 1
+startCommand = "node apps/web/server.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
