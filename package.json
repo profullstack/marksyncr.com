@@ -14,7 +14,8 @@
     "precommit": "pnpm lint && pnpm build",
     "version:bump": "tsx scripts/bump-version.ts",
     "setup:hooks": "git config core.hooksPath .githooks && git config push.followTags true && echo 'Git hooks and push.followTags configured'",
-    "postinstall": "git config core.hooksPath .githooks && git config push.followTags true 2>/dev/null || true"
+    "postinstall": "pnpm dlx @socketsecurity/socket-patch apply --silent --ecosystems npm && git config core.hooksPath .githooks && git config push.followTags true 2>/dev/null || true",
+    "dependencies": "pnpm dlx @socketsecurity/socket-patch apply --silent --ecosystems npm"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
