@@ -3,6 +3,9 @@ import './globals.css';
 
 export const metadata = {
   metadataBase: new URL('https://marksyncr.com'),
+  alternates: {
+    canonical: 'https://marksyncr.com',
+  },
   title: 'MarkSyncr - Sync Your Bookmarks Everywhere',
   description:
     'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
@@ -77,6 +80,89 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: 'Profullstack, Inc.',
+              url: 'https://marksyncr.com/',
+              logo: 'https://marksyncr.com/logo.svg',
+              description:
+                'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
+              sameAs: [
+                'https://github.com/profullstack/marksyncr.com',
+                'https://discord.gg/U7dEXfBA3s',
+                'https://chromewebstore.google.com/detail/marksyncr/hjcjjcpialiakkalcgadnfnoomdaegjg',
+              ],
+              contactPoint: {
+                '@type': 'ContactPoint',
+                email: 'support@marksyncr.com',
+                contactType: 'customer support',
+              },
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'SoftwareApplication',
+              name: 'MarkSyncr',
+              url: 'https://marksyncr.com/',
+              applicationCategory: 'BrowserApplication',
+              operatingSystem: 'Chrome, Firefox, Edge, Safari, Brave, Opera',
+              description:
+                'Cross-browser bookmark sync extension with bring-your-own storage. Store bookmarks in GitHub, Dropbox, Google Drive, or MarkSyncr Cloud. Two-way sync, conflict resolution, version history.',
+              offers: [
+                {
+                  '@type': 'Offer',
+                  name: 'Free',
+                  price: '0',
+                  priceCurrency: 'USD',
+                  description:
+                    'Unlimited bookmarks, MarkSyncr Cloud, GitHub/Dropbox/Google Drive sync, Chrome & Firefox, 5-day version history',
+                },
+                {
+                  '@type': 'Offer',
+                  name: 'Pro',
+                  price: '5',
+                  priceCurrency: 'USD',
+                  billingIncrement: 'P1M',
+                  description:
+                    'Everything in Free plus Safari support, priority sync, 30-day version history, priority support',
+                },
+                {
+                  '@type': 'Offer',
+                  name: 'Team',
+                  price: '12',
+                  priceCurrency: 'USD',
+                  billingIncrement: 'P1M',
+                  description:
+                    'Everything in Pro plus shared folders, team management, admin controls, 1-year version history, dedicated support',
+                },
+              ],
+              author: {
+                '@type': 'Organization',
+                name: 'Profullstack, Inc.',
+              },
+              featureList: [
+                'Two-way bookmark sync',
+                'Conflict resolution',
+                'Folder structure preservation',
+                'Version history',
+                'GitHub storage backend',
+                'Dropbox storage backend',
+                'Google Drive storage backend',
+                'MarkSyncr Cloud storage',
+                'Offline support',
+                'Chrome, Firefox, Edge, Safari support',
+              ],
+            }),
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
