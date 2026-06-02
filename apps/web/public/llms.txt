@@ -1,0 +1,40 @@
+# MarkSyncr
+
+> Cross-browser bookmark sync with bring-your-own storage. By Profullstack, Inc.
+
+MarkSyncr is a browser extension and web service that keeps your bookmarks in sync across Chrome, Firefox, Safari, Edge, Brave, and Opera. You choose where your data lives: GitHub, Dropbox, Google Drive, a local file, or MarkSyncr's managed cloud. The service never sees your bookmarks unless you opt into the managed cloud.
+
+## Key pages
+
+- [Home](https://marksyncr.com/) — Product overview, features, pricing, and storage options
+- [Docs](https://marksyncr.com/docs) — Getting started guide, storage setup, FAQ
+- [Pricing](https://marksyncr.com/pricing) — Free, Pro ($5/mo), Team ($12/mo)
+- [Privacy Policy](https://marksyncr.com/privacy) — Data handling, GDPR rights, contact
+- [Terms of Service](https://marksyncr.com/terms) — Subscription terms, cancellation policy
+- [Sign Up](https://marksyncr.com/signup) — Create a free account
+- [Contact](https://marksyncr.com/contact) — Support and sales inquiries
+
+## Product
+
+- **Name**: MarkSyncr
+- **Category**: Browser extension / bookmark sync
+- **Browsers**: Chrome, Firefox, Edge (all plans); Safari (Pro+); Brave, Opera (all plans)
+- **Storage backends**: GitHub, Dropbox, Google Drive, local file, MarkSyncr Cloud
+- **Key features**: Two-way sync, conflict resolution, folder structure preservation, version history, offline support, instant sync
+- **Open source**: https://github.com/profullstack/marksyncr.com (MIT)
+
+## Pricing
+
+- **Free**: $0/month — Unlimited bookmarks, MarkSyncr Cloud, GitHub/Dropbox/Google Drive sync, Chrome & Firefox, 5-day version history
+- **Pro**: $5/month — Everything in Free + Safari support, priority sync, 30-day version history, priority support
+- **Team**: $12/month — Everything in Pro + shared folders, team management, admin controls, 1-year version history, dedicated support
+
+## Company
+
+- **Legal name**: Profullstack, Inc.
+- **Support**: support@marksyncr.com
+- **Privacy**: privacy@marksyncr.com
+- **GitHub**: https://github.com/profullstack/marksyncr.com
+- **Discord**: https://discord.gg/U7dEXfBA3s
+- **Chrome extension**: https://chromewebstore.google.com/detail/marksyncr/hjcjjcpialiakkalcgadnfnoomdaegjg
+- **Firefox add-on**: https://addons.mozilla.org/firefox/addon/marksyncr/
