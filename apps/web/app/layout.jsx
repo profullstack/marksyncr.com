@@ -197,7 +197,6 @@ export default function RootLayout({ children }) {
         />
               <Script data-site="901e4030-5cdb-4bfc-9e33-4498c5ff1294" src="https://crawlproof.com/stats.js" strategy="afterInteractive" />
       <script async src="https://feedback.profullstack.com/embed/profullstack-feedback.js" data-property="marksyncr.com"></script>
-              <div data-cp-ad="" data-slot="a57c46ce-341d-4f8d-ab28-92ea1d31fb7e" data-format="banner_300x250" />
       <Script src="https://crawlproof.com/ad.js" strategy="afterInteractive" />
       </body>
     </html>
