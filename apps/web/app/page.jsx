@@ -576,6 +576,15 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* CrawlProof ad unit */}
+      <div className="flex justify-center px-4 py-8">
+        <div
+          data-cp-ad=""
+          data-slot="a57c46ce-341d-4f8d-ab28-92ea1d31fb7e"
+          data-format="banner_300x250"
+        />
+      </div>
+
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
