@@ -1,4 +1,4 @@
-import { createBrowserClient } from '@supabase/ssr';
+import { createBrowserSupabase } from '@profullstack/stack/supabase';
 
 /**
  * Create a Supabase client for client-side operations
@@ -6,8 +6,5 @@ import { createBrowserClient } from '@supabase/ssr';
  * @returns {import('@supabase/supabase-js').SupabaseClient}
  */
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return createBrowserSupabase();
 }

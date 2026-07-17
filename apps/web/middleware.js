@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse } from 'next/server';
+import { updateSession } from '@profullstack/stack/supabase';
 
 /**
  * Middleware to refresh Supabase session on every request.
@@ -10,34 +9,8 @@ import { NextResponse } from 'next/server';
  * if needed, and writes the updated cookies back to the response.
  */
 export async function middleware(request) {
-  let supabaseResponse = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // Do not run code between createServerClient and supabase.auth.getUser().
-  // A simple mistake could make it very hard to debug issues with users being
-  // randomly logged out.
-
-  await supabase.auth.getUser();
-
-  return supabaseResponse;
+  const { response } = await updateSession(request);
+  return response;
 }
 
 export const config = {

@@ -14,18 +14,20 @@ const mockSignOut = vi.fn();
 const mockResetPasswordForEmail = vi.fn();
 const mockUpdateUser = vi.fn();
 
-// Mock @supabase/ssr createServerClient
-vi.mock('@supabase/ssr', () => ({
-  createServerClient: vi.fn(() => ({
-    auth: {
-      signUp: mockSignUp,
-      signInWithPassword: mockSignInWithPassword,
-      signInWithOAuth: mockSignInWithOAuth,
-      signOut: mockSignOut,
-      resetPasswordForEmail: mockResetPasswordForEmail,
-      updateUser: mockUpdateUser,
-    },
-  })),
+// Mock the Supabase server client factory (wraps @profullstack/stack/supabase)
+vi.mock('../lib/supabase/server.js', () => ({
+  createClient: vi.fn(() =>
+    Promise.resolve({
+      auth: {
+        signUp: mockSignUp,
+        signInWithPassword: mockSignInWithPassword,
+        signInWithOAuth: mockSignInWithOAuth,
+        signOut: mockSignOut,
+        resetPasswordForEmail: mockResetPasswordForEmail,
+        updateUser: mockUpdateUser,
+      },
+    })
+  ),
 }));
 
 // Mock next/navigation

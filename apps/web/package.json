@@ -15,6 +15,7 @@
     "@marksyncr/core": "workspace:*",
     "@marksyncr/sources": "workspace:*",
     "@marksyncr/types": "workspace:*",
+    "@profullstack/stack": "^0.1.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "next": "^16.1.0",

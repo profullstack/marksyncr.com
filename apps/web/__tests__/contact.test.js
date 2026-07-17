@@ -1,31 +1,30 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
 
-// Create a mock send function that we can control
-const mockSend = vi.fn();
+// Create a mock fetch function that we can control
+// (@profullstack/emailer posts directly to the Resend HTTP API)
+const mockFetch = vi.fn();
 
 // Set the environment variable before any imports
 process.env.RESEND_API_KEY = 'test-api-key';
 
-// Mock Resend module
-vi.mock('resend', () => {
-  return {
-    Resend: class MockResend {
-      constructor() {
-        this.emails = {
-          send: mockSend,
-        };
-      }
-    },
-  };
-});
+const mockSendSuccess = () =>
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ id: 'email-123' }),
+  });
 
 describe('Contact API Route', () => {
   let POST;
 
   beforeAll(async () => {
+    vi.stubGlobal('fetch', mockFetch);
     // Import after setting env and mocking
     const module = await import('../app/api/contact/route.js');
     POST = module.POST;
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
   });
 
   beforeEach(() => {
@@ -38,10 +37,7 @@ describe('Contact API Route', () => {
 
   describe('POST /api/contact', () => {
     it('should send email successfully with valid data', async () => {
-      mockSend.mockResolvedValue({
-        data: { id: 'email-123' },
-        error: null,
-      });
+      mockSendSuccess();
 
       const request = createRequest({
         name: 'John Doe',
@@ -58,6 +54,27 @@ describe('Contact API Route', () => {
       expect(data.messageId).toBe('email-123');
     });
 
+    it('should send the submission to the Resend API', async () => {
+      mockSendSuccess();
+
+      const request = createRequest({
+        name: 'John Doe',
+        email: 'john@example.com',
+        subject: 'General Inquiry',
+        message: 'Hello',
+      });
+
+      await POST(request);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.resend.com/emails',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('[Contact Form] General Inquiry'),
+        })
+      );
+    });
+
     it('should return 400 when name is missing', async () => {
       const request = createRequest({
         email: 'john@example.com',
@@ -69,7 +86,7 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('All fields are required');
+      expect(data.error).toBe('Name is required');
     });
 
     it('should return 400 when email is missing', async () => {
@@ -83,7 +100,7 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('All fields are required');
+      expect(data.error).toBe('Email is required');
     });
 
     it('should return 400 when subject is missing', async () => {
@@ -97,7 +114,7 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('All fields are required');
+      expect(data.error).toBe('Subject is required');
     });
 
     it('should return 400 when message is missing', async () => {
@@ -111,7 +128,7 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('All fields are required');
+      expect(data.error).toBe('Message is required');
     });
 
     it('should return 400 for invalid email format', async () => {
@@ -126,7 +143,7 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid email format');
+      expect(data.error).toBe('Valid email is required');
     });
 
     it('should return 400 for email without domain', async () => {
@@ -141,13 +158,14 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid email format');
+      expect(data.error).toBe('Valid email is required');
     });
 
     it('should return 500 when Resend returns an error', async () => {
-      mockSend.mockResolvedValue({
-        data: null,
-        error: { message: 'API key invalid' },
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: { message: 'API key invalid' } }),
       });
 
       const request = createRequest({
@@ -164,7 +182,7 @@ describe('Contact API Route', () => {
       expect(data.error).toBe('Failed to send message. Please try again later.');
     });
 
-    it('should return 500 when an unexpected error occurs', async () => {
+    it('should return 400 when the body is not valid JSON', async () => {
       const request = {
         json: () => Promise.reject(new Error('Parse error')),
       };
@@ -172,15 +190,12 @@ describe('Contact API Route', () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('An unexpected error occurred');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Invalid JSON body');
     });
 
     it('should accept valid email formats', async () => {
-      mockSend.mockResolvedValue({
-        data: { id: 'email-123' },
-        error: null,
-      });
+      mockSendSuccess();
 
       const validEmails = ['test@example.com', 'user.name@domain.org', 'user+tag@example.co.uk'];
 
@@ -209,7 +224,7 @@ describe('Contact API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('All fields are required');
+      expect(data.error).toBe('Name is required');
     });
   });
 });

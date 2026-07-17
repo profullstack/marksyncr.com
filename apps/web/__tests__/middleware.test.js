@@ -1,30 +1,19 @@
 /**
  * @fileoverview Tests for Next.js middleware that refreshes Supabase sessions
  *
- * The middleware intercepts every request, reads session cookies, and calls
+ * The middleware intercepts every request and delegates to updateSession()
+ * from @profullstack/stack/supabase, which reads session cookies and calls
  * supabase.auth.getUser() to trigger a token refresh if the JWT is expiring.
  * Without this middleware, web app sessions expire after ~1 hour.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock Supabase SSR
-const mockGetUser = vi.fn();
-const mockSetAll = vi.fn();
+// Mock the stack session helper
+const mockUpdateSession = vi.fn();
 
-vi.mock('@supabase/ssr', () => ({
-  createServerClient: vi.fn((url, key, options) => {
-    // Capture the cookie handlers so we can verify they work
-    mockSetAll.mockImplementation((cookiesToSet) => {
-      options.cookies.setAll(cookiesToSet);
-    });
-
-    return {
-      auth: {
-        getUser: mockGetUser,
-      },
-    };
-  }),
+vi.mock('@profullstack/stack/supabase', () => ({
+  updateSession: mockUpdateSession,
 }));
 
 // Import after mocks
@@ -55,33 +44,37 @@ function createMockRequest(path = '/', cookies = []) {
 describe('Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
   });
 
-  it('should call supabase.auth.getUser() to refresh the session', async () => {
+  it('should call updateSession() to refresh the session', async () => {
+    const mockResponse = { headers: new Map() };
+    mockUpdateSession.mockResolvedValue({ response: mockResponse, user: null });
+
     const request = createMockRequest('/dashboard', [
       { name: 'sb-access-token', value: 'old-jwt' },
     ]);
 
     await middleware(request);
 
-    expect(mockGetUser).toHaveBeenCalledOnce();
+    expect(mockUpdateSession).toHaveBeenCalledOnce();
+    expect(mockUpdateSession).toHaveBeenCalledWith(request);
   });
 
-  it('should return a response even when no user is authenticated', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'No session' } });
+  it('should return the response even when no user is authenticated', async () => {
+    const mockResponse = { headers: new Map() };
+    mockUpdateSession.mockResolvedValue({ response: mockResponse, user: null });
 
     const request = createMockRequest('/');
     const response = await middleware(request);
 
-    expect(response).toBeDefined();
-    expect(mockGetUser).toHaveBeenCalledOnce();
+    expect(response).toBe(mockResponse);
   });
 
-  it('should return a response when user is authenticated', async () => {
-    mockGetUser.mockResolvedValue({
-      data: { user: { id: 'user-123', email: 'test@example.com' } },
-      error: null,
+  it('should return the response when user is authenticated', async () => {
+    const mockResponse = { headers: new Map() };
+    mockUpdateSession.mockResolvedValue({
+      response: mockResponse,
+      user: { id: 'user-123', email: 'test@example.com' },
     });
 
     const request = createMockRequest('/dashboard', [
@@ -90,33 +83,7 @@ describe('Middleware', () => {
 
     const response = await middleware(request);
 
-    expect(response).toBeDefined();
-    expect(mockGetUser).toHaveBeenCalledOnce();
-  });
-
-  it('should pass cookies from request to Supabase client', async () => {
-    const { createServerClient } = await import('@supabase/ssr');
-
-    const sessionCookies = [
-      { name: 'sb-access-token', value: 'jwt-token' },
-      { name: 'sb-refresh-token', value: 'refresh-token' },
-    ];
-    const request = createMockRequest('/dashboard', sessionCookies);
-
-    await middleware(request);
-
-    // Verify createServerClient was called with cookie handlers
-    expect(createServerClient).toHaveBeenCalledWith(
-      // URL and key come from process.env (may be undefined in test env)
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      expect.objectContaining({
-        cookies: expect.objectContaining({
-          getAll: expect.any(Function),
-          setAll: expect.any(Function),
-        }),
-      })
-    );
+    expect(response).toBe(mockResponse);
   });
 });
 
