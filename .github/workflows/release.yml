@@ -179,13 +179,26 @@ jobs:
           echo "$RESPONSE" | jq .
 
           STATUS=$(echo "$RESPONSE" | jq -r '.status[0] // empty')
-          if [[ "$STATUS" != "OK" && "$STATUS" != "PUBLISHED_WITH_FRICTION_WARNING" && "$STATUS" != "PENDING_REVIEW" ]]; then
-            echo "::error::Chrome publish failed with status: $STATUS"
-            echo "$RESPONSE" | jq '.statusDetail // .'
-            exit 1
+          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+
+          if [[ "$STATUS" == "OK" || "$STATUS" == "PUBLISHED_WITH_FRICTION_WARNING" || "$STATUS" == "PENDING_REVIEW" ]]; then
+            echo "Chrome extension v${{ needs.build.outputs.version }} submitted (status: $STATUS)"
+            exit 0
           fi
 
-          echo "Chrome extension v${{ needs.build.outputs.version }} submitted (status: $STATUS)"
+          # The new package is uploaded as a draft regardless of this step. Some
+          # publish failures are one-time account-level gates the owner must clear
+          # in the Chrome dashboard (e.g. the mandatory "Privacy practices" form).
+          # Those shouldn't fail the release — the draft is ready to submit — so
+          # warn loudly and pass. Genuinely unexpected errors still fail.
+          if echo "$ERROR_MSG" | grep -qiE "publish condition not met|privacy"; then
+            echo "::warning title=Chrome publish gated::Draft v${{ needs.build.outputs.version }} uploaded but not submitted — clear the gate in the Chrome dashboard: $ERROR_MSG"
+            exit 0
+          fi
+
+          echo "::error::Chrome publish failed with status: ${STATUS:-none}"
+          echo "$RESPONSE" | jq '.statusDetail // .error // .'
+          exit 1
 
   firefox-release:
     name: Publish to Firefox Add-ons
@@ -276,9 +289,13 @@ jobs:
           echo "Upload response (HTTP $HTTP_CODE):"
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
 
-          OPERATION_ID=$(echo "$BODY" | jq -r '.operationID // empty')
-          if [[ -z "$OPERATION_ID" ]]; then
-            OPERATION_ID=$(echo "$RESPONSE" | grep -oP '"operationID"\s*:\s*"\K[^"]+' || true)
+          # Expired/invalid Edge publisher credentials are an ops issue, not a
+          # release blocker — warn and skip the rest of the Edge job rather than
+          # failing the whole release. Refresh the EDGE_* secrets to re-enable.
+          if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
+            echo "::warning title=Edge publish skipped::Edge auth failed (HTTP $HTTP_CODE) — refresh EDGE_API_KEY/EDGE_CLIENT_ID secrets to re-enable Edge publishing."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" ]]; then
@@ -286,10 +303,16 @@ jobs:
             exit 1
           fi
 
+          OPERATION_ID=$(echo "$BODY" | jq -r '.operationID // empty')
+          if [[ -z "$OPERATION_ID" ]]; then
+            OPERATION_ID=$(echo "$RESPONSE" | grep -oP '"operationID"\s*:\s*"\K[^"]+' || true)
+          fi
+
           echo "operation_id=$OPERATION_ID" >> "$GITHUB_OUTPUT"
           echo "Edge extension uploaded, operation: $OPERATION_ID"
 
       - name: Wait for upload processing
+        if: steps.upload.outputs.skipped != 'true'
         run: |
           OPERATION_ID="${{ steps.upload.outputs.operation_id }}"
           if [[ -z "$OPERATION_ID" ]]; then
@@ -318,6 +341,7 @@ jobs:
           done
 
       - name: Publish submission
+        if: steps.upload.outputs.skipped != 'true'
         run: |
           RESPONSE=$(curl -sS -w "\n%{http_code}" \
             -X POST \
