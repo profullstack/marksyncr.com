@@ -1,6 +1,6 @@
 {
   "name": "@marksyncr/extension",
-  "version": "0.8.33",
+  "version": "0.8.34",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "build:firefox": "node scripts/build.js firefox",
     "build:safari": "node scripts/build.js safari",
     "build:vite": "vite build",
+    "build:filters": "node scripts/build-filters.js",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx",
     "test": "vitest run",

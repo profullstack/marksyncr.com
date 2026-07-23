@@ -48,6 +48,19 @@ function clean() {
 }
 
 /**
+ * Regenerate declarativeNetRequest rulesets from the vendored filter lists.
+ * Reads filters/*.txt and writes public/rules/*.json (no network access).
+ */
+function buildFilters() {
+  console.log('🛡️  Building adblock rulesets...');
+
+  execSync('node scripts/build-filters.js', {
+    cwd: ROOT_DIR,
+    stdio: 'inherit',
+  });
+}
+
+/**
  * Run Vite build
  */
 function buildVite() {
@@ -57,6 +70,21 @@ function buildVite() {
     cwd: ROOT_DIR,
     stdio: 'inherit',
   });
+}
+
+/**
+ * Copy adblock rulesets (public/rules/*.json) into a target build dir.
+ */
+function copyRules(targetDir) {
+  const rulesDir = join(ROOT_DIR, 'public/rules');
+  const targetRulesDir = join(targetDir, 'rules');
+
+  if (!existsSync(rulesDir)) {
+    console.log('   ⚠️  No rules directory found, skipping adblock rules copy');
+    return;
+  }
+
+  copyDirectorySync(rulesDir, targetRulesDir);
 }
 
 /**
@@ -102,6 +130,9 @@ function buildChrome() {
   // Copy icons
   copyIcons(CHROME_DIR);
 
+  // Copy adblock rulesets
+  copyRules(CHROME_DIR);
+
   // Copy background script
   const bgSrc = join(ROOT_DIR, 'src/background/index.js');
   if (existsSync(bgSrc)) {
@@ -130,6 +161,9 @@ function buildFirefox() {
   // Copy icons
   copyIcons(FIREFOX_DIR);
 
+  // Copy adblock rulesets
+  copyRules(FIREFOX_DIR);
+
   // Copy background script
   const bgSrc = join(ROOT_DIR, 'src/background/index.js');
   if (existsSync(bgSrc)) {
@@ -157,6 +191,9 @@ function buildSafari() {
 
   // Copy icons
   copyIcons(SAFARI_DIR);
+
+  // Copy adblock rulesets
+  copyRules(SAFARI_DIR);
 
   // Copy background script
   const bgSrc = join(ROOT_DIR, 'src/background/index.js');
@@ -279,6 +316,7 @@ async function main() {
 
   try {
     clean();
+    buildFilters();
     buildVite();
 
     const targets = [];

@@ -9,6 +9,12 @@
  */
 
 import browser from 'webextension-polyfill';
+import {
+  initAdblock,
+  getAdblockStatus,
+  setAdblockEnabled,
+  setAdblockList,
+} from './adblock.js';
 
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
@@ -1121,6 +1127,11 @@ async function initialize() {
 
   // Set up alarm for proactive token refresh (keeps session alive independent of sync)
   await setupTokenRefreshAlarm();
+
+  // Ensure adblock rulesets match the stored preference on every boot
+  await initAdblock().catch((err) =>
+    console.error('[MarkSyncr] Failed to init adblock on boot:', err)
+  );
 
   // Restore locally modified bookmark IDs from storage (survives service worker restarts)
   locallyModifiedBookmarkIds = await loadLocallyModifiedIds();
@@ -3601,6 +3612,15 @@ browser.runtime.onMessage.addListener((message, sender) => {
       lastSyncError = null;
       return Promise.resolve({ success: true, message: 'Sync state force reset' });
 
+    case 'GET_ADBLOCK_STATUS':
+      return getAdblockStatus();
+
+    case 'SET_ADBLOCK_ENABLED':
+      return setAdblockEnabled(message.payload?.enabled);
+
+    case 'SET_ADBLOCK_LIST':
+      return setAdblockList(message.payload?.listId, message.payload?.enabled);
+
     default:
       console.warn('[MarkSyncr] Unknown message type:', message.type);
       return Promise.resolve({ success: false, error: 'Unknown message type' });
@@ -3749,6 +3769,11 @@ browser.runtime.onInstalled.addListener((details) => {
   Promise.all([setupAutoSync(), setupTokenRefreshAlarm()]).then(() => {
     console.log('[MarkSyncr] Alarms setup completed after install/update');
   });
+
+  // Sync the adblock rulesets with the user's stored preference
+  initAdblock().catch((err) =>
+    console.error('[MarkSyncr] Failed to init adblock on install/update:', err)
+  );
 });
 
 // Startup handler - registered synchronously
@@ -3761,6 +3786,11 @@ browser.runtime.onStartup.addListener(async () => {
   await setupAutoSync();
   await setupTokenRefreshAlarm();
   console.log('[MarkSyncr] Alarms verified on startup');
+
+  // Re-apply adblock preference (rulesets reset to manifest defaults otherwise)
+  await initAdblock().catch((err) =>
+    console.error('[MarkSyncr] Failed to init adblock on startup:', err)
+  );
 
   const { settings } = await browser.storage.local.get('settings');
 

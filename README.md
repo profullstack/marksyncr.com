@@ -20,6 +20,28 @@ MarkSyncr is a browser extension that enables two-way bookmark synchronization b
 - **Automatic & manual sync**: Schedule syncs or trigger manually
 - **Conflict resolution**: Smart handling of concurrent changes
 - **Cross-device sync**: Track sync status across all your devices
+- **Built-in adblocker**: One-tap ad & tracker blocking (EasyList + EasyPrivacy) via native declarativeNetRequest — no page slowdown, no host permissions
+
+### Adblocker
+
+The extension ships a lightweight, uBlock-Origin-Lite-style content blocker. Blocking is
+done natively by the browser through Manifest V3 **declarativeNetRequest** static rulesets, so
+there is no per-request JavaScript and no broad host permissions are requested.
+
+- Toggle the whole blocker on/off, or enable/disable individual lists, from the **Shield** tab
+  in the popup. State is persisted and re-applied on every browser start.
+- Rulesets are generated from the vendored filter lists in `apps/extension/filters/*.txt`
+  (EasyList, EasyPrivacy) by `apps/extension/scripts/build-filters.js`, which converts the
+  network-blocking rules into `apps/extension/public/rules/*.json`. Only rules that map exactly
+  to declarativeNetRequest are kept (cosmetic/element-hiding rules are skipped), and each list is
+  capped at 15k rules to stay within the cross-browser enabled-rule limit.
+- Regenerate after updating the lists: `pnpm --filter @marksyncr/extension build:filters`
+  (the full `build` runs it automatically). Refresh the lists with:
+
+  ```sh
+  curl -sSL https://easylist.to/easylist/easylist.txt    -o apps/extension/filters/easylist.txt
+  curl -sSL https://easylist.to/easylist/easyprivacy.txt -o apps/extension/filters/easyprivacy.txt
+  ```
 
 ## Project Structure
 

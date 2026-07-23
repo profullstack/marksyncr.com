@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/index.js';
 import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
 import { LoginPanel } from './components/LoginPanel.jsx';
+import { AdblockPanel } from './components/AdblockPanel.jsx';
 
 // Confirmation Dialog Component using native <dialog> element
 function ConfirmDialog({
@@ -495,7 +496,7 @@ export function Popup() {
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
-  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'pro' | 'account'
+  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'shield' | 'pro' | 'account'
   const [exportMessage, setExportMessage] = useState(null);
   const [forceActionMessage, setForceActionMessage] = useState(null);
   const fileInputRef = useRef(null);
@@ -794,7 +795,7 @@ ${content}
       <div className="flex border-b border-slate-200">
         <button
           onClick={() => setActiveTab('sync')}
-          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 px-2 py-2 text-sm font-medium transition-colors ${
             activeTab === 'sync'
               ? 'border-b-2 border-primary-600 text-primary-600'
               : 'text-slate-500 hover:text-slate-700'
@@ -806,8 +807,28 @@ ${content}
           </div>
         </button>
         <button
+          onClick={() => setActiveTab('shield')}
+          className={`flex-1 px-2 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'shield'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+            Shield
+          </div>
+        </button>
+        <button
           onClick={() => setActiveTab('pro')}
-          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 px-2 py-2 text-sm font-medium transition-colors ${
             activeTab === 'pro'
               ? 'border-b-2 border-primary-600 text-primary-600'
               : 'text-slate-500 hover:text-slate-700'
@@ -832,7 +853,7 @@ ${content}
         </button>
         <button
           onClick={() => setActiveTab('account')}
-          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 px-2 py-2 text-sm font-medium transition-colors ${
             activeTab === 'account'
               ? 'border-b-2 border-primary-600 text-primary-600'
               : 'text-slate-500 hover:text-slate-700'
@@ -1015,6 +1036,8 @@ ${content}
             </button>
           </div>
         )}
+
+        {activeTab === 'shield' && <AdblockPanel />}
 
         {activeTab === 'pro' && (
           <ProFeaturesPanel
