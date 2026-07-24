@@ -20,7 +20,7 @@ MarkSyncr is a browser extension that enables two-way bookmark synchronization b
 - **Automatic & manual sync**: Schedule syncs or trigger manually
 - **Conflict resolution**: Smart handling of concurrent changes
 - **Cross-device sync**: Track sync status across all your devices
-- **Built-in adblocker**: One-tap ad & tracker blocking (EasyList + EasyPrivacy) via native declarativeNetRequest — no page slowdown, no host permissions
+- **Built-in adblocker**: One-tap ad & tracker blocking (EasyList + EasyPrivacy) via native declarativeNetRequest — no page slowdown, no host permissions; per-site allowlist and cross-device sync
 
 ### Adblocker
 
@@ -30,11 +30,22 @@ there is no per-request JavaScript and no broad host permissions are requested.
 
 - Toggle the whole blocker on/off, or enable/disable individual lists, from the **Shield** tab
   in the popup. State is persisted and re-applied on every browser start.
+- **Per-site allowlist** — "Disable on this site" turns blocking off for the current domain via
+  a higher-priority dynamic `allow` rule (priority 2 > the priority-1 block rules), so that one
+  site is exempt while everything else stays blocked. Uses the `activeTab` permission to read the
+  current domain.
+- **Cross-device sync** — when signed in, the master/list/allowlist preferences persist to the
+  user's cloud settings (`/api/settings` → `user_settings.settings.adblock`) and are pulled back
+  on other devices. Signed-out users keep everything locally.
 - Rulesets are generated from the vendored filter lists in `apps/extension/filters/*.txt`
   (EasyList, EasyPrivacy) by `apps/extension/scripts/build-filters.js`, which converts the
   network-blocking rules into `apps/extension/public/rules/*.json`. Only rules that map exactly
   to declarativeNetRequest are kept (cosmetic/element-hiding rules are skipped), and each list is
-  capped at 15k rules to stay within the cross-browser enabled-rule limit.
+  capped at 15k rules (30k combined) to stay within the cross-browser enabled-rule limit. Because
+  every rule is an equal-priority block, order is irrelevant — so the converter injects a curated
+  set of high-value ad/tracker domains (e.g. googlesyndication, criteo, amazon-adsystem) first and
+  ranks whole-domain `||domain^` blocks ahead of narrow path rules, ensuring the biggest networks
+  are covered despite the cap.
 - Regenerate after updating the lists: `pnpm --filter @marksyncr/extension build:filters`
   (the full `build` runs it automatically). Refresh the lists with:
 

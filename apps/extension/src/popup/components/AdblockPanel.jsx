@@ -1,19 +1,45 @@
 import React, { useEffect, useState } from 'react';
 
 /**
- * Get the extension messaging API (Chrome or Firefox), or null in a plain
+ * Get the extension messaging/tabs API (Chrome or Firefox), or null in a plain
  * web/dev context where it isn't available.
  */
-function getRuntime() {
-  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) return chrome.runtime;
-  if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) return browser.runtime;
+function getExtApi() {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) return chrome;
+  if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) return browser;
   return null;
 }
 
 async function sendMessage(message) {
-  const runtime = getRuntime();
-  if (!runtime) return { success: false, error: 'Extension API unavailable' };
-  return runtime.sendMessage(message);
+  const api = getExtApi();
+  if (!api) return { success: false, error: 'Extension API unavailable' };
+  return api.runtime.sendMessage(message);
+}
+
+/** Read the active tab's hostname (needs activeTab, granted while the popup is open). */
+async function getActiveDomain() {
+  const api = getExtApi();
+  if (!api?.tabs?.query) return '';
+  try {
+    const tabs = await api.tabs.query({ active: true, currentWindow: true });
+    const url = tabs?.[0]?.url || '';
+    if (!url.startsWith('http')) return ''; // skip chrome://, about:, etc.
+    return normalizeDomain(url);
+  } catch {
+    return '';
+  }
+}
+
+/** Mirror of background normalizeDomain: bare host, no scheme/path/port/www. */
+function normalizeDomain(input) {
+  if (!input) return '';
+  let host = String(input).trim();
+  try {
+    if (host.includes('://')) host = new URL(host).hostname;
+  } catch {
+    /* raw */
+  }
+  return host.split('/')[0].split(':')[0].toLowerCase().replace(/^www\./, '');
 }
 
 /** iOS-style toggle switch */
@@ -40,52 +66,37 @@ function Toggle({ checked, onChange, disabled, label }) {
 }
 
 const LISTS = [
-  {
-    id: 'ads',
-    name: 'Ads',
-    description: 'Blocks ad servers & banners (EasyList)',
-  },
-  {
-    id: 'privacy',
-    name: 'Trackers',
-    description: 'Blocks trackers & analytics (EasyPrivacy)',
-  },
+  { id: 'ads', name: 'Ads', description: 'Blocks ad servers & banners (EasyList)' },
+  { id: 'privacy', name: 'Trackers', description: 'Blocks trackers & analytics (EasyPrivacy)' },
 ];
 
 export function AdblockPanel() {
   const [status, setStatus] = useState(null);
+  const [domain, setDomain] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const refresh = async () => {
-    const res = await sendMessage({ type: 'GET_ADBLOCK_STATUS' });
-    if (res?.success) setStatus(res);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    refresh();
+    (async () => {
+      setDomain(await getActiveDomain());
+      // Pull cross-device prefs from the cloud (no-op if signed out), which
+      // returns fresh status; fall back to local status if it fails.
+      let res = await sendMessage({ type: 'SYNC_ADBLOCK_CLOUD' });
+      if (!res?.success) res = await sendMessage({ type: 'GET_ADBLOCK_STATUS' });
+      if (res?.success) setStatus(res);
+      setLoading(false);
+    })();
   }, []);
 
-  const handleMasterToggle = async (enabled) => {
+  const apply = async (message, optimistic) => {
     setBusy(true);
-    // Optimistic update
-    setStatus((s) => (s ? { ...s, enabled } : s));
-    const res = await sendMessage({ type: 'SET_ADBLOCK_ENABLED', payload: { enabled } });
+    if (optimistic) setStatus((s) => (s ? { ...s, ...optimistic } : s));
+    const res = await sendMessage(message);
     if (res?.success) setStatus(res);
-    else await refresh();
-    setBusy(false);
-  };
-
-  const handleListToggle = async (listId, enabled) => {
-    setBusy(true);
-    setStatus((s) => (s ? { ...s, lists: { ...s.lists, [listId]: enabled } } : s));
-    const res = await sendMessage({
-      type: 'SET_ADBLOCK_LIST',
-      payload: { listId, enabled },
-    });
-    if (res?.success) setStatus(res);
-    else await refresh();
+    else {
+      const fresh = await sendMessage({ type: 'GET_ADBLOCK_STATUS' });
+      if (fresh?.success) setStatus(fresh);
+    }
     setBusy(false);
   };
 
@@ -96,7 +107,6 @@ export function AdblockPanel() {
       </div>
     );
   }
-
   if (!status) {
     return (
       <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
@@ -105,7 +115,8 @@ export function AdblockPanel() {
     );
   }
 
-  const { enabled, lists, counts, activeRules } = status;
+  const { enabled, lists, counts, activeRules, allowlist = [] } = status;
+  const siteAllowed = domain && allowlist.includes(domain);
 
   return (
     <div className="space-y-4">
@@ -140,12 +151,45 @@ export function AdblockPanel() {
           </div>
           <Toggle
             checked={enabled}
-            onChange={handleMasterToggle}
+            onChange={(v) => apply({ type: 'SET_ADBLOCK_ENABLED', payload: { enabled: v } }, { enabled: v })}
             disabled={busy}
             label="Enable adblocker"
           />
         </div>
       </div>
+
+      {/* Per-site allowlist */}
+      {domain ? (
+        <div
+          className={`flex items-center justify-between rounded-lg border p-3 ${
+            siteAllowed ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'
+          } ${enabled ? '' : 'opacity-60'}`}
+        >
+          <div className="min-w-0 pr-3">
+            <p className="text-sm font-medium text-slate-800">
+              {siteAllowed ? 'Blocking off for' : 'This site'}
+            </p>
+            <p className="truncate text-xs text-slate-500">{domain}</p>
+          </div>
+          <button
+            type="button"
+            disabled={busy || !enabled}
+            onClick={() =>
+              apply({
+                type: siteAllowed ? 'REMOVE_ADBLOCK_ALLOWLIST' : 'ADD_ADBLOCK_ALLOWLIST',
+                payload: { domain },
+              })
+            }
+            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              siteAllowed
+                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {siteAllowed ? 'Re-enable here' : 'Disable on this site'}
+          </button>
+        </div>
+      ) : null}
 
       {/* Filter lists */}
       <div className="space-y-2">
@@ -170,7 +214,12 @@ export function AdblockPanel() {
             </div>
             <Toggle
               checked={Boolean(lists[list.id])}
-              onChange={(v) => handleListToggle(list.id, v)}
+              onChange={(v) =>
+                apply(
+                  { type: 'SET_ADBLOCK_LIST', payload: { listId: list.id, enabled: v } },
+                  { lists: { ...lists, [list.id]: v } }
+                )
+              }
               disabled={busy || !enabled}
               label={`Enable ${list.name} list`}
             />
@@ -178,10 +227,43 @@ export function AdblockPanel() {
         ))}
       </div>
 
+      {/* Allowlisted sites */}
+      {allowlist.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Disabled on {allowlist.length} {allowlist.length === 1 ? 'site' : 'sites'}
+          </h4>
+          <div className="space-y-1">
+            {allowlist.map((d) => (
+              <div
+                key={d}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2"
+              >
+                <span className="truncate text-xs text-slate-700">{d}</span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    apply({ type: 'REMOVE_ADBLOCK_ALLOWLIST', payload: { domain: d } })
+                  }
+                  className="ml-2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                  aria-label={`Remove ${d} from allowlist`}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Info footer */}
       <p className="px-1 text-xs leading-relaxed text-slate-400">
         Blocking runs natively in your browser — no page slowdown and no data leaves your device.
-        The number on the toolbar icon shows requests blocked on the current tab.
+        Your settings sync across devices when you're signed in. The number on the toolbar icon
+        shows requests blocked on the current tab.
       </p>
     </div>
   );

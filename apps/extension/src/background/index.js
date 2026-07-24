@@ -14,6 +14,9 @@ import {
   getAdblockStatus,
   setAdblockEnabled,
   setAdblockList,
+  addAllowlistDomain,
+  removeAllowlistDomain,
+  syncAdblockFromCloud,
 } from './adblock.js';
 
 // Constants
@@ -3620,6 +3623,15 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
     case 'SET_ADBLOCK_LIST':
       return setAdblockList(message.payload?.listId, message.payload?.enabled);
+
+    case 'ADD_ADBLOCK_ALLOWLIST':
+      return addAllowlistDomain(message.payload?.domain);
+
+    case 'REMOVE_ADBLOCK_ALLOWLIST':
+      return removeAllowlistDomain(message.payload?.domain);
+
+    case 'SYNC_ADBLOCK_CLOUD':
+      return syncAdblockFromCloud();
 
     default:
       console.warn('[MarkSyncr] Unknown message type:', message.type);

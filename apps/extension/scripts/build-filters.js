@@ -30,6 +30,82 @@ const RULES_DIR = join(ROOT_DIR, 'public/rules');
 // which stays inside the guaranteed limit on every MV3 browser (incl. Safari).
 const MAX_RULES_PER_LIST = 15000;
 
+// EasyList/EasyPrivacy are not ordered by importance, so a flat cap can drop
+// blanket blocks for major networks (e.g. ||pagead2.googlesyndication.com^ sits
+// past line 68k). Because every generated rule is an equal-priority block, order
+// is irrelevant to matching — so we (a) always inject these high-value, safe-to-
+// block domains first, and (b) rank whole-domain (||domain^) rules ahead of
+// narrow path rules when spending the remaining budget.
+//
+// Deliberately excluded because blocking them breaks sites: GPT loader
+// securepubads.g.doubleclick.net and the Facebook SDK connect.facebook.net.
+const PRIORITY_ADS = [
+  'pagead2.googlesyndication.com',
+  'googlesyndication.com',
+  'googleadservices.com',
+  'googleads.g.doubleclick.net',
+  'stats.g.doubleclick.net',
+  'ad.doubleclick.net',
+  '2mdn.net',
+  'adservice.google.com',
+  'amazon-adsystem.com',
+  'adnxs.com',
+  'criteo.com',
+  'criteo.net',
+  'rubiconproject.com',
+  'pubmatic.com',
+  'openx.net',
+  'casalemedia.com',
+  'adform.net',
+  'smartadserver.com',
+  '3lift.com',
+  'sharethrough.com',
+  'yieldmo.com',
+  'media.net',
+  'adsrvr.org',
+  'bidswitch.net',
+  'taboola.com',
+  'outbrain.com',
+  'teads.tv',
+  'serving-sys.com',
+  'advertising.com',
+  'contextweb.com',
+  'gumgum.com',
+  'indexww.com',
+  'lijit.com',
+  'adcolony.com',
+  'applovin.com',
+  'inmobi.com',
+];
+const PRIORITY_PRIVACY = [
+  'google-analytics.com',
+  'googletagmanager.com',
+  'googletagservices.com',
+  'scorecardresearch.com',
+  'quantserve.com',
+  'quantcount.com',
+  'hotjar.com',
+  'mixpanel.com',
+  'segment.com',
+  'segment.io',
+  'amplitude.com',
+  'fullstory.com',
+  'mouseflow.com',
+  'crazyegg.com',
+  'bluekai.com',
+  'demdex.net',
+  'crwdcntrl.net',
+  'rlcdn.com',
+  'agkn.com',
+  'adsymptotic.com',
+  'everesttech.net',
+  'mathtag.com',
+  'bidr.io',
+  'tapad.com',
+  'chartbeat.com',
+  'sail-horizon.com',
+];
+
 // EasyList resource-type option -> declarativeNetRequest ResourceType
 const RESOURCE_TYPES = {
   script: 'script',
@@ -186,49 +262,70 @@ export function parseRule(line) {
   return condition;
 }
 
+/** Whole-domain block (||domain^) — the broadest, highest-value shape. */
+function isBroad(condition) {
+  return (
+    /^\|\|[a-z0-9.\-*]+\^$/.test(condition.urlFilter) &&
+    !condition.resourceTypes &&
+    !condition.initiatorDomains
+  );
+}
+
 /**
  * Build a ruleset array from a filter-list file.
  * @param {string} file
  * @param {number} startId
+ * @param {string[]} [priorityDomains] domains injected first, always kept
  */
-export function buildRuleset(file, startId) {
+export function buildRuleset(file, startId, priorityDomains = []) {
   const text = readFileSync(join(FILTERS_DIR, file), 'utf-8');
-  const rules = [];
   const seen = new Set();
-  let id = startId;
+  const priority = [];
+  const broad = [];
+  const rest = [];
 
-  for (const line of text.split('\n')) {
-    if (rules.length >= MAX_RULES_PER_LIST) break;
-    const condition = parseRule(line);
-    if (!condition) continue;
-
-    // Dedupe on the serialized condition
+  // 1. Curated priority domains — guaranteed inclusion, added first.
+  for (const domain of priorityDomains) {
+    const condition = { urlFilter: `||${domain}^`, isUrlFilterCaseSensitive: false };
     const key = JSON.stringify(condition);
     if (seen.has(key)) continue;
     seen.add(key);
-
-    rules.push({
-      id: id++,
-      priority: 1,
-      action: { type: 'block' },
-      condition,
-    });
+    priority.push(condition);
   }
 
-  return rules;
+  // 2. Everything convertible from the list, bucketed by breadth.
+  for (const line of text.split('\n')) {
+    const condition = parseRule(line);
+    if (!condition) continue;
+    const key = JSON.stringify(condition);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    (isBroad(condition) ? broad : rest).push(condition);
+  }
+
+  // Priority + whole-domain blocks first, then narrower rules fill the budget.
+  const ordered = [...priority, ...broad, ...rest].slice(0, MAX_RULES_PER_LIST);
+
+  let id = startId;
+  return ordered.map((condition) => ({
+    id: id++,
+    priority: 1,
+    action: { type: 'block' },
+    condition,
+  }));
 }
 
 function main() {
   mkdirSync(RULES_DIR, { recursive: true });
 
   const lists = [
-    { file: 'easylist.txt', out: 'ads.json', startId: 1 },
+    { file: 'easylist.txt', out: 'ads.json', startId: 1, priority: PRIORITY_ADS },
     // Offset ids so the two rulesets never collide if ever merged
-    { file: 'easyprivacy.txt', out: 'privacy.json', startId: 1_000_000 },
+    { file: 'easyprivacy.txt', out: 'privacy.json', startId: 1_000_000, priority: PRIORITY_PRIVACY },
   ];
 
-  for (const { file, out, startId } of lists) {
-    const rules = buildRuleset(file, startId);
+  for (const { file, out, startId, priority } of lists) {
+    const rules = buildRuleset(file, startId, priority);
     writeFileSync(join(RULES_DIR, out), JSON.stringify(rules));
     console.log(`✅ ${file} -> rules/${out} (${rules.length} rules)`);
   }

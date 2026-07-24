@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseRule, isValidDomain, isValidUrlFilter } from '../scripts/build-filters.js';
+import { parseRule, isValidDomain, isValidUrlFilter, buildRuleset } from '../scripts/build-filters.js';
 
 describe('parseRule — skips what declarativeNetRequest cannot represent', () => {
   it.each([
@@ -99,6 +99,32 @@ describe('isValidDomain', () => {
       expect(isValidDomain(d)).toBe(false);
     }
   );
+});
+
+describe('buildRuleset — prioritization', () => {
+  // Uses the vendored filters/easylist.txt.
+  const rules = buildRuleset('easylist.txt', 1, ['zzz-priority-marker.example', 'another.example']);
+
+  it('caps the ruleset at the per-list maximum', () => {
+    expect(rules.length).toBe(15000);
+  });
+
+  it('injects curated priority domains first, even if absent from the list', () => {
+    expect(rules[0].condition.urlFilter).toBe('||zzz-priority-marker.example^');
+    expect(rules[1].condition.urlFilter).toBe('||another.example^');
+  });
+
+  it('emits equal-priority block rules with unique ids', () => {
+    const ids = new Set(rules.map((r) => r.id));
+    expect(ids.size).toBe(rules.length);
+    expect(rules.every((r) => r.action.type === 'block' && r.priority === 1)).toBe(true);
+  });
+
+  it('ranks whole-domain (||domain^) blocks ahead of narrow path rules', () => {
+    // Within the first slice, broad domain blocks should dominate.
+    const broad = rules.slice(0, 500).filter((r) => /^\|\|[a-z0-9.\-*]+\^$/.test(r.condition.urlFilter));
+    expect(broad.length).toBeGreaterThan(400);
+  });
 });
 
 describe('isValidUrlFilter', () => {
