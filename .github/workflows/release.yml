@@ -27,7 +27,7 @@ jobs:
         run: |
           while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
-            echo "::add-mask::$value"
+            [[ -n "$value" ]] && echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
           done <<< "$ENV_CONTENT"
 
@@ -113,7 +113,7 @@ jobs:
         run: |
           while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
-            echo "::add-mask::$value"
+            [[ -n "$value" ]] && echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
           done <<< "$ENV_CONTENT"
 
@@ -212,7 +212,7 @@ jobs:
         run: |
           while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
-            echo "::add-mask::$value"
+            [[ -n "$value" ]] && echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
           done <<< "$ENV_CONTENT"
 
@@ -261,7 +261,7 @@ jobs:
         run: |
           while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
-            echo "::add-mask::$value"
+            [[ -n "$value" ]] && echo "::add-mask::$value"
             echo "${key}=${value}" >> "$GITHUB_ENV"
           done <<< "$ENV_CONTENT"
 
