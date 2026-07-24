@@ -18,6 +18,7 @@ const plans = [
     yearlyPrice: 0,
     features: [
       'Unlimited bookmarks',
+      'Built-in ad & tracker blocker',
       'MarkSyncr Cloud storage',
       'GitHub sync',
       'Dropbox sync',
@@ -87,6 +88,11 @@ const faqs = [
     question: 'What is MarkSyncr Cloud?',
     answer:
       'MarkSyncr Cloud is our managed storage solution available to all users. It provides the simplest sync experience with no setup required - just sign in and your bookmarks sync automatically.',
+  },
+  {
+    question: 'Is the ad & tracker blocker really free?',
+    answer:
+      "Yes. The built-in adblocker is included on every plan, including Free. It blocks ads and trackers natively in your browser (EasyList + EasyPrivacy) with no page slowdown and no data leaving your device. Toggle it per-site, and when you're signed in your settings sync across devices.",
   },
   {
     question: 'Can I switch between plans?',

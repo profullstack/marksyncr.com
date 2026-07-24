@@ -148,7 +148,8 @@ export default function HomePage() {
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
             Keep your bookmarks in sync across Chrome, Firefox, and Safari. Store them in GitHub,
-            Dropbox, Google Drive, or our cloud service. Your bookmarks, your choice.
+            Dropbox, Google Drive, or our cloud service. Your bookmarks, your choice — plus a
+            built-in ad &amp; tracker blocker, free on every plan.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link href="/signup" className="btn-primary px-8 py-3 text-base">
@@ -368,6 +369,20 @@ export default function HomePage() {
               title="Cross-Browser"
               description="Works seamlessly across Chrome, Firefox, and Safari with a single account."
             />
+            <FeatureCard
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
+                </svg>
+              }
+              title="Built-in Adblocker"
+              description="Block ads and trackers on every site — included free on all plans. Native, fast, with a one-tap per-site allowlist."
+            />
           </div>
         </div>
       </section>
@@ -510,6 +525,7 @@ export default function HomePage() {
               description="Perfect for personal use"
               features={[
                 'Unlimited bookmarks',
+                'Built-in ad & tracker blocker',
                 'MarkSyncr Cloud storage',
                 'GitHub, Dropbox, Google Drive sync',
                 'HTML & JSON import/export',

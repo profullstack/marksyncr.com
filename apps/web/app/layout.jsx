@@ -9,13 +9,13 @@ export const metadata = {
   },
   title: 'MarkSyncr - Sync Your Bookmarks Everywhere',
   description:
-    'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
-  keywords: ['bookmarks', 'sync', 'browser extension', 'chrome', 'firefox', 'safari'],
+    'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service. Includes a free built-in ad & tracker blocker.',
+  keywords: ['bookmarks', 'sync', 'browser extension', 'chrome', 'firefox', 'safari', 'adblocker', 'ad blocker', 'tracker blocker'],
   authors: [{ name: 'MarkSyncr' }],
   openGraph: {
     title: 'MarkSyncr - Sync Your Bookmarks Everywhere',
     description:
-      'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
+      'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service. Includes a free built-in ad & tracker blocker.',
     url: 'https://marksyncr.com',
     siteName: 'MarkSyncr',
     images: [
@@ -33,7 +33,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'MarkSyncr - Sync Your Bookmarks Everywhere',
     description:
-      'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
+      'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service. Includes a free built-in ad & tracker blocker.',
     images: ['/banner.png'],
   },
   robots: {
@@ -91,7 +91,7 @@ export default function RootLayout({ children }) {
               url: 'https://marksyncr.com/',
               logo: 'https://marksyncr.com/logo.svg',
               description:
-                'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service.',
+                'Sync your browser bookmarks across Chrome, Firefox, and Safari using GitHub, Dropbox, Google Drive, or our cloud service. Includes a free built-in ad & tracker blocker.',
               sameAs: [
                 'https://github.com/profullstack/marksyncr.com',
                 'https://discord.gg/U7dEXfBA3s',
