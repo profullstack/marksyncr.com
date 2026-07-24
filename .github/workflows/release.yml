@@ -31,13 +31,11 @@ jobs:
             echo "${key}=${value}" >> "$GITHUB_ENV"
           done <<< "$ENV_CONTENT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.1
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: "pnpm"
@@ -81,21 +79,21 @@ jobs:
           cp apps/extension/dist/marksyncr-chrome.zip apps/extension/dist/marksyncr-edge.zip
 
       - name: Upload Chrome ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: marksyncr-chrome
           path: apps/extension/dist/marksyncr-chrome.zip
           retention-days: 30
 
       - name: Upload Firefox ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: marksyncr-firefox
           path: apps/extension/dist/marksyncr-firefox.zip
           retention-days: 30
 
       - name: Upload Edge ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: marksyncr-edge
           path: apps/extension/dist/marksyncr-edge.zip
@@ -120,7 +118,7 @@ jobs:
           done <<< "$ENV_CONTENT"
 
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: marksyncr-chrome
 
@@ -219,7 +217,7 @@ jobs:
           done <<< "$ENV_CONTENT"
 
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: marksyncr-firefox
 
@@ -230,7 +228,7 @@ jobs:
           echo "Extension contents:"
           ls -la extension/
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
@@ -268,7 +266,7 @@ jobs:
           done <<< "$ENV_CONTENT"
 
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: marksyncr-edge
 
