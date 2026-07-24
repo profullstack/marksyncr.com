@@ -13,11 +13,16 @@ export async function GET() {
     environment: process.env.NODE_ENV || 'development',
   };
 
-  // Check Supabase connection
+  // Check Supabase connection.
+  // NOTE: probe the GoTrue health endpoint, not the PostgREST root (/rest/v1/).
+  // Under Supabase's new API-key system the REST root requires a *secret* key and
+  // returns 401 ("Only secret API keys can be used for this endpoint") for the
+  // publishable key the app uses — a false negative even though the project is
+  // healthy and table queries work. /auth/v1/health needs no key and returns 200.
   try {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`, {
-        method: 'HEAD',
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health`, {
+        method: 'GET',
         headers: {
           apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
         },
