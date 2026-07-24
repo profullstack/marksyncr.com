@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MarkSyncr",
-  "version": "0.8.36",
+  "version": "0.8.37",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7DFgy2MqEiueb1SY1qjWLrRLkQgsnEyG1d817j9qUHcEi8vPe+d3A2ClAspwRpPI141K+xlswpztXIROfCrbix1l/NqE+OauChZRxdud/+BTeW+emhaRNsE9t1+r+6R+4gY6k1WboeMGZTsOScJjta4F9qzjQBV6Ge+TukKgwvC89YZ8SYSp9QYpLeNx7XHIbQ9o33Zlt0Zz+P5gvs5cUgPea9MJkP0STHbYkMFi8SmymeLXiauEE+Ye9tCLhfh+JvW7w7fkrdbI3VLnbKhAwJ2U+KJOWhENKNIyoOjaz0S5P2TO2lgPfC1JvSxK9fZESW4saryCI+gxsHPGdw3TrwIDAQAB",
   "description": "Sync your bookmarks across browsers using GitHub, Dropbox, Google Drive, or MarkSyncr Cloud",
   "icons": {
