@@ -74,11 +74,11 @@ function payloadFrom(impl) {
       impl.createItem('note', { name: 'WiFi', notes: 'the password is on the router' }),
       impl.createItem('key', {
         name: 'deploy@railway',
-        key: { keyType: 'ssh', algorithm: 'ed25519', privateKey: '-----BEGIN-----', path: '~/.ssh/id_ed25519', mode: '0600' },
+        key: { keyType: 'ssh', algorithm: 'ed25519', privateKey: '<private key body>', path: '~/.ssh/id_ed25519', mode: '0600' },
       }),
       impl.createItem('account', {
         name: 'Stripe',
-        account: { provider: 'stripe', accessToken: 'sk_live_x', scopes: ['charges:write', 'customers:read'] },
+        account: { provider: 'stripe', accessToken: '<access token>', scopes: ['charges:write', 'customers:read'] },
       }),
     ],
   };

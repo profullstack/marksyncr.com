@@ -54,11 +54,11 @@ function samplePayload() {
       createItem('note', { name: 'WiFi', notes: 'on the router' }),
       createItem('key', {
         name: 'deploy',
-        key: { keyType: 'ssh', privateKey: '-----BEGIN-----', path: '~/.ssh/id_ed25519', mode: '0600' },
+        key: { keyType: 'ssh', privateKey: '<private key body>', path: '~/.ssh/id_ed25519', mode: '0600' },
       }),
       createItem('account', {
         name: 'Stripe',
-        account: { provider: 'stripe', accessToken: 'sk_live_x', scopes: ['charges:write'] },
+        account: { provider: 'stripe', accessToken: '<access token>', scopes: ['charges:write'] },
       }),
     ],
   };
@@ -82,7 +82,7 @@ describe('the six item types', () => {
     const userKey = randomBytes(32);
     for (const item of [
       createItem('key', { name: 'deploy', key: { keyType: 'ssh', privateKey: 'SECRET' } }),
-      createItem('account', { name: 'Stripe', account: { accessToken: 'sk_live_x' } }),
+      createItem('account', { name: 'Stripe', account: { accessToken: '<access token>' } }),
     ]) {
       const row = await encryptItem(userKey, item);
       expect(row.type).toBe(ITEM_TYPE[item.type]);
@@ -134,7 +134,7 @@ describe('exporting', () => {
     const raw = JSON.stringify(db);
     expect(raw).not.toContain('hunter2');
     expect(raw).not.toContain('4242424242424242');
-    expect(raw).not.toContain('sk_live_x');
+    expect(raw).not.toContain('<access token>');
     // The counts are readable without the passphrase, for a preview.
     expect(db.manifest.itemCount).toBe(6);
   });
