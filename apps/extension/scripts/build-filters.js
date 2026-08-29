@@ -352,6 +352,29 @@ export function buildLabelIndex(rules, startId) {
     .join('\n');
 }
 
+/**
+ * Read the vendored phishing/scam list into a plain domain array.
+ *
+ * Unlike the ad/tracker lists this is not converted into one rule per entry.
+ * declarativeNetRequest's `requestDomains` takes a whole array in a single
+ * rule and matches subdomains implicitly, so ~18k domains cost a couple of
+ * rules rather than 18k of the ~30k static budget — which is already fully
+ * spent by the ads and privacy rulesets.
+ * @returns {string[]}
+ */
+export function buildSecuritySeed(file = 'phishing.txt') {
+  const text = readFileSync(join(FILTERS_DIR, file), 'utf-8');
+  const domains = [];
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('!') || line.startsWith('#')) continue;
+    domains.push(line);
+  }
+
+  return domains;
+}
+
 function main() {
   mkdirSync(RULES_DIR, { recursive: true });
 
@@ -385,6 +408,17 @@ function main() {
   // never has to hard-code the start ids this script chose.
   writeFileSync(join(RULES_DIR, 'index.json'), JSON.stringify({ lists: index }));
   console.log(`✅ rules/index.json (${Object.keys(index).length} lists)`);
+
+  // The security list ships as a domain array, not as rules — the background
+  // installs it as dynamic rules so it can be refreshed between store releases.
+  // Phishing domains have a median lifetime of hours; a static ruleset only
+  // changes when a new version clears review.
+  const securityDomains = buildSecuritySeed();
+  writeFileSync(
+    join(RULES_DIR, 'security-seed.json'),
+    JSON.stringify({ generatedAt: new Date().toISOString(), domains: securityDomains })
+  );
+  console.log(`✅ rules/security-seed.json (${securityDomains.length} domains)`);
 }
 
 // Only run the file-writing build when invoked directly (not when imported by tests)

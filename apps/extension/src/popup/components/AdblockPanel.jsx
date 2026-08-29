@@ -217,6 +217,7 @@ export function AdblockPanel() {
   const [tabId, setTabId] = useState(null);
   const [blocked, setBlocked] = useState(null);
   const [blockedBusy, setBlockedBusy] = useState(false);
+  const [security, setSecurity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -239,10 +240,23 @@ export function AdblockPanel() {
       let res = await sendMessage({ type: 'SYNC_ADBLOCK_CLOUD' });
       if (!res?.success) res = await sendMessage({ type: 'GET_ADBLOCK_STATUS' });
       if (res?.success) setStatus(res);
+
+      // Phishing protection keeps its own prefs (and its own cloud blob key).
+      let sec = await sendMessage({ type: 'SYNC_SECURITY_CLOUD' });
+      if (!sec?.success) sec = await sendMessage({ type: 'GET_SECURITY_STATUS' });
+      if (sec?.success) setSecurity(sec);
+
       setLoading(false);
       loadBlocked(tab.id);
     })();
   }, [loadBlocked]);
+
+  const applySecurity = async (message) => {
+    setBusy(true);
+    const res = await sendMessage(message);
+    if (res?.success) setSecurity(res);
+    setBusy(false);
+  };
 
   const apply = async (message, optimistic) => {
     setBusy(true);
@@ -313,6 +327,79 @@ export function AdblockPanel() {
           />
         </div>
       </div>
+
+      {/* Phishing & scam protection — independent of the ad/tracker blocker, so
+          it stays on for a site the user has allowlisted for ads. */}
+      {security && (
+        <div
+          className={`rounded-xl border p-4 transition-colors ${
+            security.enabled ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                  security.enabled ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-600'
+                }`}
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 004.99 19z"
+                  />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-slate-900">Scam &amp; phishing</h3>
+                <p className="truncate text-xs text-slate-500">
+                  {security.enabled
+                    ? `${(security.listCount || 0).toLocaleString()} dangerous sites blocked`
+                    : 'Turned off'}
+                </p>
+              </div>
+            </div>
+            <Toggle
+              checked={security.enabled}
+              onChange={(v) =>
+                applySecurity({ type: 'SET_SECURITY_ENABLED', payload: { enabled: v } })
+              }
+              disabled={busy}
+              label="Enable phishing and scam protection"
+            />
+          </div>
+
+          {security.enabled && security.bypasses?.length > 0 && (
+            <div className="mt-3 border-t border-emerald-200 pt-3">
+              <p className="mb-1.5 text-xs font-medium text-slate-600">
+                Warnings you dismissed
+              </p>
+              <div className="space-y-1">
+                {security.bypasses.map((d) => (
+                  <div key={d} className="flex items-center justify-between gap-2">
+                    <span className="truncate font-mono text-xs text-amber-700">{d}</span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        applySecurity({
+                          type: 'REMOVE_SECURITY_BYPASS',
+                          payload: { domain: d },
+                        })
+                      }
+                      className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
+                    >
+                      Re-block
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Per-site allowlist */}
       {domain ? (

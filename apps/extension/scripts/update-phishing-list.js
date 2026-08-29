@@ -1,0 +1,182 @@
+#!/usr/bin/env node
+
+/**
+ * Refresh the vendored phishing/scam domain list in `filters/phishing.txt`.
+ *
+ * This is the only script here that touches the network, and it is run by hand
+ * (or on a schedule) rather than as part of a build — `build-filters.js` stays
+ * offline and deterministic, converting whatever is vendored.
+ *
+ * Sources are chosen for licence first. A blocklist shipped inside a commercial
+ * extension has to be redistributable, which rules out most of the well-known
+ * ones (hagezi and AdGuard's lists are GPL-3.0-only, Cloudflare Radar is
+ * CC BY-NC, OpenPhish's community feed is non-commercial).
+ *
+ * Usage: node scripts/update-phishing-list.js
+ */
+
+import { writeFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = join(__dirname, '..');
+const OUT_FILE = join(ROOT_DIR, 'filters/phishing.txt');
+
+/**
+ * @typedef {Object} Source
+ * @property {string} id
+ * @property {string} url
+ * @property {'adblock'|'hosts'|'plain'} format
+ * @property {string} licence
+ * @property {string} note
+ */
+
+/** @type {Source[]} */
+export const SOURCES = [
+  {
+    id: 'cert-pl',
+    url: 'https://hole.cert.pl/domains/v2/domains_ublock.txt',
+    format: 'adblock',
+    licence: 'Unrestricted — CERT.PL Warning List API spec v1.2',
+    note: 'Updated every 5 minutes. Poland-weighted, so paired with the global lists below.',
+  },
+  {
+    id: 'durablenapkin-scam',
+    url: 'https://raw.githubusercontent.com/durablenapkin/scamblocklist/master/hosts.txt',
+    format: 'hosts',
+    licence: 'MIT',
+    note: 'Global scam / fake-shop domains.',
+  },
+  {
+    id: 'phishing-database-new',
+    url: 'https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-NEW-today.txt',
+    format: 'plain',
+    licence: 'MIT',
+    note: 'Daily delta. Small on any given day; accumulates across refreshes.',
+  },
+];
+
+/**
+ * Pull the bare domains out of one feed.
+ * @param {string} text
+ * @param {Source['format']} format
+ * @returns {string[]}
+ */
+export function parseFeed(text, format) {
+  const domains = [];
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || line.startsWith('!') || line.startsWith('[')) continue;
+
+    let candidate = line;
+    if (format === 'hosts') {
+      // "0.0.0.0 example.com" / "127.0.0.1 example.com"
+      const parts = line.split(/\s+/);
+      if (parts.length < 2) continue;
+      candidate = parts[1];
+    }
+
+    const domain = normalizeDomain(candidate);
+    if (domain) domains.push(domain);
+  }
+
+  return domains;
+}
+
+/**
+ * Lowercase a hostname and drop a leading "www.". Returns '' for anything that
+ * is not a plain registrable hostname — declarativeNetRequest rejects IPs,
+ * wildcards and ports in `requestDomains`, and one bad entry fails the whole
+ * rule, so this is deliberately strict.
+ * @param {string} input
+ * @returns {string}
+ */
+export function normalizeDomain(input) {
+  if (!input) return '';
+  let host = String(input).trim().toLowerCase();
+  if (host.includes('://')) {
+    try {
+      host = new URL(host).hostname;
+    } catch {
+      return '';
+    }
+  }
+  host = host.split('/')[0].split(':')[0].replace(/^\*\./, '').replace(/^www\./, '');
+  if (!host || host.length > 253) return '';
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return '';
+  // Bare IPv4 is not a domain.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return '';
+  return host;
+}
+
+/**
+ * Drop any domain already covered by a listed parent.
+ *
+ * `requestDomains` matches subdomains implicitly, so listing both example.com
+ * and login.example.com is pure waste — the parent already blocks the child.
+ * @param {string[]} domains
+ * @returns {string[]}
+ */
+export function collapseSubdomains(domains) {
+  const set = new Set(domains);
+  const kept = [];
+
+  for (const domain of set) {
+    const labels = domain.split('.');
+    let covered = false;
+    // Check every proper suffix that is still a registrable-looking domain.
+    for (let i = 1; i <= labels.length - 2; i++) {
+      if (set.has(labels.slice(i).join('.'))) {
+        covered = true;
+        break;
+      }
+    }
+    if (!covered) kept.push(domain);
+  }
+
+  return kept.sort();
+}
+
+async function main() {
+  const all = [];
+  const provenance = [];
+
+  for (const source of SOURCES) {
+    process.stdout.write(`Fetching ${source.id}… `);
+    const res = await fetch(source.url);
+    if (!res.ok) {
+      throw new Error(`${source.id} returned HTTP ${res.status}`);
+    }
+    const domains = parseFeed(await res.text(), source.format);
+    all.push(...domains);
+    provenance.push(`!   ${source.id}: ${domains.length} domains — ${source.licence}`);
+    console.log(`${domains.length} domains`);
+  }
+
+  const domains = collapseSubdomains(all);
+
+  const header = [
+    '! MarkSyncr Shield — phishing & scam domains',
+    `! Generated by scripts/update-phishing-list.js on ${new Date().toISOString()}`,
+    '!',
+    '! Sources (all redistributable in a commercial extension):',
+    ...provenance,
+    '!',
+    `! ${all.length} domains fetched, ${domains.length} after removing duplicates and`,
+    '! subdomains already covered by a listed parent (requestDomains matches',
+    '! subdomains implicitly, so a listed parent covers its children).',
+    '',
+  ].join('\n');
+
+  writeFileSync(OUT_FILE, header + domains.join('\n') + '\n');
+  console.log(`\n✅ filters/phishing.txt — ${domains.length} domains`);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((err) => {
+    console.error(`\n❌ ${err.message}`);
+    process.exit(1);
+  });
+}
