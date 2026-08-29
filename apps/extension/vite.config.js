@@ -38,6 +38,14 @@ function moveHtmlPlugin() {
           }
         }
 
+        // Move the shield's warning page to /blocked.html at the package root.
+        // The redirect rule names that exact path and it is declared as a
+        // web_accessible_resource, so it cannot live under src/ or a subfolder.
+        const blockedHtml = resolve(srcDir, 'blocked', 'index.html');
+        if (existsSync(blockedHtml)) {
+          renameSync(blockedHtml, resolve(distDir, 'blocked.html'));
+        }
+
         // Clean up the src directory
         rmSync(srcDir, { recursive: true, force: true });
       }
@@ -60,6 +68,7 @@ export default defineConfig(({ mode }) => {
           popup: resolve(__dirname, 'src/popup/index.html'),
           background: resolve(__dirname, 'src/background/index.js'),
           options: resolve(__dirname, 'src/options/index.html'),
+          blocked: resolve(__dirname, 'src/blocked/index.html'),
         },
         output: {
           entryFileNames: '[name]/index.js',

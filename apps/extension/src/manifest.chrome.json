@@ -56,7 +56,9 @@
     "https://www.googleapis.com/*",
     "https://*.supabase.co/*",
     "https://marksyncr.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://hole.cert.pl/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "oauth2": {
     "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
@@ -71,6 +73,14 @@
     {
       "resources": [
         "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "blocked.html"
       ],
       "matches": [
         "<all_urls>"

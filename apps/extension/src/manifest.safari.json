@@ -53,7 +53,9 @@
     "https://api.dropboxapi.com/*",
     "https://content.dropboxapi.com/*",
     "https://www.googleapis.com/*",
-    "https://*.supabase.co/*"
+    "https://*.supabase.co/*",
+    "https://hole.cert.pl/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
@@ -62,6 +64,14 @@
     {
       "resources": [
         "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "blocked.html"
       ],
       "matches": [
         "<all_urls>"

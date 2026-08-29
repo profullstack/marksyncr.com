@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dangerous site blocked — MarkSyncr</title>
+    <link rel="icon" href="/icons/favicon-32.png" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fef2f2;
+        --card: #ffffff;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --danger: #b91c1c;
+        --danger-bg: #fee2e2;
+        --border: #fecaca;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a0d0d;
+          --card: #1e1b1b;
+          --ink: #f1f5f9;
+          --muted: #94a3b8;
+          --danger: #fca5a5;
+          --danger-bg: #3f1d1d;
+          --border: #7f1d1d;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.6 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      .card {
+        max-width: 560px;
+        width: 100%;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 10px 40px rgb(0 0 0 / 8%);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--danger-bg);
+        color: var(--danger);
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 6px 12px;
+        border-radius: 999px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 16px 0 8px;
+      }
+      p {
+        color: var(--muted);
+        margin: 0 0 16px;
+      }
+      .site {
+        display: block;
+        background: var(--danger-bg);
+        color: var(--danger);
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        word-break: break-all;
+        margin-bottom: 20px;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 11px 20px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .primary {
+        background: #16a34a;
+        color: #fff;
+        flex: 1;
+        min-width: 160px;
+      }
+      .primary:hover {
+        background: #15803d;
+      }
+      .link {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 13px;
+        text-decoration: underline;
+        padding: 8px 0;
+        cursor: pointer;
+      }
+      .link:hover {
+        color: var(--danger);
+      }
+      .why {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .hidden {
+        display: none;
+      }
+      .confirm {
+        background: var(--danger-bg);
+        border-radius: 10px;
+        padding: 14px;
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--danger);
+      }
+      .confirm button {
+        margin-top: 10px;
+        background: transparent;
+        border: 1px solid currentColor;
+        color: inherit;
+        font-size: 13px;
+        padding: 8px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <span class="badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+        Dangerous site
+      </span>
+
+      <h1>MarkSyncr blocked this site</h1>
+      <p>
+        It appears on a list of known phishing, malware and scam sites. Sites like this try to steal
+        passwords, payment details or crypto by imitating something you trust.
+      </p>
+
+      <code class="site" id="site">the site you requested</code>
+
+      <div class="actions">
+        <button class="primary" id="back" type="button">Go back to safety</button>
+      </div>
+
+      <button class="link" id="reveal" type="button">I understand the risk, let me continue</button>
+
+      <div class="confirm hidden" id="confirm">
+        <strong>Continue to this site anyway?</strong>
+        <div>
+          MarkSyncr will stop blocking it on this device until you re-enable it from the extension.
+          Never enter a password or card number on a site you reached this way.
+        </div>
+        <button id="proceed" type="button">Yes, continue to this site</button>
+      </div>
+
+      <p class="why">
+        Checked entirely on your device against a list of known-bad domains. No address you visit is
+        ever sent to MarkSyncr or anyone else.
+      </p>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
