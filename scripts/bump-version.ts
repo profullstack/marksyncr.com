@@ -5,7 +5,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,6 +99,29 @@ function exec(command: string, silent = false): string {
   }
 }
 
+/**
+ * Run git with an explicit argument list and no shell.
+ *
+ * The release commit and tag embed a version string read out of package.json.
+ * Interpolated into a shell command that value is executable text, so a stray
+ * quote or backtick in a malformed version would run as a command rather than
+ * fail. Passing argv directly removes the shell from the path entirely.
+ */
+function git(args: string[], silent = false): string {
+  try {
+    return execFileSync('git', args, {
+      cwd: rootDir,
+      stdio: silent ? 'pipe' : 'inherit',
+      encoding: 'utf-8',
+    }) as string;
+  } catch (error) {
+    if (!silent) {
+      console.error(`Command failed: git ${args.join(' ')}`);
+    }
+    throw error;
+  }
+}
+
 function checkGitStatus(): void {
   const status = exec('git status --porcelain', true);
   if (status && status.trim()) {
@@ -160,9 +183,9 @@ function main(): void {
   console.log('🔖 Creating git commit and tag...');
 
   try {
-    exec(`git add ${FILES_TO_UPDATE.join(' ')}`);
-    exec(`git commit --no-verify -m "chore(release): v${newVersion}"`);
-    exec(`git tag -a v${newVersion} -m "Release v${newVersion}"`);
+    git(['add', ...FILES_TO_UPDATE]);
+    git(['commit', '--no-verify', '-m', `chore(release): v${newVersion}`]);
+    git(['tag', '-a', `v${newVersion}`, '-m', `Release v${newVersion}`]);
 
     console.log(`\n✅ Version bumped to v${newVersion}`);
     console.log('\nNext steps:');

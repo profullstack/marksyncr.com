@@ -20,16 +20,19 @@ NC='\033[0m' # No Color
 # Track if any check fails
 FAILED=0
 
-# Function to run a check
+# Function to run a check.
+# Takes the command as separate arguments and runs it directly rather than
+# through `eval`, which would re-parse the string as shell and expand anything
+# a caller interpolated into it.
 run_check() {
     local name="$1"
-    local cmd="$2"
+    shift
 
     echo "----------------------------------------"
     echo "  $name"
     echo "----------------------------------------"
 
-    if eval "$cmd"; then
+    if "$@"; then
         echo "${GREEN}  $name passed${NC}"
         echo ""
     else
@@ -49,10 +52,10 @@ if [ -z "$STAGED_FILES" ]; then
 fi
 
 # 1. Linting
-run_check "Lint" "pnpm lint"
+run_check "Lint" pnpm lint
 
 # 2. Build check
-run_check "Build" "pnpm build"
+run_check "Build" pnpm build
 
 # Final result
 echo "----------------------------------------"

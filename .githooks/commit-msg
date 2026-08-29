@@ -15,8 +15,12 @@
 COMMIT_MSG_FILE="$1"
 COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
 
-# Temp file to signal post-commit hook
-RELEASE_TRIGGER_FILE="/tmp/.marksyncr-release-trigger"
+# Where the release trigger is recorded, for the post-commit hook to read.
+# Kept inside the repository's git directory rather than /tmp: a fixed name in a
+# world-writable directory can be pre-created or symlinked by another user on a
+# shared machine, and a per-repo path also stops two checkouts colliding.
+GIT_DIR_PATH=$(git rev-parse --git-dir)
+RELEASE_TRIGGER_FILE="$GIT_DIR_PATH/marksyncr-release-trigger"
 
 # Clean up any previous trigger
 rm -f "$RELEASE_TRIGGER_FILE"

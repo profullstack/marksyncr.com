@@ -1,0 +1,21 @@
+# gitleaks false positives, verified by reading the flagged commit.
+#
+# The CI job scans the full history (`gitleaks detect --source .`), so these
+# findings cannot be resolved by editing the working tree -- the match lives in
+# a commit that is already written. Each fingerprint below was checked against
+# `git show <commit>:<file>` and carries no credential material.
+#
+# Re-verify before adding an entry here. An entry is a claim that a human looked
+# at the matched line and found no secret, not a way to quiet a noisy job.
+
+# Rule `dropbox-api-token` matched the *response header name* in
+#   response.headers.get('dropbox-api-result')
+# The literal is an HTTP header key, not a token.
+4bfe09616e7cb4e28428992f8ca33a2835caba2e:packages/sources/src/oauth/dropbox-sync.ts:dropbox-api-token:142
+7f5c8e0dfba8493dfb2055518851c4fad0fb1078:packages/sources/src/oauth/dropbox-sync.ts:dropbox-api-token:112
+
+# Rule `generic-api-key` matched the Ahrefs Analytics site key on the
+#   <Script src="https://analytics.ahrefs.com/analytics.js" data-key="..." />
+# tag in the public site layout. Ahrefs data-keys identify the site to a browser
+# script and ship in the HTML of every page view, so this is public by design.
+cb873dfb1faab110858c57c74970c753768a5c32:apps/web/app/layout.jsx:generic-api-key:109
