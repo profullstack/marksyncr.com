@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 /**
  * Get the extension messaging/tabs API (Chrome or Firefox), or null in a plain
@@ -16,17 +16,23 @@ async function sendMessage(message) {
   return api.runtime.sendMessage(message);
 }
 
-/** Read the active tab's hostname (needs activeTab, granted while the popup is open). */
-async function getActiveDomain() {
+/**
+ * Read the active tab's id + hostname (needs activeTab, which is granted to the
+ * extension while the popup is open). The id is what lets the background ask
+ * declarativeNetRequest which rules matched on this tab.
+ */
+async function getActiveTab() {
   const api = getExtApi();
-  if (!api?.tabs?.query) return '';
+  if (!api?.tabs?.query) return { id: null, domain: '' };
   try {
     const tabs = await api.tabs.query({ active: true, currentWindow: true });
-    const url = tabs?.[0]?.url || '';
-    if (!url.startsWith('http')) return ''; // skip chrome://, about:, etc.
-    return normalizeDomain(url);
+    const tab = tabs?.[0];
+    const url = tab?.url || '';
+    const id = typeof tab?.id === 'number' ? tab.id : null;
+    if (!url.startsWith('http')) return { id, domain: '' }; // skip chrome://, about:, etc.
+    return { id, domain: normalizeDomain(url) };
   } catch {
-    return '';
+    return { id: null, domain: '' };
   }
 }
 
@@ -70,23 +76,173 @@ const LISTS = [
   { id: 'privacy', name: 'Trackers', description: 'Blocks trackers & analytics (EasyPrivacy)' },
 ];
 
+/** Ruleset id -> short label for the blocked-request rows. */
+const LIST_NAMES = Object.fromEntries(LISTS.map((l) => [l.id, l.name]));
+
+/** How many blocked rows to show before "Show all". */
+const BLOCKED_PREVIEW_COUNT = 6;
+
+/**
+ * "Blocked on this page" — what the shield actually stopped on the active tab.
+ *
+ * declarativeNetRequest reports matched *rules*, not URLs, so in a packaged
+ * build each row names the filter's domain (e.g. doubleclick.net) rather than
+ * the full request URL. Dev builds with the feedback permission get real URLs,
+ * which are shown as an expandable detail.
+ */
+function BlockedList({ report, busy, onRefresh }) {
+  const [showAll, setShowAll] = useState(false);
+  const [expanded, setExpanded] = useState(null);
+
+  const entries = report?.entries || [];
+  const shown = showAll ? entries : entries.slice(0, BLOCKED_PREVIEW_COUNT);
+  const hasUrls = report?.source === 'debug';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Blocked on this page
+          {report?.total ? (
+            <span className="ml-1.5 rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold text-primary-700">
+              {report.total}
+            </span>
+          ) : null}
+        </h4>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={busy}
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+          aria-label="Refresh blocked requests"
+          title="Refresh"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {report && !report.supported ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          {report.error || 'Blocked-request details are not available in this browser.'}
+        </p>
+      ) : entries.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          Nothing blocked on this page yet. Reload the page to see what gets stopped.
+        </p>
+      ) : (
+        <>
+          <div className="space-y-1">
+            {shown.map((entry) => {
+              const key = `${entry.list}:${entry.label}`;
+              const isOpen = expanded === key;
+              return (
+                <div
+                  key={key}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        hasUrls && entry.urls?.length ? setExpanded(isOpen ? null : key) : null
+                      }
+                      className={`min-w-0 flex-1 text-left ${
+                        hasUrls && entry.urls?.length ? 'cursor-pointer' : 'cursor-default'
+                      }`}
+                      title={entry.label}
+                    >
+                      <span className="block truncate font-mono text-xs text-slate-700">
+                        {entry.label}
+                      </span>
+                    </button>
+                    <span
+                      className={`whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                        entry.list === 'ads'
+                          ? 'bg-rose-50 text-rose-600'
+                          : 'bg-violet-50 text-violet-600'
+                      }`}
+                    >
+                      {LIST_NAMES[entry.list] || entry.list}
+                    </span>
+                    <span className="w-6 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-500">
+                      {entry.count}
+                    </span>
+                  </div>
+
+                  {isOpen && entry.urls?.length ? (
+                    <ul className="mt-1.5 space-y-0.5 border-t border-slate-100 pt-1.5">
+                      {entry.urls.map((url) => (
+                        <li
+                          key={url}
+                          className="truncate font-mono text-[10px] text-slate-400"
+                          title={url}
+                        >
+                          {url}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          {entries.length > BLOCKED_PREVIEW_COUNT && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="w-full rounded-lg py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+            >
+              {showAll
+                ? 'Show fewer'
+                : `Show all ${entries.length} domains`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AdblockPanel() {
   const [status, setStatus] = useState(null);
   const [domain, setDomain] = useState('');
+  const [tabId, setTabId] = useState(null);
+  const [blocked, setBlocked] = useState(null);
+  const [blockedBusy, setBlockedBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  /** Ask the background what the shield stopped on the given tab. */
+  const loadBlocked = useCallback(async (id) => {
+    if (typeof id !== 'number') return;
+    setBlockedBusy(true);
+    const res = await sendMessage({ type: 'GET_BLOCKED_REQUESTS', payload: { tabId: id } });
+    if (res?.success) setBlocked(res);
+    setBlockedBusy(false);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      setDomain(await getActiveDomain());
+      const tab = await getActiveTab();
+      setDomain(tab.domain);
+      setTabId(tab.id);
       // Pull cross-device prefs from the cloud (no-op if signed out), which
       // returns fresh status; fall back to local status if it fails.
       let res = await sendMessage({ type: 'SYNC_ADBLOCK_CLOUD' });
       if (!res?.success) res = await sendMessage({ type: 'GET_ADBLOCK_STATUS' });
       if (res?.success) setStatus(res);
       setLoading(false);
+      loadBlocked(tab.id);
     })();
-  }, []);
+  }, [loadBlocked]);
 
   const apply = async (message, optimistic) => {
     setBusy(true);
@@ -226,6 +382,15 @@ export function AdblockPanel() {
           </div>
         ))}
       </div>
+
+      {/* What the shield actually blocked on this page */}
+      {enabled && typeof tabId === 'number' && (
+        <BlockedList
+          report={blocked}
+          busy={blockedBusy}
+          onRefresh={() => loadBlocked(tabId)}
+        />
+      )}
 
       {/* Allowlisted sites */}
       {allowlist.length > 0 && (

@@ -4,7 +4,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseRule, isValidDomain, isValidUrlFilter, buildRuleset } from '../scripts/build-filters.js';
+import {
+  parseRule,
+  isValidDomain,
+  isValidUrlFilter,
+  buildRuleset,
+  ruleLabel,
+  buildLabelIndex,
+} from '../scripts/build-filters.js';
 
 describe('parseRule — skips what declarativeNetRequest cannot represent', () => {
   it.each([
@@ -138,5 +145,55 @@ describe('isValidUrlFilter', () => {
     expect(isValidUrlFilter('')).toBe(false);
     expect(isValidUrlFilter('||^')).toBe(false);
     expect(isValidUrlFilter('foo|bar')).toBe(false);
+  });
+});
+
+describe('ruleLabel — naming what a rule blocked', () => {
+  it.each([
+    ['whole-domain block', '||doubleclick.net^', 'doubleclick.net'],
+    ['no trailing separator', '||doubleclick.net', 'doubleclick.net'],
+    ['start anchor', '|http://ads.example.com', 'http://ads.example.com'],
+    ['end anchor', 'ads.example.com|', 'ads.example.com'],
+    ['path pattern', '||example.com/ads/*', 'example.com/ads/*'],
+    ['bare substring', '/adserver.', '/adserver.'],
+  ])('%s -> %s', (_label, urlFilter, expected) => {
+    expect(ruleLabel(urlFilter)).toBe(expected);
+  });
+
+  it('is empty for a missing filter', () => {
+    expect(ruleLabel('')).toBe('');
+    expect(ruleLabel(undefined)).toBe('');
+  });
+});
+
+describe('buildLabelIndex — line N names rule startId + N', () => {
+  const rules = [
+    { id: 1, condition: { urlFilter: '||a.example^' } },
+    { id: 2, condition: { urlFilter: '||b.example^' } },
+    { id: 3, condition: { urlFilter: '||c.example^' } },
+  ];
+
+  it('emits one label per rule, in rule-id order', () => {
+    expect(buildLabelIndex(rules, 1).split('\n')).toEqual(['a.example', 'b.example', 'c.example']);
+  });
+
+  it('honours a non-zero start id', () => {
+    const offset = rules.map((r, i) => ({ ...r, id: 1_000_000 + i }));
+    expect(buildLabelIndex(offset, 1_000_000).split('\n')[2]).toBe('c.example');
+  });
+
+  it('throws rather than silently misaligning when ids are not dense', () => {
+    const gapped = [rules[0], { id: 99, condition: { urlFilter: '||x.example^' } }];
+    expect(() => buildLabelIndex(gapped, 1)).toThrow(/dense/);
+  });
+
+  it('stays aligned with what buildRuleset actually produced', () => {
+    const built = buildRuleset('easylist.txt', 1, ['pagead2.googlesyndication.com']);
+    const labels = buildLabelIndex(built, 1).split('\n');
+    expect(labels).toHaveLength(built.length);
+    // Spot-check across the whole range, not just the head.
+    for (const i of [0, 1, 500, 9000, built.length - 1]) {
+      expect(labels[built[i].id - 1]).toBe(ruleLabel(built[i].condition.urlFilter));
+    }
   });
 });

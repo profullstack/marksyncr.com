@@ -18,6 +18,11 @@ import {
   removeAllowlistDomain,
   syncAdblockFromCloud,
 } from './adblock.js';
+import {
+  initBlockedLog,
+  getBlockedRequests,
+  clearBlockedRequests,
+} from './blocked-log.js';
 
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
@@ -3633,6 +3638,12 @@ browser.runtime.onMessage.addListener((message, sender) => {
     case 'SYNC_ADBLOCK_CLOUD':
       return syncAdblockFromCloud();
 
+    case 'GET_BLOCKED_REQUESTS':
+      return getBlockedRequests(message.payload?.tabId);
+
+    case 'CLEAR_BLOCKED_REQUESTS':
+      return Promise.resolve(clearBlockedRequests(message.payload?.tabId));
+
     default:
       console.warn('[MarkSyncr] Unknown message type:', message.type);
       return Promise.resolve({ success: false, error: 'Unknown message type' });
@@ -3643,6 +3654,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
 // EVENT LISTENERS - Must be registered synchronously at top level
 // This is critical for Firefox MV3 where background scripts are event-driven
 // ==========================================
+
+// Shield blocked-request log — attaches the rule-match and tab listeners.
+// Must run synchronously at top level like every other listener below.
+initBlockedLog();
 
 // Alarm handler - registered synchronously for Firefox MV3 compatibility
 browser.alarms.onAlarm.addListener(async (alarm) => {

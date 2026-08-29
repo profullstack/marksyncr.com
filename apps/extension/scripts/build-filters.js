@@ -315,20 +315,76 @@ export function buildRuleset(file, startId, priorityDomains = []) {
   }));
 }
 
+/**
+ * Human-readable label for a rule's urlFilter, used by the popup to name what
+ * a matched rule blocked. declarativeNetRequest only reports the *rule id* of a
+ * match — never the request URL — so this label is the only way to tell the
+ * user what was stopped. Strips the anchors (`||`, `|`, trailing `^`) that are
+ * filter syntax rather than part of the name.
+ * @param {string} urlFilter
+ * @returns {string}
+ */
+export function ruleLabel(urlFilter) {
+  if (!urlFilter) return '';
+  return String(urlFilter)
+    .replace(/^\|\|?/, '')
+    .replace(/\|$/, '')
+    .replace(/\^$/, '');
+}
+
+/**
+ * Build the newline-delimited label index for a ruleset. Line N holds the label
+ * for rule id `startId + N`, so a lookup is a single array index with no keys
+ * to ship. Throws if ids aren't dense from startId, which would silently
+ * misalign every label.
+ * @param {Array<{id: number, condition: {urlFilter: string}}>} rules
+ * @param {number} startId
+ * @returns {string}
+ */
+export function buildLabelIndex(rules, startId) {
+  return rules
+    .map((rule, i) => {
+      if (rule.id !== startId + i) {
+        throw new Error(`Rule ids must be dense from ${startId}: got ${rule.id} at index ${i}`);
+      }
+      return ruleLabel(rule.condition.urlFilter);
+    })
+    .join('\n');
+}
+
 function main() {
   mkdirSync(RULES_DIR, { recursive: true });
 
   const lists = [
-    { file: 'easylist.txt', out: 'ads.json', startId: 1, priority: PRIORITY_ADS },
+    { file: 'easylist.txt', out: 'ads.json', id: 'ads', startId: 1, priority: PRIORITY_ADS },
     // Offset ids so the two rulesets never collide if ever merged
-    { file: 'easyprivacy.txt', out: 'privacy.json', startId: 1_000_000, priority: PRIORITY_PRIVACY },
+    {
+      file: 'easyprivacy.txt',
+      out: 'privacy.json',
+      id: 'privacy',
+      startId: 1_000_000,
+      priority: PRIORITY_PRIVACY,
+    },
   ];
 
-  for (const { file, out, startId, priority } of lists) {
+  /** @type {Record<string, { startId: number, count: number, labels: string }>} */
+  const index = {};
+
+  for (const { file, out, id, startId, priority } of lists) {
     const rules = buildRuleset(file, startId, priority);
     writeFileSync(join(RULES_DIR, out), JSON.stringify(rules));
-    console.log(`✅ ${file} -> rules/${out} (${rules.length} rules)`);
+
+    const labelsFile = `${id}.labels.txt`;
+    writeFileSync(join(RULES_DIR, labelsFile), buildLabelIndex(rules, startId));
+
+    index[id] = { startId, count: rules.length, labels: `rules/${labelsFile}` };
+    console.log(`✅ ${file} -> rules/${out} (${rules.length} rules) + rules/${labelsFile}`);
   }
+
+  // Self-describing map of ruleset id -> id range + label file, so the runtime
+  // never has to hard-code the start ids this script chose.
+  writeFileSync(join(RULES_DIR, 'index.json'), JSON.stringify({ lists: index }));
+  console.log(`✅ rules/index.json (${Object.keys(index).length} lists)`);
 }
 
 // Only run the file-writing build when invoked directly (not when imported by tests)

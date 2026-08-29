@@ -73,7 +73,9 @@ function buildVite() {
 }
 
 /**
- * Copy adblock rulesets (public/rules/*.json) into a target build dir.
+ * Copy adblock rulesets and their label index (public/rules/*) into a target
+ * build dir. The whole directory is copied, so the generated *.labels.txt and
+ * index.json the popup uses to name blocked domains travel with the rules.
  */
 function copyRules(targetDir) {
   const rulesDir = join(ROOT_DIR, 'public/rules');
