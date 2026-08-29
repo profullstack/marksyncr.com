@@ -1,17 +1,34 @@
 /**
  * Importing from other password managers.
  *
- * Every supported source exports CSV, so the work is one correct CSV reader
- * plus a column mapping per product. The reader is hand-written rather than
- * pulled from a dependency because this runs inside an extension service worker
- * and inside Next — and because the failure mode of a sloppy parser here is
+ * Two shapes arrive here, and they are not equally good.
+ *
+ * Most products export CSV, so most of the work is one correct CSV reader plus
+ * a column mapping per product. The reader is hand-written rather than pulled
+ * from a dependency because this runs inside an extension service worker and
+ * inside Next — and because the failure mode of a sloppy parser here is
  * silently importing half of somebody's passwords.
  *
- * Nothing in this file touches the network or the crypto. It turns text into
- * plain item objects; the caller encrypts them.
+ * The other shape is an OpenCreds database (https://logicsrc.com/opencreds): a
+ * whole vault as one encrypted file, with a manifest authenticated by the same
+ * tag as the data. Where a CSV truncated at 3,000 rows imports 3,000 rows and
+ * reports success, an OpenCreds file that lost an item fails its manifest and
+ * imports nothing. It also carries what no CSV has a column for — password
+ * history, TOTP seeds, folders, custom fields, URI match rules, and `key` and
+ * `account` items.
+ *
+ * Nothing in this file touches the network. The CSV path touches no crypto at
+ * all; the OpenCreds path decrypts the file it was handed and nothing else.
+ * Both produce plain item objects, and the caller encrypts them into the vault.
  */
 
 import { createItem } from './items.js';
+import {
+  isOpenCredsDatabase,
+  openOpenCredsDatabase,
+  parseOpenCredsDatabase,
+  readOpenCredsHeader,
+} from './opencreds.js';
 
 /**
  * Parse CSV into rows of cells.
@@ -306,4 +323,79 @@ export function parseImport(text, { source } = {}) {
   });
 
   return { source: detected, items, skipped };
+}
+
+/**
+ * Which kind of file this is, without parsing it properly.
+ *
+ * Cheap enough to run on a dropped file before deciding whether to ask for a
+ * passphrase.
+ * @param {string} text
+ * @returns {'opencreds'|'csv'|'unknown'}
+ */
+export function detectImportKind(text) {
+  // A BOM written as an escape, not as the character: a literal BOM in source
+  // is invisible in every editor and reads as a corrupted file to the next
+  // person who opens it.
+  const trimmed = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .trimStart();
+  if (trimmed.startsWith('{')) {
+    try {
+      return isOpenCredsDatabase(JSON.parse(trimmed)) ? 'opencreds' : 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+  return trimmed.length > 0 ? 'csv' : 'unknown';
+}
+
+/**
+ * Inspect an OpenCreds file before importing it.
+ *
+ * The header is readable without the passphrase, and in the encrypted form it
+ * is authenticated — so a preview can show what the file claims to hold and the
+ * claim cannot be a lie. Use this to decide whether to prompt.
+ * @param {string} text
+ */
+export function inspectOpenCredsFile(text) {
+  return readOpenCredsHeader(parseOpenCredsDatabase(text));
+}
+
+/**
+ * Import an OpenCreds database.
+ *
+ * Returns the same shape as {@link parseImport}, plus the folders the file
+ * carried and its header. Throws when the passphrase is wrong, the file was
+ * altered, or the manifest disagrees with the payload — and in every one of
+ * those cases the caller writes nothing.
+ *
+ * @param {string} text
+ * @param {{ passphrase?: string, key?: Uint8Array, allowUnregisteredNamespace?: boolean }} [options]
+ * @returns {Promise<{source: 'opencreds', items: Array, folders: Array, skipped: Array, header: Object}>}
+ */
+export async function parseOpenCredsImport(text, options = {}) {
+  const db = parseOpenCredsDatabase(text);
+  const header = readOpenCredsHeader(db);
+  const payload = await openOpenCredsDatabase(db, options);
+  return { source: 'opencreds', items: payload.items, folders: payload.folders, skipped: [], header };
+}
+
+/**
+ * Import a file of either kind.
+ *
+ * One entry point, so a caller does not have to know what it was handed. CSV
+ * imports carry no folders; OpenCreds imports report no skipped rows, because a
+ * file that would have had any fails its manifest instead.
+ *
+ * @param {string} text
+ * @param {{ passphrase?: string, source?: string, key?: Uint8Array }} [options]
+ * @returns {Promise<{source: string|null, items: Array, folders: Array, skipped: Array, header?: Object}>}
+ */
+export async function importFile(text, options = {}) {
+  if (detectImportKind(text) === 'opencreds') {
+    return parseOpenCredsImport(text, options);
+  }
+  const parsed = parseImport(text, options.source ? { source: options.source } : {});
+  return { ...parsed, folders: [] };
 }

@@ -11,7 +11,8 @@
     "./keys": "./src/vault-key.js",
     "./items": "./src/items.js",
     "./generator": "./src/generator.js",
-    "./import": "./src/import.js"
+    "./import": "./src/import.js",
+    "./opencreds": "./src/opencreds.js"
   },
   "scripts": {
     "test": "vitest run",

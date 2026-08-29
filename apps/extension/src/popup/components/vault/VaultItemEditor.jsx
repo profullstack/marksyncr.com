@@ -4,11 +4,23 @@ import { generatePassword, generatePassphrase, passwordEntropyBits } from '@mark
 /**
  * Create and edit vault items.
  *
- * One editor for all three types — logins, cards and identities differ only in
- * which field group they render, because they are one record shape underneath.
+ * One editor for every type — logins, cards, identities, notes, keys and
+ * accounts differ only in which field group they render, because they are one
+ * record shape underneath. The types are the OpenCreds six; see
+ * https://logicsrc.com/opencreds.
  */
 
-const TYPE_LABELS = { login: 'Login', card: 'Card', identity: 'Identity', note: 'Note' };
+const TYPE_LABELS = {
+  login: 'Login',
+  card: 'Card',
+  identity: 'Identity',
+  note: 'Note',
+  key: 'Key',
+  account: 'Account',
+};
+
+/** Key kinds, in the order people reach for them. */
+const KEY_TYPES = ['ssh', 'api', 'pgp', 'certificate', 'symmetric', 'env'];
 
 /**
  * Placeholder shown in place of a hidden password. Built rather than written as
@@ -33,6 +45,66 @@ function Field({ label, value, onChange, type = 'text', mono = false, autoFocus 
         }`}
       />
     </label>
+  );
+}
+
+/** A multi-line field, for key bodies and anything else that wraps. */
+function TextArea({ label, value, onChange, rows = 3 }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-medium text-slate-600">{label}</span>
+      <textarea
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        spellCheck={false}
+        className="mt-0.5 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+      />
+    </label>
+  );
+}
+
+/**
+ * A secret that is masked until asked for.
+ *
+ * Distinct from PasswordField because these have no generator: nobody generates
+ * an access token here, they paste the one the provider issued.
+ */
+function SecretField({ label, value, onChange, multiline = false }) {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-slate-600">{label}</span>
+        <button
+          type="button"
+          onClick={() => setRevealed((v) => !v)}
+          className="text-[10px] text-primary-600 hover:underline"
+        >
+          {revealed ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      {multiline ? (
+        <textarea
+          value={revealed ? value || '' : value ? MASK : ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={!revealed && Boolean(value)}
+          rows={3}
+          spellCheck={false}
+          className="mt-0.5 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+      ) : (
+        <input
+          type={revealed ? 'text' : 'password'}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+          className="mt-0.5 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+      )}
+    </div>
   );
 }
 
@@ -315,6 +387,111 @@ export function VaultItemEditor({ item, type: initialType, onSave, onCancel }) {
             <Field label="State" value={group.state} onChange={setField('state')} />
             <Field label="Country" value={group.country} onChange={setField('country')} />
           </div>
+        </>
+      )}
+
+      {type === 'key' && (
+        <>
+          <label className="block">
+            <span className="text-[11px] font-medium text-slate-600">Kind</span>
+            <select
+              value={group.keyType || ''}
+              onChange={(e) => setField('keyType')(e.target.value)}
+              className="mt-0.5 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              <option value="">Choose…</option>
+              {KEY_TYPES.map((kind) => (
+                <option key={kind} value={kind}>
+                  {kind}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* An api, env or symmetric key is one opaque string; the rest are a
+              keypair. Rendering both would ask for a public key for an API
+              token, which is a question with no answer. */}
+          {['api', 'env', 'symmetric'].includes(group.keyType) ? (
+            <SecretField label="Secret" value={group.value} onChange={setField('value')} />
+          ) : (
+            <>
+              <TextArea
+                label="Public key"
+                value={group.publicKey}
+                onChange={setField('publicKey')}
+              />
+              <SecretField
+                label="Private key"
+                value={group.privateKey}
+                onChange={setField('privateKey')}
+                multiline
+              />
+              <SecretField
+                label="Key passphrase"
+                value={group.passphrase}
+                onChange={setField('passphrase')}
+              />
+            </>
+          )}
+
+          <Field label="Algorithm" value={group.algorithm} onChange={setField('algorithm')} />
+          {/* Path and mode make a restore total: a private key written back
+              with the wrong mode is a key ssh refuses to use, and one at the
+              wrong path is a key nothing finds. */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <Field label="Path" value={group.path} onChange={setField('path')} mono />
+            </div>
+            <Field label="Mode" value={group.mode} onChange={setField('mode')} mono />
+          </div>
+          <Field
+            label="Fingerprint"
+            value={group.fingerprint}
+            onChange={setField('fingerprint')}
+            mono
+          />
+        </>
+      )}
+
+      {type === 'account' && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Provider" value={group.provider} onChange={setField('provider')} />
+            <Field label="Handle" value={group.handle} onChange={setField('handle')} />
+          </div>
+          <Field label="Account id" value={group.accountId} onChange={setField('accountId')} mono />
+          <Field label="Email" value={group.email} onChange={setField('email')} type="email" />
+          <SecretField
+            label="Access token"
+            value={group.accessToken}
+            onChange={setField('accessToken')}
+          />
+          <SecretField
+            label="Refresh token"
+            value={group.refreshToken}
+            onChange={setField('refreshToken')}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            {/* A test key and a live key look identical and are not. */}
+            <Field
+              label="Environment"
+              value={group.environment}
+              onChange={setField('environment')}
+            />
+            <Field label="Expires" value={group.expiresAt} onChange={setField('expiresAt')} />
+          </div>
+          <Field
+            label="Scopes (comma separated)"
+            value={Array.isArray(group.scopes) ? group.scopes.join(', ') : group.scopes}
+            onChange={(value) =>
+              setField('scopes')(
+                String(value)
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              )
+            }
+          />
         </>
       )}
 

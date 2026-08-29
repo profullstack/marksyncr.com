@@ -66,11 +66,27 @@ export {
   ITEM_SCHEMA_VERSION,
   MAX_HISTORY_ENTRIES,
   createItem,
+  assertGroupsMatchType,
   recordPasswordChange,
   encryptItem,
   decryptItem,
   decryptItems,
 } from './items.js';
+
+export {
+  OPENCREDS_VERSION,
+  OPENCREDS_EXTENSION,
+  OPENCREDS_MEDIA_TYPE,
+  NAMESPACE as OPENCREDS_NAMESPACE,
+  buildManifest,
+  verifyManifest,
+  isOpenCredsDatabase,
+  readOpenCredsHeader,
+  parseOpenCredsDatabase,
+  openOpenCredsDatabase,
+  exportOpenCredsDatabase,
+  exportPlaintextOpenCredsDatabase,
+} from './opencreds.js';
 
 export {
   LOWERCASE,
@@ -91,4 +107,8 @@ export {
   rowsToObjects,
   detectSource,
   parseImport,
+  detectImportKind,
+  inspectOpenCredsFile,
+  parseOpenCredsImport,
+  importFile,
 } from './import.js';

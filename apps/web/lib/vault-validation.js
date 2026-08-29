@@ -52,7 +52,10 @@ export function isSaneBlob(value, { required = true, maxLength = MAX_KEY_FIELD_L
 export function validateItemPayload(body, { requireId = true } = {}) {
   if (!body || typeof body !== 'object') return 'Invalid JSON body';
   if (requireId && !isUuid(body.id)) return 'A valid item id is required';
-  if (!Number.isInteger(body.type) || body.type < 1 || body.type > 4) return 'Unknown item type';
+  // OpenCreds type codes: 1 login, 2 card, 3 identity, 4 note, 5 key, 6 account.
+  // Mirrors the vault_items_type_known constraint, so a rejection here and a
+  // rejection in the database mean the same thing.
+  if (!Number.isInteger(body.type) || body.type < 1 || body.type > 6) return 'Unknown item type';
   if (!isSaneBlob(body.ciphertext, { maxLength: MAX_CIPHERTEXT_LENGTH })) {
     return 'Malformed ciphertext';
   }

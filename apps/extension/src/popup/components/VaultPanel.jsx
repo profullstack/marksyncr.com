@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { parseImport } from '@marksyncr/vault';
+import { detectImportKind, inspectOpenCredsFile, parseImport, parseOpenCredsImport } from '@marksyncr/vault';
 import { VaultUnlock } from './vault/VaultUnlock.jsx';
 import { VaultItemEditor } from './vault/VaultItemEditor.jsx';
 
@@ -31,7 +31,12 @@ const TYPE_META = {
   card: { label: 'Card', badge: 'bg-violet-50 text-violet-700' },
   identity: { label: 'Identity', badge: 'bg-amber-50 text-amber-700' },
   note: { label: 'Note', badge: 'bg-slate-100 text-slate-600' },
+  key: { label: 'Key', badge: 'bg-emerald-50 text-emerald-700' },
+  account: { label: 'Account', badge: 'bg-rose-50 text-rose-700' },
 };
+
+/** The types offered as new-item buttons. Notes are reachable from import. */
+const NEW_ITEM_TYPES = ['login', 'card', 'identity', 'key', 'account'];
 
 /** Search across the fields a person would actually search by. */
 export function filterItems(items, query) {
@@ -251,23 +256,82 @@ export function VaultPanel() {
     await refreshStatus();
   };
 
+  /**
+   * Import a CSV export from another manager, or an OpenCreds database.
+   *
+   * An OpenCreds file is a whole vault rather than a table of logins: it
+   * carries folders, password history, TOTP seeds, and `key` and `account`
+   * items that no CSV has a column for. When it is encrypted — the default —
+   * the header still says what it holds, and that claim is authenticated, so
+   * the passphrase prompt can name a real number before anyone types anything.
+   */
   const onImport = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     event.target.value = '';
 
     const text = await file.text();
-    const { source, items: parsed, skipped } = parseImport(text);
 
-    if (!parsed.length) {
-      notify(skipped[0]?.reason || 'Nothing to import');
+    if (detectImportKind(text) !== 'opencreds') {
+      const { source, items: parsed, skipped } = parseImport(text);
+      if (!parsed.length) {
+        notify(skipped[0]?.reason || 'Nothing to import');
+        return;
+      }
+      const res = await sendMessage({ type: 'VAULT_IMPORT', payload: { items: parsed } });
+      if (res?.success) {
+        await loadItems(showTrash);
+        notify(
+          skipped.length
+            ? `Imported ${res.imported} from ${source}; skipped ${skipped.length}`
+            : `Imported ${res.imported} from ${source}`
+        );
+      } else {
+        notify(res?.error || 'Import failed');
+      }
       return;
     }
 
-    const res = await sendMessage({ type: 'VAULT_IMPORT', payload: { items: parsed } });
+    let header;
+    try {
+      header = inspectOpenCredsFile(text);
+    } catch (err) {
+      notify(err.message);
+      return;
+    }
+
+    let passphrase;
+    if (header.protected) {
+      // The popup has no modal layer, and asking here is better than importing
+      // nothing and explaining why afterwards.
+      passphrase = window.prompt(
+        `This OpenCreds file holds ${header.itemCount} ${
+          header.itemCount === 1 ? 'item' : 'items'
+        }. Enter its export passphrase to import.`
+      );
+      if (passphrase === null) return;
+    } else if (
+      !window.confirm(
+        `This OpenCreds file is unprotected — every secret in it is in the clear. Import ${header.itemCount} items anyway?`
+      )
+    ) {
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = await parseOpenCredsImport(text, { passphrase });
+    } catch (err) {
+      // A manifest mismatch, a wrong passphrase and an altered file all land
+      // here, and in every one of them nothing has been written.
+      notify(err.message);
+      return;
+    }
+
+    const res = await sendMessage({ type: 'VAULT_IMPORT', payload: { items: parsed.items } });
     if (res?.success) {
       await loadItems(showTrash);
-      notify(`Imported ${res.imported} from ${source}`);
+      notify(`Imported ${res.imported} of ${parsed.items.length} from OpenCreds`);
     } else {
       notify(res?.error || 'Import failed');
     }
@@ -338,8 +402,8 @@ export function VaultPanel() {
       </div>
 
       {!showTrash && (
-        <div className="flex gap-1.5">
-          {['login', 'card', 'identity'].map((type) => (
+        <div className="flex flex-wrap gap-1.5">
+          {NEW_ITEM_TYPES.map((type) => (
             <button
               key={type}
               type="button"
@@ -401,7 +465,12 @@ export function VaultPanel() {
         {!showTrash && (
           <label className="cursor-pointer text-xs font-medium text-primary-600 hover:underline">
             Import
-            <input type="file" accept=".csv,text/csv" onChange={onImport} className="hidden" />
+            <input
+              type="file"
+              accept=".csv,text/csv,.opencreds,.json,application/json,application/vnd.logicsrc.opencreds+json"
+              onChange={onImport}
+              className="hidden"
+            />
           </label>
         )}
       </div>

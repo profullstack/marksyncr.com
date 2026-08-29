@@ -82,12 +82,15 @@ describe('validateItemPayload', () => {
     expect(validateItemPayload(withoutId, { requireId: false })).toBeNull();
   });
 
-  it.each([[0], [5], [null], ['login'], [1.5]])('rejects type %s', (type) => {
+  it.each([[0], [7], [null], ['login'], [1.5]])('rejects type %s', (type) => {
     expect(validateItemPayload({ ...validItem(), type })).toMatch(/Unknown item type/);
   });
 
   it('accepts every defined type', () => {
-    for (const type of [1, 2, 3, 4]) {
+    // The OpenCreds six: 1 login, 2 card, 3 identity, 4 note, 5 key, 6 account.
+    // Mirrors the vault_items_type_known constraint, so a rejection here and a
+    // rejection in the database mean the same thing.
+    for (const type of [1, 2, 3, 4, 5, 6]) {
       expect(validateItemPayload({ ...validItem(), type })).toBeNull();
     }
   });

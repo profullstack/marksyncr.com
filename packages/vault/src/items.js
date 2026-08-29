@@ -22,12 +22,18 @@ import {
  * paginate without decrypting. This is deliberate, and it is the metadata the
  * design accepts leaking: the server learns you hold 40 logins and 2 cards,
  * never which sites or what values.
+ *
+ * These are the OpenCreds type codes (https://logicsrc.com/opencreds). Codes
+ * 1-4 predate that specification and are what fixed them there — renumbering
+ * would break every vault already written. Codes 5 and 6 come from it.
  */
 export const ITEM_TYPE = Object.freeze({
   login: 1,
   card: 2,
   identity: 3,
   note: 4,
+  key: 5,
+  account: 6,
 });
 
 /** Reverse lookup, for turning a stored row back into a name. */
@@ -57,18 +63,86 @@ const EMPTY_FIELDS = Object.freeze({
     firstName: '',
     middleName: '',
     lastName: '',
+    username: '',
     company: '',
     email: '',
     phone: '',
     address1: '',
     address2: '',
+    address3: '',
     city: '',
     state: '',
     postalCode: '',
     country: '',
+    ssn: '',
+    passportNumber: '',
+    licenseNumber: '',
   }),
   note: () => ({}),
+  /**
+   * SSH and PGP keys, API tokens, certificates, and .env secrets.
+   *
+   * `path` and `mode` are carried so a restore is total: a private key written
+   * back with the wrong mode is a key ssh refuses to use, and one written to
+   * the wrong path is a key nothing finds.
+   */
+  key: () => ({
+    keyType: '',
+    algorithm: '',
+    publicKey: '',
+    privateKey: '',
+    passphrase: '',
+    fingerprint: '',
+    value: '',
+    path: '',
+    mode: '',
+    expiresAt: '',
+  }),
+  /**
+   * A provider account and the tokens that authorize acting as it.
+   *
+   * Deliberately not a login: a login is what a person types at a sign-in form,
+   * an account is what a machine presents to an API. They expire differently
+   * and are revoked differently, and conflating them is how a rotated refresh
+   * token ends up in a password history array.
+   */
+  account: () => ({
+    provider: '',
+    accountId: '',
+    handle: '',
+    email: '',
+    accessToken: '',
+    refreshToken: '',
+    tokenType: '',
+    scopes: [],
+    expiresAt: '',
+    environment: '',
+  }),
 });
+
+/** The per-type group names, so the wrong-group check cannot fall out of step. */
+const GROUP_NAMES = Object.freeze(Object.keys(EMPTY_FIELDS));
+
+/** "an account", "a login" — these strings are read by people. */
+function article(word) {
+  return /^[aeiou]/i.test(word) ? 'an' : 'a';
+}
+
+/**
+ * Reject an item carrying a field group that is not its own type's.
+ *
+ * A card group on a login is either a broken importer or an attempt to smuggle
+ * a field past a type-based check; neither should reach the ciphertext.
+ * @param {Object} item
+ */
+export function assertGroupsMatchType(item) {
+  for (const name of GROUP_NAMES) {
+    if (name === 'note') continue;
+    if (name !== item.type && item[name] !== undefined) {
+      throw new Error(`A ${item.type} item must not carry ${article(name)} ${name} field group`);
+    }
+  }
+}
 
 /**
  * Create a new item.
@@ -163,6 +237,7 @@ function itemAad(id, version) {
 export async function encryptItem(userKey, item) {
   if (!item?.id) throw new Error('An item must have an id before it can be encrypted');
   if (!(item.type in ITEM_TYPE)) throw new Error(`Unknown item type: ${item.type}`);
+  assertGroupsMatchType(item);
 
   const version = item.v ?? ITEM_SCHEMA_VERSION;
   const plaintext = utf8Encode(JSON.stringify({ ...item, v: version }));
