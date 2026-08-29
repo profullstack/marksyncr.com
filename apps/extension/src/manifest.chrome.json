@@ -28,12 +28,10 @@
     "bookmarks",
     "storage",
     "alarms",
+    "notifications",
     "identity",
     "declarativeNetRequest",
     "activeTab"
-  ],
-  "optional_permissions": [
-    "tabs"
   ],
   "declarative_net_request": {
     "rule_resources": [
@@ -60,24 +58,10 @@
     "https://hole.cert.pl/*",
     "https://raw.githubusercontent.com/*"
   ],
-  "oauth2": {
-    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/drive.file"
-    ]
-  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "web_accessible_resources": [
-    {
-      "resources": [
-        "icons/*"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    },
     {
       "resources": [
         "blocked.html"

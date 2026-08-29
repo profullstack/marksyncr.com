@@ -5,7 +5,18 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'fs';
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
 
-const browser = process.env.BROWSER || 'chrome';
+// Deliberately NOT `process.env.BROWSER`: that is a standard Linux env var
+// (xdg-open et al) and is commonly set to something like `true` or `firefox`,
+// which silently redirected the build into dist/<whatever> and shipped a zip
+// missing the popup, options page, service worker and icons.
+const TARGETS = ['chrome', 'firefox', 'safari'];
+const requested = process.env.EXT_BROWSER;
+if (requested && !TARGETS.includes(requested)) {
+  throw new Error(
+    `EXT_BROWSER must be one of ${TARGETS.join(', ')} (got "${requested}")`
+  );
+}
+const browser = requested || 'chrome';
 
 // Plugin to move HTML files from src/* to root after build
 function moveHtmlPlugin() {

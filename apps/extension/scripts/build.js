@@ -66,9 +66,12 @@ function buildFilters() {
 function buildVite() {
   console.log('📦 Building with Vite...');
 
+  // Vite writes to dist/<EXT_BROWSER>; pass it explicitly so an ambient
+  // BROWSER env var can never redirect the output (see vite.config.js).
   execSync('pnpm vite build', {
     cwd: ROOT_DIR,
     stdio: 'inherit',
+    env: { ...process.env, EXT_BROWSER: 'chrome' },
   });
 }
 
@@ -116,6 +119,33 @@ function copyDirectorySync(src, dest) {
 }
 
 /**
+ * Read a source manifest and prepare it for distribution.
+ *
+ * `http://localhost:*` host permissions are needed when running against a local
+ * web app, but shipping them is a standing "unnecessary permissions" rejection
+ * risk on the Chrome Web Store and AMO. Keep them in the source manifests and
+ * strip them from release builds; set EXT_DEV=1 to keep them.
+ */
+function readManifestForRelease(browser) {
+  const manifest = JSON.parse(
+    readFileSync(join(ROOT_DIR, `src/manifest.${browser}.json`), 'utf-8')
+  );
+
+  if (!process.env.EXT_DEV && Array.isArray(manifest.host_permissions)) {
+    const before = manifest.host_permissions.length;
+    manifest.host_permissions = manifest.host_permissions.filter(
+      (h) => !/^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/.test(h)
+    );
+    const dropped = before - manifest.host_permissions.length;
+    if (dropped > 0) {
+      console.log(`   Stripped ${dropped} localhost host permission(s) (EXT_DEV=1 to keep)`);
+    }
+  }
+
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+/**
  * Copy manifest and assets for Chrome
  */
 function buildChrome() {
@@ -126,20 +156,13 @@ function buildChrome() {
   // We need to ensure the manifest and icons are correct
 
   // Copy Chrome manifest as manifest.json
-  const chromeManifest = readFileSync(join(ROOT_DIR, 'src/manifest.chrome.json'), 'utf-8');
-  writeFileSync(join(CHROME_DIR, 'manifest.json'), chromeManifest);
+  writeFileSync(join(CHROME_DIR, 'manifest.json'), readManifestForRelease('chrome'));
 
   // Copy icons
   copyIcons(CHROME_DIR);
 
   // Copy adblock rulesets
   copyRules(CHROME_DIR);
-
-  // Copy background script
-  const bgSrc = join(ROOT_DIR, 'src/background/index.js');
-  if (existsSync(bgSrc)) {
-    copyFileSync(bgSrc, join(CHROME_DIR, 'background.js'));
-  }
 
   console.log('✅ Chrome build complete');
 }
@@ -157,20 +180,13 @@ function buildFirefox() {
   }
 
   // Copy Firefox manifest as manifest.json (overwrite Chrome manifest)
-  const firefoxManifest = readFileSync(join(ROOT_DIR, 'src/manifest.firefox.json'), 'utf-8');
-  writeFileSync(join(FIREFOX_DIR, 'manifest.json'), firefoxManifest);
+  writeFileSync(join(FIREFOX_DIR, 'manifest.json'), readManifestForRelease('firefox'));
 
   // Copy icons
   copyIcons(FIREFOX_DIR);
 
   // Copy adblock rulesets
   copyRules(FIREFOX_DIR);
-
-  // Copy background script
-  const bgSrc = join(ROOT_DIR, 'src/background/index.js');
-  if (existsSync(bgSrc)) {
-    copyFileSync(bgSrc, join(FIREFOX_DIR, 'background.js'));
-  }
 
   console.log('✅ Firefox build complete');
 }
@@ -188,20 +204,13 @@ function buildSafari() {
   }
 
   // Copy Safari manifest as manifest.json (overwrite Chrome manifest)
-  const safariManifest = readFileSync(join(ROOT_DIR, 'src/manifest.safari.json'), 'utf-8');
-  writeFileSync(join(SAFARI_DIR, 'manifest.json'), safariManifest);
+  writeFileSync(join(SAFARI_DIR, 'manifest.json'), readManifestForRelease('safari'));
 
   // Copy icons
   copyIcons(SAFARI_DIR);
 
   // Copy adblock rulesets
   copyRules(SAFARI_DIR);
-
-  // Copy background script
-  const bgSrc = join(ROOT_DIR, 'src/background/index.js');
-  if (existsSync(bgSrc)) {
-    copyFileSync(bgSrc, join(SAFARI_DIR, 'background.js'));
-  }
 
   console.log('✅ Safari build complete');
   console.log('');

@@ -32,12 +32,10 @@
     "bookmarks",
     "storage",
     "alarms",
+    "notifications",
     "identity",
     "declarativeNetRequest",
     "activeTab"
-  ],
-  "optional_permissions": [
-    "tabs"
   ],
   "declarative_net_request": {
     "rule_resources": [
@@ -68,14 +66,6 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "web_accessible_resources": [
-    {
-      "resources": [
-        "icons/*"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    },
     {
       "resources": [
         "blocked.html"
