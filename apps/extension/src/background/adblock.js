@@ -14,6 +14,11 @@
 
 import browser from 'webextension-polyfill';
 import { fetchCloudSettings, saveCloudSettings } from '../lib/api.js';
+import {
+  ALLOWLIST_RULE_ID_START,
+  ALLOWLIST_RULE_ID_END,
+  PRIORITY,
+} from './rule-ids.js';
 
 const ADBLOCK_STORAGE_KEY = 'adblock';
 
@@ -130,23 +135,32 @@ async function applyRulesets(prefs) {
 }
 
 /**
- * Rebuild the dynamic "allow" rules that exempt allowlisted sites. Each rule is
- * higher priority than the static block rules (priority 2 > 1), so any request
- * initiated by an allowlisted site wins an "allow" and is never blocked.
- * When the blocker is off, no allow rules are needed.
+ * Rebuild the dynamic "allow" rules that exempt allowlisted sites. Each rule
+ * outranks the static block rules, so any request initiated by an allowlisted
+ * site wins an "allow" and is never blocked. When the blocker is off, no allow
+ * rules are needed.
+ *
+ * Only ids in the allowlist band are removed. The security shield keeps its own
+ * dynamic rules in a different band, and clearing every dynamic rule here — as
+ * this once did — would delete the user's phishing protection every time they
+ * toggled a site.
  * @param {AdblockPrefs} prefs
  */
 async function applyAllowlist(prefs) {
   const existing = await browser.declarativeNetRequest.getDynamicRules();
-  const removeRuleIds = existing.map((r) => r.id);
+  const removeRuleIds = existing
+    .map((r) => r.id)
+    .filter((id) => id >= ALLOWLIST_RULE_ID_START && id <= ALLOWLIST_RULE_ID_END);
 
   const domains = prefs.enabled ? prefs.allowlist : [];
-  const addRules = domains.map((domain, i) => ({
-    id: i + 1,
-    priority: 2,
-    action: { type: 'allow' },
-    condition: { initiatorDomains: [domain] },
-  }));
+  const addRules = domains
+    .slice(0, ALLOWLIST_RULE_ID_END - ALLOWLIST_RULE_ID_START + 1)
+    .map((domain, i) => ({
+      id: ALLOWLIST_RULE_ID_START + i,
+      priority: PRIORITY.allowlist,
+      action: { type: 'allow' },
+      condition: { initiatorDomains: [domain] },
+    }));
 
   await browser.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
 }

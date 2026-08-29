@@ -60,7 +60,9 @@
     "https://www.googleapis.com/*",
     "https://*.supabase.co/*",
     "https://marksyncr.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://hole.cert.pl/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
@@ -69,6 +71,14 @@
     {
       "resources": [
         "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "blocked.html"
       ],
       "matches": [
         "<all_urls>"

@@ -23,6 +23,16 @@ import {
   getBlockedRequests,
   clearBlockedRequests,
 } from './blocked-log.js';
+import {
+  initSecurityShield,
+  getSecurityStatus,
+  setSecurityEnabled,
+  addSecurityBypass,
+  removeSecurityBypass,
+  refreshSecurityList,
+  syncSecurityFromCloud,
+  isSecurityRefreshAlarm,
+} from './security-shield.js';
 
 // Constants
 const SYNC_ALARM_NAME = 'marksyncr-auto-sync';
@@ -104,7 +114,7 @@ async function clearSession() {
  */
 async function getTombstones() {
   const data = await browser.storage.local.get(TOMBSTONES_STORAGE_KEY);
-  return data[TOMBSTONES_STORAGE_KEY] || [];
+  return data?.[TOMBSTONES_STORAGE_KEY] || [];
 }
 
 /**
@@ -200,7 +210,7 @@ function pruneTombstonesSupersededByBookmarks(tombstones, bookmarks) {
  */
 async function loadLocallyModifiedIds() {
   const data = await browser.storage.local.get(LOCALLY_MODIFIED_IDS_KEY);
-  const ids = data[LOCALLY_MODIFIED_IDS_KEY] || [];
+  const ids = data?.[LOCALLY_MODIFIED_IDS_KEY] || [];
   return new Set(ids);
 }
 
@@ -331,7 +341,7 @@ async function generateChecksum(bookmarks) {
  */
 async function getLastCloudChecksum() {
   const data = await browser.storage.local.get(LAST_CLOUD_CHECKSUM_KEY);
-  return data[LAST_CLOUD_CHECKSUM_KEY] || null;
+  return data?.[LAST_CLOUD_CHECKSUM_KEY] || null;
 }
 
 /**
@@ -348,7 +358,7 @@ async function storeLastCloudChecksum(checksum) {
  */
 async function getLastSyncTime() {
   const data = await browser.storage.local.get(LAST_SYNC_TIME_KEY);
-  return data[LAST_SYNC_TIME_KEY] || null;
+  return data?.[LAST_SYNC_TIME_KEY] || null;
 }
 
 /**
@@ -1139,6 +1149,11 @@ async function initialize() {
   // Ensure adblock rulesets match the stored preference on every boot
   await initAdblock().catch((err) =>
     console.error('[MarkSyncr] Failed to init adblock on boot:', err)
+  );
+
+  // Reinstall the phishing/scam rules and schedule the list refresh
+  await initSecurityShield().catch((err) =>
+    console.error('[MarkSyncr] Failed to init security shield on boot:', err)
   );
 
   // Restore locally modified bookmark IDs from storage (survives service worker restarts)
@@ -3641,6 +3656,24 @@ browser.runtime.onMessage.addListener((message, sender) => {
     case 'GET_BLOCKED_REQUESTS':
       return getBlockedRequests(message.payload?.tabId);
 
+    case 'GET_SECURITY_STATUS':
+      return getSecurityStatus();
+
+    case 'SET_SECURITY_ENABLED':
+      return setSecurityEnabled(message.payload?.enabled);
+
+    case 'ADD_SECURITY_BYPASS':
+      return addSecurityBypass(message.payload?.domain);
+
+    case 'REMOVE_SECURITY_BYPASS':
+      return removeSecurityBypass(message.payload?.domain);
+
+    case 'REFRESH_SECURITY_LIST':
+      return refreshSecurityList();
+
+    case 'SYNC_SECURITY_CLOUD':
+      return syncSecurityFromCloud();
+
     case 'CLEAR_BLOCKED_REQUESTS':
       return Promise.resolve(clearBlockedRequests(message.payload?.tabId));
 
@@ -3712,6 +3745,19 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
     } catch (err) {
       console.error('[MarkSyncr] ⏰ Periodic sync error:', err);
     }
+  }
+
+  if (isSecurityRefreshAlarm(alarm.name)) {
+    console.log('[MarkSyncr] ⏰ Security list refresh triggered');
+    try {
+      const res = await refreshSecurityList();
+      console.log(
+        `[MarkSyncr] ⏰ Security list ${res.refreshed ? 'refreshed' : 'unchanged'}: ${res.listCount} domains`
+      );
+    } catch (err) {
+      console.error('[MarkSyncr] ⏰ Security list refresh error:', err);
+    }
+    return;
   }
 
   if (alarm.name === TOKEN_REFRESH_ALARM_NAME) {
@@ -3801,6 +3847,11 @@ browser.runtime.onInstalled.addListener((details) => {
   initAdblock().catch((err) =>
     console.error('[MarkSyncr] Failed to init adblock on install/update:', err)
   );
+
+  // Install the phishing/scam rules from the bundled seed and schedule refresh
+  initSecurityShield().catch((err) =>
+    console.error('[MarkSyncr] Failed to init security shield on install/update:', err)
+  );
 });
 
 // Startup handler - registered synchronously
@@ -3817,6 +3868,11 @@ browser.runtime.onStartup.addListener(async () => {
   // Re-apply adblock preference (rulesets reset to manifest defaults otherwise)
   await initAdblock().catch((err) =>
     console.error('[MarkSyncr] Failed to init adblock on startup:', err)
+  );
+
+  // Re-apply the security shield and make sure its refresh alarm exists
+  await initSecurityShield().catch((err) =>
+    console.error('[MarkSyncr] Failed to init security shield on startup:', err)
   );
 
   const { settings } = await browser.storage.local.get('settings');
