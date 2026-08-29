@@ -9,7 +9,9 @@
     "./primitives": "./src/primitives.js",
     "./kdf": "./src/kdf.js",
     "./keys": "./src/vault-key.js",
-    "./items": "./src/items.js"
+    "./items": "./src/items.js",
+    "./generator": "./src/generator.js",
+    "./import": "./src/import.js"
   },
   "scripts": {
     "test": "vitest run",

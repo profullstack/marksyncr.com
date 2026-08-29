@@ -21,6 +21,7 @@
     "@marksyncr/core": "workspace:*",
     "@marksyncr/sources": "workspace:*",
     "@marksyncr/types": "workspace:*",
+    "@marksyncr/vault": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
     "fuse.js": "^7.1.0",
     "react": "^19.0.0",

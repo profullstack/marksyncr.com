@@ -45,6 +45,9 @@ importers:
       '@marksyncr/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@marksyncr/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.89.0

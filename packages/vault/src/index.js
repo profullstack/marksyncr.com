@@ -71,3 +71,24 @@ export {
   decryptItem,
   decryptItems,
 } from './items.js';
+
+export {
+  LOWERCASE,
+  UPPERCASE,
+  DIGITS,
+  SYMBOLS,
+  WORDS,
+  DEFAULT_OPTIONS as DEFAULT_GENERATOR_OPTIONS,
+  generatePassword,
+  generatePassphrase,
+  passwordEntropyBits,
+  passphraseEntropyBits,
+} from './generator.js';
+
+export {
+  IMPORT_SOURCES,
+  parseCsv,
+  rowsToObjects,
+  detectSource,
+  parseImport,
+} from './import.js';

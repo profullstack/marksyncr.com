@@ -10,6 +10,25 @@
 
 import browser from 'webextension-polyfill';
 import {
+  initVaultSession,
+  isVaultLockAlarm,
+  getVaultStatus,
+  getVaultPrefs,
+  setVaultPrefs,
+  setupVault,
+  unlock as unlockVaultSession,
+  lockVault,
+  recoverVault,
+  changeMasterPassword,
+  listItems as listVaultItems,
+  saveItem as saveVaultItem,
+  buildItem as buildVaultItem,
+  trashItem as trashVaultItem,
+  restoreItem as restoreVaultItem,
+  destroyItem as destroyVaultItem,
+  importItems as importVaultItems,
+} from './vault-session.js';
+import {
   initAdblock,
   getAdblockStatus,
   setAdblockEnabled,
@@ -3638,6 +3657,58 @@ browser.runtime.onMessage.addListener((message, sender) => {
     case 'SYNC_ADBLOCK_CLOUD':
       return syncAdblockFromCloud();
 
+    // ----- Vault -----
+    case 'VAULT_STATUS':
+      return getVaultStatus();
+
+    case 'VAULT_SETUP':
+      return setupVault(message.payload?.password);
+
+    case 'VAULT_UNLOCK':
+      return unlockVaultSession(message.payload?.password);
+
+    case 'VAULT_LOCK':
+      return lockVault();
+
+    case 'VAULT_RECOVER':
+      return recoverVault(message.payload?.recoveryKey, message.payload?.newPassword);
+
+    case 'VAULT_CHANGE_PASSWORD':
+      return changeMasterPassword(
+        message.payload?.currentPassword,
+        message.payload?.newPassword
+      );
+
+    case 'VAULT_LIST':
+      return listVaultItems({ trash: Boolean(message.payload?.trash) });
+
+    case 'VAULT_SAVE_ITEM': {
+      const { type, fields, existing } = message.payload || {};
+      const item = buildVaultItem(type, fields || {}, existing);
+      return saveVaultItem(item);
+    }
+
+    case 'VAULT_TRASH_ITEM':
+      return trashVaultItem(message.payload?.id);
+
+    case 'VAULT_RESTORE_ITEM':
+      return restoreVaultItem(message.payload?.id);
+
+    case 'VAULT_DELETE_ITEM':
+      return destroyVaultItem(message.payload?.id);
+
+    case 'VAULT_IMPORT':
+      return importVaultItems(message.payload?.items || []);
+
+    case 'VAULT_GET_PREFS':
+      return getVaultPrefs().then((prefs) => ({ success: true, ...prefs }));
+
+    case 'VAULT_SET_PREFS':
+      return setVaultPrefs({ lockMinutes: message.payload?.lockMinutes }).then((prefs) => ({
+        success: true,
+        ...prefs,
+      }));
+
     case 'GET_BLOCKED_REQUESTS':
       return getBlockedRequests(message.payload?.tabId);
 
@@ -3658,6 +3729,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
 // Shield blocked-request log — attaches the rule-match and tab listeners.
 // Must run synchronously at top level like every other listener below.
 initBlockedLog();
+
+// Vault session — hardens session storage so no content script can read the key.
+initVaultSession();
 
 // Alarm handler - registered synchronously for Firefox MV3 compatibility
 browser.alarms.onAlarm.addListener(async (alarm) => {
@@ -3712,6 +3786,12 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
     } catch (err) {
       console.error('[MarkSyncr] ⏰ Periodic sync error:', err);
     }
+  }
+
+  if (isVaultLockAlarm(alarm.name)) {
+    console.log('[MarkSyncr] ⏰ Vault auto-lock triggered');
+    await lockVault();
+    return;
   }
 
   if (alarm.name === TOKEN_REFRESH_ALARM_NAME) {

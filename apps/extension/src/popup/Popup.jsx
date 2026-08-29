@@ -3,6 +3,7 @@ import { useStore } from '../store/index.js';
 import { ProFeaturesPanel } from './components/ProFeaturesPanel.jsx';
 import { LoginPanel } from './components/LoginPanel.jsx';
 import { AdblockPanel } from './components/AdblockPanel.jsx';
+import { VaultPanel } from './components/VaultPanel.jsx';
 
 // Confirmation Dialog Component using native <dialog> element
 function ConfirmDialog({
@@ -496,7 +497,7 @@ export function Popup() {
   } = useStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
-  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'shield' | 'pro' | 'account'
+  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'shield' | 'vault' | 'pro' | 'account'
   const [exportMessage, setExportMessage] = useState(null);
   const [forceActionMessage, setForceActionMessage] = useState(null);
   const fileInputRef = useRef(null);
@@ -827,6 +828,26 @@ ${content}
           </div>
         </button>
         <button
+          onClick={() => setActiveTab('vault')}
+          className={`flex-1 px-2 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'vault'
+              ? 'border-b-2 border-primary-600 text-primary-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-1">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+            Vault
+          </div>
+        </button>
+        <button
           onClick={() => setActiveTab('pro')}
           className={`flex-1 px-2 py-2 text-sm font-medium transition-colors ${
             activeTab === 'pro'
@@ -1038,6 +1059,22 @@ ${content}
         )}
 
         {activeTab === 'shield' && <AdblockPanel />}
+
+        {activeTab === 'vault' &&
+          (isAuthenticated ? (
+            <VaultPanel />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
+              <p className="text-sm text-slate-600">Sign in to use your vault.</p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('account')}
+                className="mt-2 rounded-lg bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
+              >
+                Go to Account
+              </button>
+            </div>
+          ))}
 
         {activeTab === 'pro' && (
           <ProFeaturesPanel

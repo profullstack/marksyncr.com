@@ -70,6 +70,17 @@ async function clearUserData() {
   if (!browserAPI) return;
 
   await browserAPI.storage.local.remove(['user', 'isLoggedIn', 'session']);
+
+  // Signing out must lock the vault. The unlocked key lives in session storage,
+  // which clearing local storage does not touch — leaving it behind would keep
+  // the vault open for whoever signs in next on this profile. Session storage
+  // holds nothing but that key, so clearing it wholesale is both safe and
+  // future-proof against another secret being put there.
+  try {
+    await browserAPI.storage.session?.clear();
+  } catch {
+    /* session storage unavailable — nothing to clear */
+  }
 }
 
 /**
@@ -89,7 +100,7 @@ async function storeUserData(user) {
  * Make an authenticated API request
  * Uses Bearer token in Authorization header
  */
-async function apiRequest(endpoint, options = {}) {
+export async function apiRequest(endpoint, options = {}) {
   const token = await getAccessToken();
 
   const headers = {
