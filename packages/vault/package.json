@@ -1,0 +1,24 @@
+{
+  "name": "@marksyncr/vault",
+  "version": "0.8.33",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./primitives": "./src/primitives.js",
+    "./kdf": "./src/kdf.js",
+    "./keys": "./src/vault-key.js",
+    "./items": "./src/items.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}
