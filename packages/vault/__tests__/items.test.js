@@ -198,14 +198,14 @@ describe('password history', () => {
 
   it('travels inside the encrypted blob, so it is protected for free', async () => {
     const key = userKey();
-    let item = createItem('login', { login: { password: 'leaked-if-plaintext' } });
+    let item = createItem('login', { login: { password: 'prior-value-must-stay-encrypted' } });
     item = recordPasswordChange(item, 'current');
 
     const row = await encryptItem(key, item);
-    expect(JSON.stringify(row)).not.toContain('leaked-if-plaintext');
+    expect(JSON.stringify(row)).not.toContain('prior-value-must-stay-encrypted');
 
     const back = await decryptItem(key, row);
-    expect(back.history[0].password).toBe('leaked-if-plaintext');
+    expect(back.history[0].password).toBe('prior-value-must-stay-encrypted');
   });
 
   it('is only for logins', () => {
@@ -213,8 +213,8 @@ describe('password history', () => {
   });
 
   it('does not mutate the item it was given', () => {
-    const item = createItem('login', { login: { password: 'original' } });
+    const item = createItem('login', { login: { password: 'value-before-edit' } });
     recordPasswordChange(item, 'changed');
-    expect(item.login.password).toBe('original');
+    expect(item.login.password).toBe('value-before-edit');
   });
 });

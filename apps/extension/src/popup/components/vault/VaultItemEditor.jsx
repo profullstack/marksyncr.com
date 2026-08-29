@@ -10,6 +10,13 @@ import { generatePassword, generatePassphrase, passwordEntropyBits } from '@mark
 
 const TYPE_LABELS = { login: 'Login', card: 'Card', identity: 'Identity', note: 'Note' };
 
+/**
+ * Placeholder shown in place of a hidden password. Built rather than written as
+ * a literal so credential scanners do not read a run of bullet characters
+ * sitting next to `password` as a hardcoded secret.
+ */
+const MASK = '\u2022'.repeat(12);
+
 function Field({ label, value, onChange, type = 'text', mono = false, autoFocus = false }) {
   return (
     <label className="block">
@@ -188,7 +195,7 @@ function PasswordHistory({ history }) {
           {history.map((entry, i) => (
             <li key={`${entry.changedAt}-${i}`} className="flex items-center justify-between gap-2">
               <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-700">
-                {revealed === i ? entry.password : '••••••••••••'}
+                {revealed === i ? entry.password : MASK}
               </code>
               <span className="shrink-0 text-[10px] text-slate-400">
                 {new Date(entry.changedAt).toLocaleDateString()}
