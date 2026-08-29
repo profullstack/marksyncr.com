@@ -183,6 +183,17 @@ BEGIN
 END;
 $$;
 
+-- Postgres grants EXECUTE on a new function to PUBLIC by default, and through
+-- PostgREST that means any unauthenticated caller could POST
+-- /rest/v1/rpc/purge_expired_vault_items and trigger a cross-tenant delete. It
+-- only removes rows already past their retention deadline, so the blast radius
+-- is small, but maintenance is not something an anonymous caller should be able
+-- to run at all. Caught by the Supabase security advisor after the first apply.
+REVOKE ALL ON FUNCTION public.purge_expired_vault_items() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.purge_expired_vault_items() FROM anon;
+REVOKE ALL ON FUNCTION public.purge_expired_vault_items() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.purge_expired_vault_items() TO service_role;
+
 COMMENT ON TABLE public.vault_meta IS
     'Per-user vault key material. Every value is encrypted or derived client-side; the server cannot decrypt any of it.';
 COMMENT ON TABLE public.vault_items IS
