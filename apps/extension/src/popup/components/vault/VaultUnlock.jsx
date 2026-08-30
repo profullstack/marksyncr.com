@@ -9,23 +9,24 @@ import React, { useState } from 'react';
  * background/vault-session.js.
  */
 
-const MIN_PASSWORD_LENGTH = 12;
-
 /** Rough strength read, shown while choosing a master password. */
 export function assessPassword(password) {
   const value = String(password || '');
   if (value.length === 0) return { score: 0, label: '', hint: '' };
 
+  // Length still dominates the rating, but it no longer gates anything: a short
+  // master password reads as weak and is accepted all the same.
+  if (value.length < 8) {
+    return { score: 1, label: 'Weak', hint: 'Short passwords are easy to guess' };
+  }
+
   let score = 0;
-  if (value.length >= MIN_PASSWORD_LENGTH) score += 1;
+  if (value.length >= 8) score += 1;
   if (value.length >= 16) score += 1;
   if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
   if (/\d/.test(value)) score += 1;
   if (/[^A-Za-z0-9]/.test(value)) score += 1;
 
-  if (value.length < MIN_PASSWORD_LENGTH) {
-    return { score: 1, label: 'Too short', hint: `Use at least ${MIN_PASSWORD_LENGTH} characters` };
-  }
   if (score <= 2) return { score: 2, label: 'Weak', hint: 'Add length, or a mix of characters' };
   if (score === 3) return { score: 3, label: 'Fair', hint: '' };
   if (score === 4) return { score: 4, label: 'Good', hint: '' };
@@ -149,8 +150,8 @@ export function VaultUnlock({ exists, onSetup, onUnlock, onRecover, onUnlocked }
 
     let res;
     if (mode === 'setup') {
-      if (password.length < MIN_PASSWORD_LENGTH) {
-        setError(`Use at least ${MIN_PASSWORD_LENGTH} characters`);
+      if (password.length === 0) {
+        setError('Enter a master password');
         setBusy(false);
         return;
       }
@@ -166,8 +167,8 @@ export function VaultUnlock({ exists, onSetup, onUnlock, onRecover, onUnlocked }
         return;
       }
     } else if (mode === 'recover') {
-      if (password.length < MIN_PASSWORD_LENGTH) {
-        setError(`Use at least ${MIN_PASSWORD_LENGTH} characters`);
+      if (password.length === 0) {
+        setError('Enter a master password');
         setBusy(false);
         return;
       }

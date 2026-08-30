@@ -83,10 +83,16 @@ describe('assessPassword', () => {
     expect(assessPassword('')).toMatchObject({ score: 0, label: '' });
   });
 
-  it('calls out a password that is simply too short', () => {
+  it('rates a very short password weak without demanding a minimum length', () => {
     const result = assessPassword('Ab1!xy');
-    expect(result.label).toBe('Too short');
-    expect(result.hint).toMatch(/at least 12/);
+    expect(result.label).toBe('Weak');
+    expect(result.hint).not.toMatch(/at least/);
+  });
+
+  it('accepts an eleven-character password as a normal rating', () => {
+    const result = assessPassword('5stringerSS');
+    expect(result.label).toBe('Fair');
+    expect(result.score).toBeGreaterThanOrEqual(3);
   });
 
   it('rates a long mixed password highly', () => {
