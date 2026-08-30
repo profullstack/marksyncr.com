@@ -179,21 +179,36 @@ jobs:
           STATUS=$(echo "$RESPONSE" | jq -r '.status[0] // empty')
           ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
 
+          VERSION="${{ needs.build.outputs.version }}"
+
           if [[ "$STATUS" == "OK" || "$STATUS" == "PUBLISHED_WITH_FRICTION_WARNING" || "$STATUS" == "PENDING_REVIEW" ]]; then
-            echo "Chrome extension v${{ needs.build.outputs.version }} submitted (status: $STATUS)"
+            echo "Chrome extension v$VERSION submitted (status: $STATUS)"
+            echo "- **Chrome**: v$VERSION submitted for review (\`$STATUS\`)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          # The new package is uploaded as a draft regardless of this step. Some
-          # publish failures are one-time account-level gates the owner must clear
-          # in the Chrome dashboard (e.g. the mandatory "Privacy practices" form).
-          # Those shouldn't fail the release — the draft is ready to submit — so
-          # warn loudly and pass. Genuinely unexpected errors still fail.
+          # The package uploads fine and then Google refuses to submit it. The
+          # usual cause is the Privacy practices form: Chrome invalidates the
+          # permission justifications whenever the manifest's permission set
+          # changes, and only a human in the dashboard can clear that.
+          #
+          # This branch used to `exit 0` with a warning. It must not. A release
+          # that reaches no user is a failed release, and the green tick is
+          # exactly how v0.8.37 and v0.8.39 sat unpublished — CI said success
+          # while the store served an older version for weeks.
           if echo "$ERROR_MSG" | grep -qiE "publish condition not met|privacy"; then
-            echo "::warning title=Chrome publish gated::Draft v${{ needs.build.outputs.version }} uploaded but not submitted — clear the gate in the Chrome dashboard: $ERROR_MSG"
-            exit 0
+            {
+              echo "- **Chrome**: :x: v$VERSION uploaded as a draft but **NOT submitted**"
+              echo "  - \`$ERROR_MSG\`"
+              echo "  - Fix: open <https://chrome.google.com/webstore/devconsole>, select MarkSyncr,"
+              echo "    complete the **Privacy practices** tab, then **Submit for review**."
+              echo "  - Re-running this workflow will not clear it."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=Chrome publish gated::v$VERSION uploaded as a draft but NOT submitted. Complete the Privacy practices tab at https://chrome.google.com/webstore/devconsole and submit for review. $ERROR_MSG"
+            exit 1
           fi
 
+          echo "- **Chrome**: :x: v$VERSION publish failed (\`${STATUS:-no status}\`)" >> "$GITHUB_STEP_SUMMARY"
           echo "::error::Chrome publish failed with status: ${STATUS:-none}"
           echo "$RESPONSE" | jq '.statusDetail // .error // .'
           exit 1
@@ -246,6 +261,7 @@ jobs:
             --approval-timeout 0
 
           echo "Firefox extension v${{ needs.build.outputs.version }} submitted to AMO"
+          echo "- **Firefox**: v${{ needs.build.outputs.version }} submitted to AMO (human review queue)" >> "$GITHUB_STEP_SUMMARY"
 
   edge-release:
     name: Publish to Edge Add-ons
@@ -292,6 +308,7 @@ jobs:
           # failing the whole release. Refresh the EDGE_* secrets to re-enable.
           if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
             echo "::warning title=Edge publish skipped::Edge auth failed (HTTP $HTTP_CODE) — refresh EDGE_API_KEY/EDGE_CLIENT_ID secrets to re-enable Edge publishing."
+            echo "- **Edge**: :warning: skipped — credentials rejected (HTTP $HTTP_CODE); nothing shipped" >> "$GITHUB_STEP_SUMMARY"
             echo "skipped=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -361,3 +378,4 @@ jobs:
           fi
 
           echo "Edge extension v${{ needs.build.outputs.version }} submitted for review"
+          echo "- **Edge**: v${{ needs.build.outputs.version }} submitted for review" >> "$GITHUB_STEP_SUMMARY"

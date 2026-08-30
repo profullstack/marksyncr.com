@@ -149,9 +149,31 @@ The tag version doesn't match `manifest.chrome.json`. Run `pnpm version:bump` an
 
 ### Chrome: upload succeeds but publish fails
 
+**Most often this is the Privacy practices form, not a policy violation.** Chrome
+invalidates the permission justifications whenever the manifest's permission set
+changes, and then refuses to submit the uploaded draft with
+`Publish condition not met`. The release job fails on this deliberately — a
+version nobody can install is not a release. See
+[CHROME_PRIVACY_PRACTICES.md](./CHROME_PRIVACY_PRACTICES.md) for the drafts to
+paste and the steps to clear it. Re-running the workflow will not help.
+
+Otherwise:
+
 - The extension may have policy violations flagged by automated review
 - Check the [Developer Dashboard](https://chrome.google.com/webstore/devconsole/) for details
 - `PUBLISHED_WITH_FRICTION_WARNING` is treated as success (warnings are informational)
+
+### Confirming a release actually reached users
+
+A green release run means the API accepted the upload, nothing more. Ask the
+Chrome update server what it serves:
+
+```bash
+curl -s "https://clients2.google.com/service/update2/crx?response=updatecheck&prodversion=140.0&acceptformat=crx2,crx3&x=id%3Dhjcjjcpialiakkalcgadnfnoomdaegjg%26uc"
+```
+
+The `Verify Published Versions` workflow runs this daily and fails when Chrome
+trails the newest tag. Run it on demand from the Actions tab.
 
 ### Firefox: web-ext sign fails
 

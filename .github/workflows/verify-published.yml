@@ -1,0 +1,89 @@
+name: Verify Published Versions
+
+# CI going green is not evidence that anything reached a user. The Chrome
+# publish can be gated after a successful upload, AMO sits in a human review
+# queue, and Edge has been failing auth silently. This job asks the stores what
+# they actually serve and complains when that trails the newest tag.
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Compare stores against the newest tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load environment variables
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE }}
+        run: |
+          while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" =~ ^# ]] && continue
+            [[ -n "$value" ]] && echo "::add-mask::$value"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done <<< "$ENV_CONTENT"
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the newest released version
+        id: tag
+        run: |
+          TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [[ -z "$TAG" ]]; then
+            echo "::error::No release tag found"
+            exit 1
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Newest tag: $TAG"
+
+      - name: Ask the stores what they serve
+        env:
+          RELEASED: ${{ steps.tag.outputs.version }}
+        run: |
+          behind=0
+
+          # Chrome: the update server is the only honest source — it returns the
+          # version real browsers will be handed, not the dashboard's draft.
+          CHROME_XML=$(curl -sS --max-time 30 \
+            "https://clients2.google.com/service/update2/crx?response=updatecheck&prodversion=140.0&acceptformat=crx2,crx3&x=id%3D${CHROME_EXTENSION_ID}%26uc" || true)
+          # Anchor to the <updatecheck> element: a bare ` version="` also matches
+          # the XML declaration's version="1.0" and silently reports that instead.
+          CHROME_VER=$(printf '%s' "$CHROME_XML" | grep -oP '<updatecheck[^>]*\sversion="\K[0-9][0-9.]*' | head -1)
+
+          if [[ -z "$CHROME_VER" ]]; then
+            echo "::warning::Could not read the Chrome update server response"
+            echo "- **Chrome**: :grey_question: could not be read" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$CHROME_VER" == "$RELEASED" ]]; then
+            echo "- **Chrome**: :white_check_mark: serving $CHROME_VER" >> "$GITHUB_STEP_SUMMARY"
+          else
+            behind=1
+            {
+              echo "- **Chrome**: :x: serving **$CHROME_VER**, newest tag is **$RELEASED**"
+              echo "  - A draft may be uploaded but unsubmitted. Check the **Privacy practices**"
+              echo "    tab at <https://chrome.google.com/webstore/devconsole>."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=Chrome is behind::Store serves $CHROME_VER but $RELEASED is tagged"
+          fi
+
+          # AMO review is a human queue, so lagging is normal and only worth a note.
+          AMO_VER=$(curl -sS --max-time 30 \
+            "https://addons.mozilla.org/api/v5/addons/addon/marksyncr/" \
+            | jq -r '.current_version.version // empty' || true)
+
+          if [[ -z "$AMO_VER" ]]; then
+            echo "- **Firefox**: :grey_question: could not be read" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$AMO_VER" == "$RELEASED" ]]; then
+            echo "- **Firefox**: :white_check_mark: serving $AMO_VER" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- **Firefox**: :hourglass: serving $AMO_VER, newest tag is $RELEASED (review queue)" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=AMO is behind::AMO serves $AMO_VER but $RELEASED is tagged"
+          fi
+
+          exit $behind
