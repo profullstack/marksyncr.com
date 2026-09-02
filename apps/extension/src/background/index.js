@@ -27,6 +27,7 @@ import {
   restoreItem as restoreVaultItem,
   destroyItem as destroyVaultItem,
   importItems as importVaultItems,
+  getImportProgress as getVaultImportProgress,
 } from './vault-session.js';
 import {
   initAdblock,
@@ -3714,6 +3715,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
     case 'VAULT_IMPORT':
       return importVaultItems(message.payload?.items || []);
+
+    case 'VAULT_IMPORT_PROGRESS':
+      return Promise.resolve(getVaultImportProgress());
 
     case 'VAULT_GET_PREFS':
       return getVaultPrefs().then((prefs) => ({ success: true, ...prefs }));

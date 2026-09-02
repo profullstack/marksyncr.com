@@ -67,6 +67,10 @@ vi.mock('../src/lib/vault-api.js', () => ({
     serverRef.items.filter((row) => Boolean(row.deleted_at) === Boolean(trash))
   ),
   createVaultItem: vi.fn(async (row) => {
+    // Mirrors the real route: the id is chosen by the client, so a second
+    // create of the same id is a 409 rather than a duplicate row. Import
+    // resume depends on that being reported as a conflict, not an error.
+    if (serverRef.items.some((r) => r.id === row.id)) return { conflict: true };
     const stored = { ...row, revision: 1, deleted_at: null };
     serverRef.items.push(stored);
     return stored;
@@ -321,6 +325,95 @@ describe('items', () => {
     expect(res.imported).toBe(2);
     expect((await mod.listItems()).items).toHaveLength(2);
   }, 30_000);
+
+  /**
+   * A database of a few thousand keys is a few thousand POSTs. Blocking the
+   * caller for that long is what made a large import impossible: the popup that
+   * was awaiting it had already been dismissed, so the result went nowhere. A
+   * big import is scheduled and reported through progress instead.
+   */
+  it('schedules a large import and finishes it in the background', async () => {
+    const mod = await loadModule();
+    await mod.setupVault(PASSWORD);
+
+    const batch = Array.from({ length: 120 }, (_, i) =>
+      mod.buildItem('login', { name: `Item ${i}` })
+    );
+    const res = await mod.importItems(batch);
+
+    // Returns immediately, before the writes are done.
+    expect(res.success).toBe(true);
+    expect(res.started).toBe(true);
+    expect(res.total).toBe(120);
+
+    await vi.waitFor(
+      () => {
+        const { job } = mod.getImportProgress();
+        expect(job.running).toBe(false);
+      },
+      { timeout: 30_000, interval: 50 }
+    );
+
+    const { job } = mod.getImportProgress();
+    expect(job.imported).toBe(120);
+    expect(job.failed).toBe(0);
+    expect(job.done).toBe(120);
+    expect((await mod.listItems()).items).toHaveLength(120);
+  }, 60_000);
+
+  /**
+   * The service worker can be killed mid-import and the job is lost with it, so
+   * the recovery is to import the same file again. That is only safe if an item
+   * already stored counts as done rather than as a failure.
+   */
+  it('counts already-stored items as present, so re-running resumes', async () => {
+    const mod = await loadModule();
+    await mod.setupVault(PASSWORD);
+
+    const batch = Array.from({ length: 120 }, (_, i) =>
+      mod.buildItem('login', { name: `Item ${i}` })
+    );
+
+    await mod.importItems(batch);
+    await vi.waitFor(() => expect(mod.getImportProgress().job.running).toBe(false), {
+      timeout: 30_000,
+      interval: 50,
+    });
+
+    // The same file again: every id is already on the server.
+    await mod.importItems(batch);
+    await vi.waitFor(() => expect(mod.getImportProgress().job.running).toBe(false), {
+      timeout: 30_000,
+      interval: 50,
+    });
+
+    const { job } = mod.getImportProgress();
+    expect(job.already).toBe(120);
+    expect(job.imported).toBe(0);
+    expect(job.failed).toBe(0);
+    // Re-running must not duplicate anything.
+    expect((await mod.listItems()).items).toHaveLength(120);
+  }, 60_000);
+
+  it('refuses to start a second import while one is running', async () => {
+    const mod = await loadModule();
+    await mod.setupVault(PASSWORD);
+
+    const batch = Array.from({ length: 120 }, (_, i) =>
+      mod.buildItem('login', { name: `Item ${i}` })
+    );
+    const first = await mod.importItems(batch);
+    expect(first.started).toBe(true);
+
+    const second = await mod.importItems(batch);
+    expect(second.success).toBe(false);
+    expect(second.error).toMatch(/already running/i);
+
+    await vi.waitFor(() => expect(mod.getImportProgress().job.running).toBe(false), {
+      timeout: 30_000,
+      interval: 50,
+    });
+  }, 60_000);
 });
 
 describe('buildItem', () => {

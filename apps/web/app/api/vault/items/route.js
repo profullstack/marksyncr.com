@@ -38,13 +38,20 @@ export async function GET(request) {
     const since = searchParams.get('since');
     const wantsTrash = searchParams.get('trash') === '1';
     const limit = Math.min(Number(searchParams.get('limit')) || MAX_PAGE_SIZE, MAX_PAGE_SIZE);
+    // A vault larger than one page was previously unreachable: the response was
+    // capped and there was no way to ask for the rest.
+    const offset = Math.max(Number(searchParams.get('offset')) || 0, 0);
 
     let query = supabase
       .from('vault_items')
       .select('id, type, ciphertext, iv, revision, deleted_at, created_at, updated_at')
       .eq('user_id', user.id)
+      // updated_at alone is not unique -- an import writes thousands of rows in
+      // the same instant -- and a non-deterministic order across pages drops
+      // and repeats rows. id is the tiebreaker that makes paging total.
       .order('updated_at', { ascending: false })
-      .limit(limit);
+      .order('id', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     query = wantsTrash ? query.not('deleted_at', 'is', null) : query.is('deleted_at', null);
 
@@ -63,7 +70,11 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500, headers });
     }
 
-    return NextResponse.json({ items: data || [] }, { headers });
+    // `paged` tells a client that this server understands `offset`, so it can
+    // safely ask for the next page. Without it a client cannot distinguish a
+    // paging server from one that silently ignores the parameter and would
+    // return the same first page forever.
+    return NextResponse.json({ items: data || [], paged: true }, { headers });
   } catch (error) {
     console.error('Vault items API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers });

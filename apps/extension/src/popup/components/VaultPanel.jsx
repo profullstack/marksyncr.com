@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { detectImportKind, inspectOpenCredsFile, parseImport, parseOpenCredsImport } from '@marksyncr/vault';
 import { VaultUnlock } from './vault/VaultUnlock.jsx';
 import { VaultItemEditor } from './vault/VaultItemEditor.jsx';
 
@@ -257,84 +256,27 @@ export function VaultPanel() {
   };
 
   /**
-   * Import a CSV export from another manager, or an OpenCreds database.
+   * Hand a vault import to the options page.
    *
-   * An OpenCreds file is a whole vault rather than a table of logins: it
-   * carries folders, password history, TOTP seeds, and `key` and `account`
-   * items that no CSV has a column for. When it is encrypted — the default —
-   * the header still says what it holds, and that claim is authenticated, so
-   * the passphrase prompt can name a real number before anyone types anything.
+   * This used to run in the popup, and could not work there. A popup is
+   * dismissed as soon as it loses focus, and both halves of the old flow took
+   * focus away: the file chooser, and then `window.prompt` for the export
+   * passphrase. Chrome suppresses JS dialogs in an action popup, so the prompt
+   * returned null and the handler took its `passphrase === null` cancel path --
+   * silently, with no message -- if the popup had not already closed under the
+   * file chooser. Either way not one item was ever sent, which is exactly what
+   * an import of a 3,000-item database looked like: the window vanished and the
+   * vault stayed empty.
+   *
+   * The options page is an ordinary extension tab, so it keeps focus through a
+   * file chooser, can ask for a passphrase in the page, and can stay open long
+   * enough to show progress.
    */
-  const onImport = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    event.target.value = '';
-
-    const text = await file.text();
-
-    if (detectImportKind(text) !== 'opencreds') {
-      const { source, items: parsed, skipped } = parseImport(text);
-      if (!parsed.length) {
-        notify(skipped[0]?.reason || 'Nothing to import');
-        return;
-      }
-      const res = await sendMessage({ type: 'VAULT_IMPORT', payload: { items: parsed } });
-      if (res?.success) {
-        await loadItems(showTrash);
-        notify(
-          skipped.length
-            ? `Imported ${res.imported} from ${source}; skipped ${skipped.length}`
-            : `Imported ${res.imported} from ${source}`
-        );
-      } else {
-        notify(res?.error || 'Import failed');
-      }
-      return;
-    }
-
-    let header;
-    try {
-      header = inspectOpenCredsFile(text);
-    } catch (err) {
-      notify(err.message);
-      return;
-    }
-
-    let passphrase;
-    if (header.protected) {
-      // The popup has no modal layer, and asking here is better than importing
-      // nothing and explaining why afterwards.
-      passphrase = window.prompt(
-        `This OpenCreds file holds ${header.itemCount} ${
-          header.itemCount === 1 ? 'item' : 'items'
-        }. Enter its export passphrase to import.`
-      );
-      if (passphrase === null) return;
-    } else if (
-      !window.confirm(
-        `This OpenCreds file is unprotected — every secret in it is in the clear. Import ${header.itemCount} items anyway?`
-      )
-    ) {
-      return;
-    }
-
-    let parsed;
-    try {
-      parsed = await parseOpenCredsImport(text, { passphrase });
-    } catch (err) {
-      // A manifest mismatch, a wrong passphrase and an altered file all land
-      // here, and in every one of them nothing has been written.
-      notify(err.message);
-      return;
-    }
-
-    const res = await sendMessage({ type: 'VAULT_IMPORT', payload: { items: parsed.items } });
-    if (res?.success) {
-      await loadItems(showTrash);
-      notify(`Imported ${res.imported} of ${parsed.items.length} from OpenCreds`);
-    } else {
-      notify(res?.error || 'Import failed');
-    }
+  const onImport = () => {
+    const api = getExtApi();
+    if (!api) return;
+    if (api.runtime.openOptionsPage) api.runtime.openOptionsPage();
+    else window.open(api.runtime.getURL('options/index.html'));
   };
 
   const visible = useMemo(() => filterItems(items, query), [items, query]);
@@ -463,15 +405,13 @@ export function VaultPanel() {
         </button>
 
         {!showTrash && (
-          <label className="cursor-pointer text-xs font-medium text-primary-600 hover:underline">
+          <button
+            type="button"
+            onClick={onImport}
+            className="text-xs font-medium text-primary-600 hover:underline"
+          >
             Import
-            <input
-              type="file"
-              accept=".csv,text/csv,.opencreds,.json,application/json,application/vnd.logicsrc.opencreds+json"
-              onChange={onImport}
-              className="hidden"
-            />
-          </label>
+          </button>
         )}
       </div>
 

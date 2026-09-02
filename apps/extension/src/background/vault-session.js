@@ -379,34 +379,123 @@ export async function destroyItem(id) {
 }
 
 /**
+ * How many item writes are in flight at once.
+ *
+ * Every item is a separate POST -- the API creates one item per request -- so a
+ * database of a few thousand keys is a few thousand round trips. Sequentially
+ * that is minutes of wall clock; the popup that started it is long gone and the
+ * user is looking at an empty vault. Eight is enough to make the trip
+ * network-bound rather than latency-bound without looking like a flood.
+ */
+const IMPORT_CONCURRENCY = 8;
+
+/**
+ * Progress for the running (or last) import.
+ *
+ * Deliberately module-level and deliberately free of item data. The service
+ * worker can be killed mid-import, and the one thing that must never happen is
+ * plaintext items being written somewhere to survive that. Losing the job on a
+ * worker restart is fine because re-running the same file resumes: every item
+ * carries its own id, so an item already stored comes back 409 and is counted
+ * as done rather than as an error.
+ *
+ * @type {{total: number, done: number, imported: number, already: number,
+ *   failed: number, running: boolean, failures: Array, error: string|null}|null}
+ */
+let importJob = null;
+
+/** Progress for the popup/options page to poll. */
+export function getImportProgress() {
+  if (!importJob) return { success: true, job: null };
+  return { success: true, job: { ...importJob, failures: importJob.failures.slice(0, 20) } };
+}
+
+/**
  * Import parsed items, encrypting each one.
+ *
+ * Returns as soon as the work is scheduled rather than when it finishes: the
+ * caller is a popup or an options tab, and neither is guaranteed to still be
+ * open in three minutes. Progress is polled through {@link getImportProgress},
+ * and closing the page no longer abandons the import.
  *
  * Reports per-item failures instead of stopping, so one bad row out of five
  * hundred does not abandon the other four hundred and ninety-nine.
+ *
  * @param {Object[]} items plaintext items from parseImport
  */
 export async function importItems(items) {
+  if (importJob?.running) {
+    return { success: false, error: 'An import is already running' };
+  }
+
+  let userKey;
   try {
-    const userKey = await requireKey();
-    let imported = 0;
-    const failures = [];
-
-    for (const item of items) {
-      try {
-        const row = await encryptItem(userKey, item);
-        const created = await createVaultItem(row);
-        if (created) imported += 1;
-        else failures.push({ name: item.name, reason: 'Server rejected the item' });
-      } catch (err) {
-        failures.push({ name: item.name, reason: err.message });
-      }
-    }
-
-    return { success: true, imported, failures };
+    userKey = await requireKey();
   } catch (err) {
     if (err.message === 'LOCKED') return { success: false, locked: true, error: 'Vault is locked' };
     return { success: false, error: err.message };
   }
+
+  const queue = Array.isArray(items) ? items.slice() : [];
+  importJob = {
+    total: queue.length,
+    done: 0,
+    imported: 0,
+    already: 0,
+    failed: 0,
+    running: true,
+    failures: [],
+    error: null,
+  };
+  const job = importJob;
+
+  let next = 0;
+  const worker = async () => {
+    for (;;) {
+      const index = next++;
+      if (index >= queue.length) return;
+      const item = queue[index];
+      try {
+        const row = await encryptItem(userKey, item);
+        const created = await createVaultItem(row);
+        if (created?.conflict) job.already += 1;
+        else if (created) job.imported += 1;
+        else {
+          job.failed += 1;
+          job.failures.push({ name: item.name, reason: 'Server rejected the item' });
+        }
+      } catch (err) {
+        job.failed += 1;
+        job.failures.push({ name: item.name, reason: err.message });
+      }
+      job.done += 1;
+    }
+  };
+
+  const run = Promise.all(
+    Array.from({ length: Math.min(IMPORT_CONCURRENCY, queue.length) }, worker)
+  )
+    .catch((err) => {
+      job.error = err.message;
+    })
+    .finally(() => {
+      job.running = false;
+    });
+
+  // Awaited only so a caller that wants the old blocking behaviour -- the tests,
+  // and a small CSV where waiting is nicer than polling -- still gets a result.
+  if (queue.length <= IMPORT_CONCURRENCY * 4) {
+    await run;
+    return {
+      success: true,
+      imported: job.imported,
+      already: job.already,
+      failures: job.failures,
+      finished: true,
+    };
+  }
+
+  return { success: true, started: true, total: job.total };
 }
 
 /**

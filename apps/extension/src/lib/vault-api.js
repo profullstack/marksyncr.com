@@ -48,28 +48,53 @@ export async function saveVaultMeta(meta) {
  * @returns {Promise<Object[]>}
  */
 export async function fetchVaultItems({ trash = false, since } = {}) {
-  const params = new URLSearchParams();
-  if (trash) params.set('trash', '1');
-  if (since) params.set('since', since);
-  const query = params.toString();
+  // The server caps one response at MAX_PAGE_SIZE (1000) and always has, so a
+  // single request silently truncated any vault larger than that -- the items
+  // were stored and simply never listed. Page until a short response says the
+  // end has been reached.
+  const PAGE = 1000;
+  const all = [];
 
   try {
-    const response = await apiRequest(`/api/vault/items${query ? `?${query}` : ''}`, {
-      method: 'GET',
-    });
-    if (!response.ok) return [];
-    const data = await response.json();
-    return data.items || [];
+    for (let offset = 0; ; offset += PAGE) {
+      const params = new URLSearchParams();
+      if (trash) params.set('trash', '1');
+      if (since) params.set('since', since);
+      params.set('limit', String(PAGE));
+      if (offset) params.set('offset', String(offset));
+
+      const response = await apiRequest(`/api/vault/items?${params.toString()}`, {
+        method: 'GET',
+      });
+      if (!response.ok) return all;
+      const data = await response.json();
+      const page = data.items || [];
+      all.push(...page);
+
+      // Short page means the end. A full page from a server that does not yet
+      // understand `offset` would repeat itself forever, so stop unless the
+      // response actually advanced past what we already hold.
+      if (page.length < PAGE) break;
+      if (!data.paged) break;
+    }
+    return all;
   } catch (err) {
     console.error('[MarkSyncr] Vault items fetch failed:', err?.message);
-    return [];
+    return all;
   }
 }
 
 /**
  * Create an item.
+ *
+ * A 409 means this id is already stored, which during an import is not a
+ * failure: the item arrived on an earlier run. It is reported as
+ * `{conflict: true}` so a re-run of an interrupted import can count it as
+ * already-done rather than as an error — that is what makes re-running the
+ * same file a safe way to resume.
+ *
  * @param {{id: string, type: number, ciphertext: string, iv: string}} row
- * @returns {Promise<Object|null>} the created row, or null
+ * @returns {Promise<Object|{conflict: true}|null>} the created row, a conflict, or null
  */
 export async function createVaultItem(row) {
   try {
@@ -77,6 +102,7 @@ export async function createVaultItem(row) {
       method: 'POST',
       body: JSON.stringify(row),
     });
+    if (response.status === 409) return { conflict: true };
     if (!response.ok) return null;
     const data = await response.json();
     return data.item || null;

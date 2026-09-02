@@ -7,6 +7,7 @@ import {
   detectImportFormat,
 } from '@marksyncr/core';
 import { deleteCloudData } from '../lib/api.js';
+import { VaultImport } from './VaultImport.jsx';
 
 // Service icons
 const GitHubIcon = ({ className = '' }) => (
@@ -724,6 +725,13 @@ export function Options() {
               onChange={handleImportFile}
               className="hidden"
             />
+          </Section>
+
+          <Section
+            title="Password vault"
+            description="Import an OpenCreds database or a CSV export from another password manager. This lives here rather than in the toolbar popup: a popup closes as soon as a file chooser or a passphrase prompt takes focus, which is why an import started there never wrote anything."
+          >
+            <VaultImport />
           </Section>
 
           {/* Export Modal */}
