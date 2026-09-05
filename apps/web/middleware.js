@@ -1,3 +1,4 @@
+import { gate } from "@/lib/crawl-gateway";
 import { updateSession } from '@profullstack/stack/supabase';
 
 /**
@@ -9,6 +10,12 @@ import { updateSession } from '@profullstack/stack/supabase';
  * if needed, and writes the updated cookies back to the response.
  */
 export async function middleware(request) {
+  // Crawl gateway first: AI training crawlers get 402 Payment Required (or the
+  // sales page at /crawl) unless they present a paid pass. People, Googlebot
+  // and retrieval crawlers fall through to everything below.
+  const answer = await gate(request);
+  if (answer) return answer;
+
   const { response } = await updateSession(request);
   return response;
 }
