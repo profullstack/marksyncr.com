@@ -1,0 +1,53 @@
+{
+  "openaccess": "0.1",
+  "name": "MarkSyncr",
+  "url": "https://marksyncr.com",
+  "operator": "https://logicsrc.com/.well-known/openprofile.md",
+  "redirect_uris": [
+    "https://marksyncr.com/api/v1/openaccess/callback"
+  ],
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "kid": "dMCRVTozYszB",
+        "x": "Hvejq44870vMViU6caolQYGb0kGKreukMqr93jtmxN8",
+        "alg": "EdDSA",
+        "use": "sig"
+      }
+    ]
+  },
+  "scopes": {},
+  "offers": [
+    {
+      "product": "marksyncr.com/pro",
+      "name": "Pro",
+      "price": "5 USD/month",
+      "links": {
+        "pay": "https://marksyncr.com/pricing?principal={principal}",
+        "cancel": "https://marksyncr.com/dashboard/settings",
+        "manage": "https://marksyncr.com/dashboard/settings"
+      }
+    },
+    {
+      "product": "marksyncr.com/team",
+      "name": "Team",
+      "price": "12 USD/month",
+      "links": {
+        "pay": "https://marksyncr.com/pricing?principal={principal}",
+        "cancel": "https://marksyncr.com/dashboard/settings",
+        "manage": "https://marksyncr.com/dashboard/settings"
+      }
+    }
+  ],
+  "honours": [
+    "profullstack.com/all-access",
+    "marksyncr.com/pro",
+    "marksyncr.com/team"
+  ],
+  "webhooks": "https://marksyncr.com/api/v1/openaccess/events",
+  "hubs": [
+    "https://openaccess.logicsrc.com"
+  ]
+}
