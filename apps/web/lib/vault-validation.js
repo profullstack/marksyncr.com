@@ -15,6 +15,15 @@ export const MAX_CIPHERTEXT_LENGTH = 64 * 1024;
 export const MAX_KEY_FIELD_LENGTH = 1024;
 /** Largest page of items returned in one request. */
 export const MAX_PAGE_SIZE = 1000;
+/**
+ * Largest batch accepted by one create request.
+ *
+ * An import of a few thousand items used to be a few thousand POSTs, which is
+ * minutes of round trips for work the database can do in one statement. Capped
+ * rather than unbounded so a single request still has a predictable size and
+ * cost: 200 items of ciphertext is a couple of megabytes at the ceiling above.
+ */
+export const MAX_BULK_ITEMS = 200;
 /** How long a deleted item stays recoverable. */
 export const TRASH_RETENTION_DAYS = 30;
 /**
