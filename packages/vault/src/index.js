@@ -112,3 +112,5 @@ export {
   parseOpenCredsImport,
   importFile,
 } from './import.js';
+
+export { parseBitwardenJson, isBitwardenExport } from './bitwarden.js';
