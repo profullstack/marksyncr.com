@@ -96,6 +96,40 @@ export async function fetchVaultItems({ trash = false, since } = {}) {
  * @param {{id: string, type: number, ciphertext: string, iv: string}} row
  * @returns {Promise<Object|{conflict: true}|null>} the created row, a conflict, or null
  */
+/**
+ * Create many items in one request.
+ *
+ * An import used to be one POST per item, so a few thousand passwords was a few
+ * thousand round trips — minutes of waiting that looked indistinguishable from a
+ * hang. The server takes a batch and reports how many were new.
+ *
+ * Returns null when the server has no batch route, so the caller can fall back
+ * to one-at-a-time rather than losing the import against an older deployment.
+ *
+ * @param {Array<Object>} rows
+ * @returns {Promise<{created: number, already: number}|null>}
+ */
+export async function createVaultItems(rows) {
+  try {
+    const response = await apiRequest('/api/vault/items', {
+      method: 'POST',
+      body: JSON.stringify({ items: rows }),
+    });
+    // A deployment that predates batching reads `{items:[...]}` as a single
+    // malformed item and rejects it. Say "unsupported" rather than "failed".
+    if (response.status === 400 || response.status === 404 || response.status === 405) {
+      return null;
+    }
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (typeof data?.created !== 'number') return null;
+    return { created: data.created, already: data.already ?? 0 };
+  } catch (err) {
+    console.error('[MarkSyncr] Vault bulk create failed:', err?.message);
+    return null;
+  }
+}
+
 export async function createVaultItem(row) {
   try {
     const response = await apiRequest('/api/vault/items', {

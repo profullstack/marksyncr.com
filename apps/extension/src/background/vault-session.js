@@ -36,6 +36,7 @@ import {
   saveVaultMeta,
   fetchVaultItems,
   createVaultItem,
+  createVaultItems,
   updateVaultItem,
   patchVaultItem,
   deleteVaultItem,
@@ -390,6 +391,15 @@ export async function destroyItem(id) {
 const IMPORT_CONCURRENCY = 8;
 
 /**
+ * Items per create request.
+ *
+ * Kept at the server's MAX_BULK_ITEMS so a full batch is never rejected for
+ * being one item too large. Four thousand items becomes about twenty requests
+ * instead of four thousand, which is the difference between seconds and minutes.
+ */
+const IMPORT_BATCH_SIZE = 200;
+
+/**
  * Progress for the running (or last) import.
  *
  * Deliberately module-level and deliberately free of item data. The service
@@ -449,14 +459,42 @@ export async function importItems(items) {
   };
   const job = importJob;
 
+  // Items are sent in batches rather than one request each. A few thousand
+  // passwords was a few thousand round trips, which is minutes of waiting that
+  // looks exactly like a hang from the options page. Encryption still happens
+  // per item — each row carries its own IV — but the network no longer does.
   let next = 0;
-  const worker = async () => {
-    for (;;) {
-      const index = next++;
-      if (index >= queue.length) return;
-      const item = queue[index];
+  let bulkSupported = true;
+
+  /** Send one batch, falling back to single posts on an older server. */
+  const sendBatch = async (batch) => {
+    const rows = [];
+    for (const item of batch) {
       try {
-        const row = await encryptItem(userKey, item);
+        rows.push({ item, row: await encryptItem(userKey, item) });
+      } catch (err) {
+        job.failed += 1;
+        job.failures.push({ name: item.name, reason: err.message });
+        job.done += 1;
+      }
+    }
+    if (rows.length === 0) return;
+
+    if (bulkSupported) {
+      const result = await createVaultItems(rows.map((r) => r.row));
+      if (result) {
+        job.imported += result.created;
+        job.already += result.already;
+        job.done += rows.length;
+        return;
+      }
+      // Only decided once: a server without the batch route will not grow one
+      // mid-import, and retrying it per batch would double every request.
+      bulkSupported = false;
+    }
+
+    for (const { item, row } of rows) {
+      try {
         const created = await createVaultItem(row);
         if (created?.conflict) job.already += 1;
         else if (created) job.imported += 1;
@@ -469,6 +507,15 @@ export async function importItems(items) {
         job.failures.push({ name: item.name, reason: err.message });
       }
       job.done += 1;
+    }
+  };
+
+  const worker = async () => {
+    for (;;) {
+      const start = next;
+      if (start >= queue.length) return;
+      next = start + IMPORT_BATCH_SIZE;
+      await sendBatch(queue.slice(start, start + IMPORT_BATCH_SIZE));
     }
   };
 

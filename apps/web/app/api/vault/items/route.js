@@ -16,7 +16,7 @@
 
 import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
-import { validateItemPayload, MAX_PAGE_SIZE } from '@/lib/vault-validation';
+import { validateItemPayload, MAX_BULK_ITEMS, MAX_PAGE_SIZE } from '@/lib/vault-validation';
 
 export async function OPTIONS(request) {
   return new NextResponse(null, {
@@ -84,6 +84,65 @@ export async function GET(request) {
 /**
  * Body: { id, type, ciphertext, iv }
  */
+/**
+ * Create many items in one statement.
+ *
+ * `ignoreDuplicates` rather than a failed batch: an id that already exists is
+ * what an interrupted import looks like on its second run, and the whole point
+ * of carrying client-side ids is that re-running the same file resumes instead
+ * of duplicating. A row that was skipped is reported as already-present, which
+ * is what the single-item path's 409 means too.
+ *
+ * An id belonging to somebody else's row conflicts and is skipped, so a batch
+ * can neither overwrite nor read another user's item.
+ */
+async function createManyItems({ body, user, supabase, headers }) {
+  const items = body.items;
+
+  if (items.length === 0) {
+    return NextResponse.json({ items: [], created: 0, already: 0 }, { status: 201, headers });
+  }
+  if (items.length > MAX_BULK_ITEMS) {
+    return NextResponse.json(
+      { error: `At most ${MAX_BULK_ITEMS} items per request` },
+      { status: 400, headers }
+    );
+  }
+
+  // Validated before anything is written, so a bad row rejects the request
+  // rather than leaving a partial batch behind.
+  for (let i = 0; i < items.length; i++) {
+    const invalid = validateItemPayload(items[i]);
+    if (invalid) {
+      return NextResponse.json({ error: `items[${i}]: ${invalid}` }, { status: 400, headers });
+    }
+  }
+
+  const rows = items.map((item) => ({
+    id: item.id,
+    user_id: user.id,
+    type: item.type,
+    ciphertext: item.ciphertext,
+    iv: item.iv,
+  }));
+
+  const { data, error } = await supabase
+    .from('vault_items')
+    .upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
+    .select('id, type, revision, created_at, updated_at');
+
+  if (error) {
+    console.error('Vault items bulk insert error:', error);
+    return NextResponse.json({ error: 'Failed to create items' }, { status: 500, headers });
+  }
+
+  const created = data ?? [];
+  return NextResponse.json(
+    { items: created, created: created.length, already: rows.length - created.length },
+    { status: 201, headers }
+  );
+}
+
 export async function POST(request) {
   const headers = corsHeaders(request, ['GET', 'POST', 'OPTIONS']);
 
@@ -94,6 +153,14 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => null);
+
+    // A batch create. An import of a few thousand items was a few thousand
+    // POSTs, which is minutes of round trips for work one statement can do.
+    // The single-item shape below is unchanged, so older clients keep working.
+    if (body && Array.isArray(body.items)) {
+      return createManyItems({ body, user, supabase, headers });
+    }
+
     const invalid = validateItemPayload(body);
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400, headers });

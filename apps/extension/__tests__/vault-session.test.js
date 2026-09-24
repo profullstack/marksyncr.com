@@ -75,6 +75,22 @@ vi.mock('../src/lib/vault-api.js', () => ({
     serverRef.items.push(stored);
     return stored;
   }),
+  createVaultItems: vi.fn(async (rows) => {
+    // Mirrors the real batch route: ON CONFLICT DO NOTHING, so an id that is
+    // already stored is skipped and counted as already-present rather than
+    // failing the whole batch. That is what makes a re-run resume.
+    let created = 0;
+    let already = 0;
+    for (const row of rows) {
+      if (serverRef.items.some((r) => r.id === row.id)) {
+        already += 1;
+        continue;
+      }
+      serverRef.items.push({ ...row, revision: 1, deleted_at: null });
+      created += 1;
+    }
+    return { created, already };
+  }),
   updateVaultItem: vi.fn(async (id, row) => {
     const existing = serverRef.items.find((r) => r.id === id);
     if (!existing) return null;
@@ -366,6 +382,32 @@ describe('items', () => {
    * the recovery is to import the same file again. That is only safe if an item
    * already stored counts as done rather than as a failure.
    */
+  it('falls back to one request per item against a server with no batch route', async () => {
+    // An extension updates before the site does, so for a while the batch route
+    // may not exist yet. Losing somebody's import to that would be worse than
+    // being slow, so an unsupported batch drops back to single posts.
+    const api = await import('../src/lib/vault-api.js');
+    api.createVaultItems.mockResolvedValueOnce(null);
+
+    const mod = await loadModule();
+    await mod.setupVault(PASSWORD);
+
+    const batch = Array.from({ length: 120 }, (_, i) =>
+      mod.buildItem('login', { name: `Fallback ${i}` })
+    );
+
+    await mod.importItems(batch);
+    await vi.waitFor(() => expect(mod.getImportProgress().job.running).toBe(false), {
+      timeout: 30_000,
+      interval: 50,
+    });
+
+    const { job } = mod.getImportProgress();
+    expect(job.failed).toBe(0);
+    expect(job.imported + job.already).toBe(120);
+    expect(api.createVaultItem).toHaveBeenCalled();
+  });
+
   it('counts already-stored items as present, so re-running resumes', async () => {
     const mod = await loadModule();
     await mod.setupVault(PASSWORD);
