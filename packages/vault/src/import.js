@@ -23,6 +23,7 @@
  */
 
 import { createItem } from './items.js';
+import { isBitwardenExport } from './bitwarden.js';
 import {
   isOpenCredsDatabase,
   openOpenCredsDatabase,
@@ -331,7 +332,7 @@ export function parseImport(text, { source } = {}) {
  * Cheap enough to run on a dropped file before deciding whether to ask for a
  * passphrase.
  * @param {string} text
- * @returns {'opencreds'|'csv'|'unknown'}
+ * @returns {'opencreds'|'bitwarden-json'|'csv'|'unknown'}
  */
 export function detectImportKind(text) {
   // A BOM written as an escape, not as the character: a literal BOM in source
@@ -342,7 +343,13 @@ export function detectImportKind(text) {
     .trimStart();
   if (trimmed.startsWith('{')) {
     try {
-      return isOpenCredsDatabase(JSON.parse(trimmed)) ? 'opencreds' : 'unknown';
+      const parsed = JSON.parse(trimmed);
+      if (isOpenCredsDatabase(parsed)) return 'opencreds';
+      // A Bitwarden export starts with a brace too. It used to fall through to
+      // 'unknown' here, which is the whole reason importing one was impossible
+      // from this page.
+      if (isBitwardenExport(parsed)) return 'bitwarden-json';
+      return 'unknown';
     } catch {
       return 'unknown';
     }

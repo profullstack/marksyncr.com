@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { detectImportKind, inspectOpenCredsFile, parseImport, parseOpenCredsImport } from '@marksyncr/vault';
+import {
+  detectImportKind,
+  inspectOpenCredsFile,
+  parseBitwardenJson,
+  parseImport,
+  parseOpenCredsImport,
+} from '@marksyncr/vault';
 
 /**
  * Vault import, on the options page rather than in the popup.
@@ -69,7 +75,10 @@ export function VaultImport() {
     const detected = detectImportKind(content);
 
     if (detected === 'unknown') {
-      setMessage({ type: 'error', text: 'That file is neither an OpenCreds database nor a CSV export.' });
+      setMessage({
+        type: 'error',
+        text: 'That file is not one this reads: an OpenCreds database, a Bitwarden JSON export, or a CSV export from Bitwarden, 1Password or Chrome. If it came from Bitwarden, export again choosing .json rather than the encrypted option.',
+      });
       reset();
       return;
     }
@@ -135,7 +144,9 @@ export function VaultImport() {
         const parsed = await parseOpenCredsImport(text, { passphrase });
         items = parsed.items;
       } else {
-        const parsed = parseImport(text);
+        // A Bitwarden JSON export and a CSV are both "not OpenCreds", but they
+        // are read by different parsers.
+        const parsed = kind === 'bitwarden-json' ? parseBitwardenJson(text) : parseImport(text);
         items = parsed.items;
         if (!items.length) {
           setBusy(false);
