@@ -87,8 +87,13 @@ export default defineConfig(({ mode }) => {
           assetFileNames: 'assets/[name]-[hash][extname]',
         },
       },
-      // Don't minify for easier debugging during development
-      minify: process.env.NODE_ENV === 'production',
+      // Never minify, including release builds. Mozilla's add-on policy treats
+      // minified code as unreviewable and rejected the listing for it, and the
+      // Firefox package is a copy of this same output (see scripts/build.js).
+      // Shipping readable code lets a reviewer diff the package against the
+      // source archive the release attaches (scripts/amo-source-archive.sh).
+      minify: false,
+      cssMinify: false,
       sourcemap: process.env.NODE_ENV !== 'production',
     },
     resolve: {
