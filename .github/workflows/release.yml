@@ -78,6 +78,19 @@ jobs:
           test -f apps/extension/dist/marksyncr-firefox.zip || { echo "::error::Firefox ZIP not found"; exit 1; }
           cp apps/extension/dist/marksyncr-chrome.zip apps/extension/dist/marksyncr-edge.zip
 
+      # AMO requires the original sources for any bundled add-on, plus
+      # instructions that rebuild the exact same files. Built here because
+      # this job has the checkout and the build-time values it records.
+      - name: Build AMO source archive
+        run: apps/extension/scripts/amo-source-archive.sh apps/extension/dist/marksyncr-source.zip
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: marksyncr-source
+          path: apps/extension/dist/marksyncr-source.zip
+          retention-days: 30
+
       - name: Upload Chrome ZIP
         uses: actions/upload-artifact@v7
         with:
@@ -236,6 +249,11 @@ jobs:
         with:
           name: marksyncr-firefox
 
+      - name: Download source archive
+        uses: actions/download-artifact@v8
+        with:
+          name: marksyncr-source
+
       - name: Unpack extension
         run: |
           mkdir -p extension
@@ -258,10 +276,11 @@ jobs:
             --api-key "$FIREFOX_JWT_ISSUER" \
             --api-secret "$FIREFOX_JWT_SECRET" \
             --channel listed \
+            --upload-source-code ./marksyncr-source.zip \
             --approval-timeout 0
 
           echo "Firefox extension v${{ needs.build.outputs.version }} submitted to AMO"
-          echo "- **Firefox**: v${{ needs.build.outputs.version }} submitted to AMO (human review queue)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Firefox**: v${{ needs.build.outputs.version }} submitted to AMO with source archive (human review queue)" >> "$GITHUB_STEP_SUMMARY"
 
   edge-release:
     name: Publish to Edge Add-ons
