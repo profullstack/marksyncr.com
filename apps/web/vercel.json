@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm build",
-  "installCommand": "pnpm install",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
   "outputDirectory": ".next",
   "regions": ["iad1"],
   "env": {

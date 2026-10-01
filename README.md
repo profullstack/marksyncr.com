@@ -46,7 +46,7 @@ there is no per-request JavaScript and no broad host permissions are requested.
   set of high-value ad/tracker domains (e.g. googlesyndication, criteo, amazon-adsystem) first and
   ranks whole-domain `||domain^` blocks ahead of narrow path rules, ensuring the biggest networks
   are covered despite the cap.
-- Regenerate after updating the lists: `pnpm --filter @marksyncr/extension build:filters`
+- Regenerate after updating the lists: `bun run --filter @marksyncr/extension build:filters`
   (the full `build` runs it automatically). Refresh the lists with:
 
   ```sh
@@ -56,7 +56,7 @@ there is no per-request JavaScript and no broad host permissions are requested.
 
 ## Project Structure
 
-This is a monorepo managed with pnpm workspaces and Turborepo:
+This is a monorepo managed with Bun workspaces and Turborepo:
 
 ```
 marksyncr/
@@ -78,7 +78,7 @@ marksyncr/
 ### Prerequisites
 
 - Node.js 20+
-- pnpm 9+
+- Bun 1.4+
 
 ### Installation
 
@@ -88,38 +88,38 @@ git clone https://github.com/yourusername/marksyncr.git
 cd marksyncr
 
 # Install dependencies
-pnpm install
+bun install
 
 # Set up git hooks (runs build and tests before each commit)
 ./scripts/setup-hooks.sh
 
 # Start development
-pnpm dev
+bun run dev
 
 # Build all packages
-pnpm build
+bun run build
 
 # Run tests
-pnpm test
+bun run test
 ```
 
 ## Development
 
 ### Apps
 
-- **Web App**: `cd apps/web && pnpm dev` - Runs on http://localhost:3000
-- **Extension**: `cd apps/extension && pnpm dev` - Builds to `dist/` for loading in browser
+- **Web App**: `cd apps/web && bun run dev` - Runs on http://localhost:3000
+- **Extension**: `cd apps/extension && bun run dev` - Builds to `dist/` for loading in browser
 
 ### Building the Extension
 
 ```bash
 # Build for all browsers
 cd apps/extension
-pnpm build
+bun run build
 
 # Build for specific browser
-pnpm build:chrome
-pnpm build:firefox
+bun run build:chrome
+bun run build:firefox
 ```
 
 ### Loading the Extension
@@ -175,7 +175,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-publishable-key
 - **Backend**: Supabase (auth, database, storage)
 - **Payments**: Stripe
 - **Testing**: Vitest
-- **Monorepo**: pnpm workspaces, Turborepo
+- **Monorepo**: Bun workspaces, Turborepo
 
 ## Architecture
 
@@ -275,7 +275,7 @@ docker-compose --profile dev up web-dev
 
 ### Extension (Chrome Web Store / Firefox Add-ons)
 
-1. Build the extension: `pnpm build`
+1. Build the extension: `bun run build`
 2. ZIP files are created in `apps/extension/dist/`
 3. Upload to respective stores:
    - Chrome: https://chrome.google.com/webstore/devconsole
@@ -286,7 +286,7 @@ docker-compose --profile dev up web-dev
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests: `pnpm test`
+4. Run tests: `bun run test`
 5. Submit a pull request
 
 ## License

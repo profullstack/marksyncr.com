@@ -9,7 +9,7 @@
 # ("Sources missing").
 #
 # The archive is `git archive` of the commit being released (the whole
-# monorepo, so pnpm-lock.yaml resolves every workspace), with:
+# monorepo, so bun.lock resolves every workspace), with:
 #   README.md          reviewer build instructions (the policy asks for a
 #                      top-level README)
 #   PROJECT_README.md  the repository's own README, moved aside
@@ -29,7 +29,7 @@ OUT="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 VERSION="$(node -p "require('$REPO_ROOT/apps/extension/package.json').version")"
-PNPM_VERSION="$(node -p "require('$REPO_ROOT/package.json').packageManager.split('@')[1]")"
+BUN_VERSION="$(node -p "require('$REPO_ROOT/package.json').packageManager.split('@')[1]")"
 
 
 STAGE="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/amo-source.XXXXXX")"
@@ -60,23 +60,23 @@ The add-on package is **not minified**. It is bundled with Vite, which
 concatenates modules into the files under \`popup/\`, \`options/\`,
 \`background/\`, \`blocked/\`, \`chunks/\` and \`assets/\`. Everything in it is
 produced from this archive by the steps below. All third-party code comes from
-npm through pnpm, pinned by \`pnpm-lock.yaml\`; nothing is vendored in
+npm through Bun, pinned by \`bun.lock\`; nothing is vendored in
 pre-built form.
 
 ## Build environment
 
 - Linux or macOS (the release is built on GitHub Actions \`ubuntu-latest\`)
 - Node.js 22.x (https://nodejs.org)
-- pnpm ${PNPM_VERSION} (pinned by \`packageManager\` in \`package.json\`)
-- network access to the npm registry during \`pnpm install\` only
+- Bun ${BUN_VERSION} (pinned by \`packageManager\` in \`package.json\`;
+  https://bun.sh), which installs the dependencies; the build itself runs on Node
+- network access to the npm registry during \`bun install\` only
 
 ## Build steps
 
 From the directory containing this README:
 
 \`\`\`sh
-corepack enable                     # provides pnpm ${PNPM_VERSION}
-pnpm install --frozen-lockfile
+bun install --frozen-lockfile       # Bun ${BUN_VERSION}
 cd apps/extension
 NODE_ENV=production node scripts/build.js firefox
 \`\`\`

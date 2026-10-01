@@ -5,9 +5,9 @@
 # commit messages and saves the release type for post-commit processing.
 #
 # Usage:
-#   git commit -m "release:patch"                    # Triggers pnpm release patch
-#   git commit -m "fix bug and release:minor"        # Triggers pnpm release minor
-#   git commit -m "big update release:major done"    # Triggers pnpm release major
+#   git commit -m "release:patch"                    # Triggers bun release patch
+#   git commit -m "fix bug and release:minor"        # Triggers bun release minor
+#   git commit -m "big update release:major done"    # Triggers bun release major
 #
 # The release only runs AFTER pre-commit tests pass and commit succeeds.
 #

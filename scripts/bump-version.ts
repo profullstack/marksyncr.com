@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Version bump script for all package.json and manifest files
- * Usage: pnpm version:bump <major|minor|patch> [--dry-run] [--from-hook]
+ * Usage: bun run version:bump <major|minor|patch> [--dry-run] [--from-hook]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -142,13 +142,13 @@ function main(): void {
     | undefined;
 
   if (!bumpType) {
-    console.error('Usage: pnpm version:bump <major|minor|patch> [--dry-run] [--from-hook]');
+    console.error('Usage: bun run version:bump <major|minor|patch> [--dry-run] [--from-hook]');
     console.error('');
     console.error('Examples:');
-    console.error('  pnpm version:bump patch        # 0.2.0 → 0.2.1');
-    console.error('  pnpm version:bump minor        # 0.2.0 → 0.3.0');
-    console.error('  pnpm version:bump major        # 0.2.0 → 1.0.0');
-    console.error('  pnpm version:bump patch --dry-run  # Preview changes');
+    console.error('  bun run version:bump patch        # 0.2.0 → 0.2.1');
+    console.error('  bun run version:bump minor        # 0.2.0 → 0.3.0');
+    console.error('  bun run version:bump major        # 0.2.0 → 1.0.0');
+    console.error('  bun run version:bump patch --dry-run  # Preview changes');
     process.exit(1);
   }
 

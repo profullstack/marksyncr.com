@@ -11,7 +11,7 @@ export default {
     '*.config.js',
     '*.config.mjs',
     'package.json',
-    'pnpm-lock.yaml',
+    'bun.lock',
     '.env*',
     'vitest.setup.js',
   ],

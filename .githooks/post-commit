@@ -43,7 +43,7 @@ if [ -f "$RELEASE_TRIGGER_FILE" ]; then
     REPO_DIR="$(git rev-parse --show-toplevel)"
 
     # Run the version bump (creates commit + tag, does NOT push)
-    if (cd "$REPO_DIR" && pnpm version:bump "$RELEASE_TYPE" --from-hook); then
+    if (cd "$REPO_DIR" && bun run version:bump "$RELEASE_TYPE" --from-hook); then
         echo ""
         echo "${GREEN}  Version bump complete.${NC}"
         echo "${YELLOW}  Push with: git push --follow-tags${NC}"
