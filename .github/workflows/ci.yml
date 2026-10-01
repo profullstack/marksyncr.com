@@ -19,7 +19,13 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       # The web app builds with `bun --bun next build`, as in the image.
+      # Placeholder public values: the middleware refuses every request without a
+      # Supabase URL and key, and NEXT_PUBLIC_* are inlined at build time.
       - run: bunx turbo build --filter=@marksyncr/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       # The standalone server must boot under Bun and answer its health check.
       - name: Standalone server answers under Bun
         run: |
