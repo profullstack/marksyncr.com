@@ -11,11 +11,11 @@
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "clean": "turbo clean && rm -rf node_modules",
-    "precommit": "pnpm lint && pnpm build",
+    "precommit": "bun run lint && bun run build",
     "version:bump": "tsx scripts/bump-version.ts",
     "setup:hooks": "git config core.hooksPath .githooks && git config push.followTags true && echo 'Git hooks and push.followTags configured'",
-    "postinstall": "command -v pnpm >/dev/null 2>&1 && pnpm dlx @socketsecurity/socket-patch apply --silent --ecosystems npm; git config core.hooksPath .githooks && git config push.followTags true 2>/dev/null || true",
-    "patch:socket": "pnpm dlx @socketsecurity/socket-patch apply --silent --ecosystems npm"
+    "postinstall": "command -v bunx >/dev/null 2>&1 && bunx @socketsecurity/socket-patch apply --silent --ecosystems npm; git config core.hooksPath .githooks && git config push.followTags true 2>/dev/null || true",
+    "patch:socket": "bunx @socketsecurity/socket-patch apply --silent --ecosystems npm"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -25,10 +25,11 @@
     "tsx": "^4.21.0",
     "turbo": "^2.3.3"
   },
-  "packageManager": "pnpm@9.15.1",
-  "engines": {
-    "node": ">=22.0.0"
-  },
+  "packageManager": "bun@1.4.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
     "dotenv": "^17.3.1"

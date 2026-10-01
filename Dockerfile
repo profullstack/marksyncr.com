@@ -1,52 +1,30 @@
-# MarkSyncr Web App Dockerfile
-# Multi-stage build for Next.js 16 with standalone output
+# syntax=docker/dockerfile:1
+#
+# MarkSyncr web app on Bun: Next.js 16 standalone output served by `bun server.js`.
+# dev2 builds this file (/home/anthony/www/marksyncr.com, `dockerfile: Dockerfile`)
+# and passes the four NEXT_PUBLIC_* build args declared below. Port 3000, env and
+# the /api/health check are unchanged from the Node image.
 
-# Stage 1: Dependencies
-FROM node:22-alpine AS deps
-RUN apk add --no-cache libc6-compat
+# Stage 1: dependencies
+FROM oven/bun:1.4.0-slim AS deps
 WORKDIR /app
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@9.15.1 --activate
-
-# Copy workspace files
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/extension/package.json ./apps/extension/
 COPY packages/types/package.json ./packages/types/
 COPY packages/core/package.json ./packages/core/
 COPY packages/sources/package.json ./packages/sources/
+COPY packages/vault/package.json ./packages/vault/
+# No git in the image: the root postinstall's git-hook setup is a no-op here.
+RUN bun install --frozen-lockfile
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Stage 2: Builder
-FROM node:22-alpine AS builder
-RUN apk add --no-cache libc6-compat
-WORKDIR /app
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@9.15.1 --activate
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/types/node_modules ./packages/types/node_modules
-COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
-COPY --from=deps /app/packages/sources/node_modules ./packages/sources/node_modules
-
-# Copy source code
+# Stage 2: build
+FROM deps AS builder
 COPY . .
-
-# Build packages first
-RUN pnpm --filter @marksyncr/types build || true
-RUN pnpm --filter @marksyncr/core build || true
-RUN pnpm --filter @marksyncr/sources build || true
-
-# Build the web app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build arguments for environment variables
+# Build arguments for the public, build-time values
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -57,29 +35,29 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
-RUN pnpm --filter @marksyncr/web build
+# `bun --bun next build` (apps/web build script): Next builds on Bun.
+RUN bun run --filter @marksyncr/web build
 
-# Stage 3: Runner
-FROM node:22-alpine AS runner
+# Stage 3: runtime
+FROM oven/bun:1.4.0-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy necessary files from builder
-# For standalone output, public folder must be at apps/web/public relative to server.js
-COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-
-USER nextjs
-
-EXPOSE 3000
-
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+# Docker sets HOSTNAME to the container id; the standalone server must bind all
+# interfaces for the published port to reach it.
+ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "apps/web/server.js"]
+# For standalone output, public/ must sit at apps/web/public beside server.js.
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=bun:bun /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=bun:bun /app/apps/web/.next/static ./apps/web/.next/static
+
+# The oven/bun image ships a non-root `bun` user.
+USER bun
+EXPOSE 3000
+# 127.0.0.1, not localhost: localhost resolves ::1 first and Next binds IPv4 only.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD bun -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+CMD ["bun", "apps/web/server.js"]

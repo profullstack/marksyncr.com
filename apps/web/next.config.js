@@ -3,6 +3,9 @@ const nextConfig = {
   reactStrictMode: true,
   // Enable standalone output for Docker deployment
   output: 'standalone',
+  // Trace from the monorepo root, never a lockfile further up the disk, so the
+  // server always lands at .next/standalone/apps/web/server.js.
+  outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
   transpilePackages: ['@marksyncr/types', '@marksyncr/core', '@marksyncr/sources'],
   experimental: {
     // Enable server actions for form handling

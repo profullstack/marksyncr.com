@@ -33,15 +33,18 @@ jobs:
 
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      # Bun installs the workspace (version from packageManager); the extension
+      # build itself (scripts/build.js, Vite) runs on Node, as before.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Extract and validate version
         id: version
@@ -63,7 +66,7 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Build extension
-        run: pnpm turbo build --filter=@marksyncr/extension...
+        run: bunx turbo build --filter=@marksyncr/extension...
         env:
           NODE_ENV: production
           NEXT_PUBLIC_SUPABASE_URL: ${{ env.NEXT_PUBLIC_SUPABASE_URL }}

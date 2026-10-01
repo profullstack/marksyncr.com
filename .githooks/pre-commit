@@ -4,7 +4,7 @@
 # Runs lint and build checks before allowing commits
 #
 # To install: git config core.hooksPath .githooks
-# Or run: pnpm setup:hooks
+# Or run: bun run setup:hooks
 #
 
 set -e
@@ -52,10 +52,10 @@ if [ -z "$STAGED_FILES" ]; then
 fi
 
 # 1. Linting
-run_check "Lint" pnpm lint
+run_check "Lint" bun run lint
 
 # 2. Build check
-run_check "Build" pnpm build
+run_check "Build" bun run build
 
 # Final result
 echo "----------------------------------------"

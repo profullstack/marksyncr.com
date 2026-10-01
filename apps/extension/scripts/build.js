@@ -68,7 +68,7 @@ function buildVite() {
 
   // Vite writes to dist/<EXT_BROWSER>; pass it explicitly so an ambient
   // BROWSER env var can never redirect the output (see vite.config.js).
-  execSync('pnpm vite build', {
+  execSync('bunx vite build', {
     cwd: ROOT_DIR,
     stdio: 'inherit',
     env: { ...process.env, EXT_BROWSER: 'chrome' },
@@ -272,7 +272,7 @@ async function createPackages(targets) {
     archiver = (await import('archiver')).default;
   } catch {
     console.log('⚠️  archiver not installed, skipping ZIP creation');
-    console.log('   Run: pnpm add -D archiver');
+    console.log('   Run: bun add -d archiver');
     return;
   }
 
