@@ -1,5 +1,4 @@
 import Script from 'next/script';
-import { FeedbackWidget } from '@profullstack/stack/feedback';
 import './globals.css';
 
 export const metadata = {
@@ -197,7 +196,6 @@ export default function RootLayout({ children }) {
           strategy="afterInteractive"
         />
               <Script data-site="901e4030-5cdb-4bfc-9e33-4498c5ff1294" src="https://crawlproof.com/stats.js" strategy="afterInteractive" />
-      <FeedbackWidget property="marksyncr.com" />
       <Script src="https://crawlproof.com/ad.js" strategy="afterInteractive" />
       </body>
     </html>
