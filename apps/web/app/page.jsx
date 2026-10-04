@@ -645,6 +645,28 @@ export default function HomePage() {
               © {new Date().getFullYear()} MarkSyncr. All rights reserved.
             </p>
           </div>
+          <nav
+            className="webring mt-6 flex items-center justify-center gap-3 text-xs text-slate-500"
+            aria-label="Profullstack webring"
+          >
+            <a
+              href="https://rssamplifier.com/ring/profullstack/previous?from=https%3A%2F%2Fmarksyncr.com%2F"
+              rel="prev"
+              className="hover:text-slate-900"
+            >
+              {'<<'}
+            </a>
+            <a href="https://rssamplifier.com/ring/profullstack" className="hover:text-slate-900">
+              Profullstack
+            </a>
+            <a
+              href="https://rssamplifier.com/ring/profullstack/next?from=https%3A%2F%2Fmarksyncr.com%2F"
+              rel="next"
+              className="hover:text-slate-900"
+            >
+              {'>>'}
+            </a>
+          </nav>
         </div>
       </footer>
     </div>
