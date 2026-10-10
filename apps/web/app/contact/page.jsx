@@ -1,5 +1,6 @@
 import { contactGuard } from '@/lib/contact-guard';
 import ContactPageClient from './ContactPageClient';
+import Footer from '../../components/Footer';
 
 // The form carries a token minted at render time, so this page must not be
 // cached — a stale page would hand every visitor the same dead token.
@@ -21,6 +22,7 @@ export default async function ContactPage() {
       token={token}
       tokenName={guardFields?.token.name ?? null}
       honeypotName={guardFields?.honeypot.name ?? null}
+      footer={<Footer />}
     />
   );
 }

@@ -1,6 +1,12 @@
 import Script from 'next/script';
 import './globals.css';
 
+// Static pages re-render hourly so the footer (@profullstack/footer, which fetches the
+// package's @latest template) picks up a footer release without a redeploy. Without
+// this, only the first page the build renders sees the template fetch; the rest reuse
+// the package's in-memory copy and are baked once.
+export const revalidate = 3600;
+
 export const metadata = {
   metadataBase: new URL('https://marksyncr.com'),
   alternates: {
