@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
-export default function ContactPageClient({ token, tokenName, honeypotName }) {
+export default function ContactPageClient({ token, tokenName, honeypotName, footer }) {
   // Honeypot. Nothing visible sets this, so anything in it came from a bot.
   const [honeypot, setHoneypot] = useState('');
   const [formData, setFormData] = useState({
@@ -288,24 +288,7 @@ export default function ContactPageClient({ token, tokenName, honeypotName }) {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-8">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between md:flex-row">
-            <p className="text-sm text-slate-500">
-              © {new Date().getFullYear()} MarkSyncr. All rights reserved.
-            </p>
-            <div className="mt-4 flex space-x-6 md:mt-0">
-              <Link href="/privacy" className="text-sm text-slate-600 hover:text-slate-900">
-                Privacy
-              </Link>
-              <Link href="/terms" className="text-sm text-slate-600 hover:text-slate-900">
-                Terms
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {footer}
     </div>
   );
 }

@@ -58,6 +58,7 @@
         "@marksyncr/core": "workspace:*",
         "@marksyncr/sources": "workspace:*",
         "@marksyncr/types": "workspace:*",
+        "@profullstack/footer": "latest",
         "@profullstack/stack": "^0.2.0",
         "@profullstack/x402-gateway": "^0.7.0",
         "@supabase/ssr": "^0.5.2",
@@ -414,6 +415,8 @@
     "@posthog/types": ["@posthog/types@1.381.0", "", {}, "sha512-AW68BovKFCNbPdq3VjOzfQeSQRYMvQVv+46LDywWFXO/oOTXFKwjY92FaJQSTXWgTNgDpqigCw3yUFDinK3hZA=="],
 
     "@profullstack/emailer": ["@profullstack/emailer@1.0.1", "", {}, "sha512-/uhHJJGH+1xSSz3mJn6X+m6aruYjMD3JOaRp/d4R/YWlzpy07H9z0/JUleIyRyBPNmaANSIwjTZ7aVjaukOEpg=="],
+
+    "@profullstack/footer": ["@profullstack/footer@0.2.1", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"], "bin": { "profullstack-footer": "bin/profullstack-footer.js" } }, "sha512-KHmKVwrlzCBrSAAJ4zobNFCxTg8VF0gvNMeAut00dX3+gbWCtk6eOwIR2AaqEC7smj6Aio6cIexzt/dUnv1McA=="],
 
     "@profullstack/form-guard": ["@profullstack/form-guard@0.1.1", "", {}, "sha512-RGLGfQhjq40f+JqEhSmsJnS0I5sFWjYdrYx4VYtkUqz8xvioN2yyR+6uFK0mnDAStKrYytlngg3meUsrChm/OQ=="],
 

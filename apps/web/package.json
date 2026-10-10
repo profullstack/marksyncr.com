@@ -15,6 +15,7 @@
     "@marksyncr/core": "workspace:*",
     "@marksyncr/sources": "workspace:*",
     "@marksyncr/types": "workspace:*",
+    "@profullstack/footer": "latest",
     "@profullstack/stack": "^0.2.0",
     "@profullstack/x402-gateway": "^0.7.0",
     "@supabase/ssr": "^0.5.2",
