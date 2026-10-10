@@ -652,6 +652,7 @@ export default function HomePage() {
             <a
               href="https://rssamplifier.com/ring/profullstack/previous?from=https%3A%2F%2Fmarksyncr.com%2F"
               rel="prev"
+              title="Previous site"
               className="hover:text-slate-900"
             >
               {'<<'}
@@ -662,9 +663,18 @@ export default function HomePage() {
             <a
               href="https://rssamplifier.com/ring/profullstack/next?from=https%3A%2F%2Fmarksyncr.com%2F"
               rel="next"
+              title="Next site"
               className="hover:text-slate-900"
             >
               {'>>'}
+            </a>
+            <a
+              href="https://rssamplifier.com/ring/profullstack/random?from=https%3A%2F%2Fmarksyncr.com%2F"
+              title="Random site"
+              aria-label="Random site"
+              className="hover:text-slate-900"
+            >
+              {'⚄'}
             </a>
           </nav>
         </div>
