@@ -78,6 +78,32 @@ export async function signUpWithEmail(formData) {
   };
 }
 
+const OAUTH_PROVIDERS = ['github', 'google'];
+
+/**
+ * OAuth providers the auth server has enabled, so the UI never offers a button
+ * that ends on GoTrue's "Unsupported provider: provider is not enabled" JSON.
+ * Fails closed: if the settings endpoint is unreachable, no OAuth buttons show.
+ * @returns {Promise<Array<'github' | 'google'>>}
+ */
+export async function getEnabledOAuthProviders() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return [];
+
+  try {
+    const res = await fetch(`${url}/auth/v1/settings`, {
+      headers: { apikey: anonKey },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const { external = {} } = await res.json();
+    return OAUTH_PROVIDERS.filter((provider) => external[provider] === true);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Sign in with OAuth provider
  * @param {'github' | 'google'} provider

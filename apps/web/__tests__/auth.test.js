@@ -57,8 +57,14 @@ vi.mock('next/headers', () => ({
 }));
 
 // Import after mocks are set up
-const { signUpWithEmail, signInWithEmail, signInWithOAuth, resetPassword, signOut } =
-  await import('../app/actions/auth.js');
+const {
+  signUpWithEmail,
+  signInWithEmail,
+  signInWithOAuth,
+  resetPassword,
+  signOut,
+  getEnabledOAuthProviders,
+} = await import('../app/actions/auth.js');
 
 /**
  * Helper to create FormData from an object
@@ -520,5 +526,56 @@ describe('Origin URL Construction', () => {
         },
       })
     );
+  });
+});
+
+describe('getEnabledOAuthProviders', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://supabase.example.com';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key';
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns only the providers GoTrue reports as enabled', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ external: { email: true, github: false, google: true } }),
+    });
+
+    await expect(getEnabledOAuthProviders()).resolves.toEqual(['google']);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://supabase.example.com/auth/v1/settings',
+      expect.objectContaining({ headers: { apikey: 'anon-key' } })
+    );
+  });
+
+  it('returns none when no OAuth provider is enabled', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ external: { email: true, phone: true } }),
+    });
+
+    await expect(getEnabledOAuthProviders()).resolves.toEqual([]);
+  });
+
+  it('fails closed when the settings endpoint errors', async () => {
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+    await expect(getEnabledOAuthProviders()).resolves.toEqual([]);
+
+    fetchMock.mockRejectedValue(new Error('network down'));
+    await expect(getEnabledOAuthProviders()).resolves.toEqual([]);
+  });
+
+  it('returns none when Supabase env is missing', async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    await expect(getEnabledOAuthProviders()).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
