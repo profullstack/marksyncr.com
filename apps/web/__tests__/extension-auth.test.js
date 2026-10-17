@@ -40,6 +40,13 @@ vi.mock('@/lib/supabase/server', () => ({
       refreshSession: mockRefreshSession,
     },
   })),
+  createFreshClient: vi.fn(() => ({
+    auth: {
+      signInWithPassword: mockSignInWithPassword,
+      getUser: mockGetUser,
+      refreshSession: mockRefreshSession,
+    },
+  })),
   createAdminClient: vi.fn(() => ({
     auth: {
       signInWithPassword: mockSignInWithPassword,
