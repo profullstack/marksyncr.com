@@ -58,9 +58,9 @@
         "@marksyncr/core": "workspace:*",
         "@marksyncr/sources": "workspace:*",
         "@marksyncr/types": "workspace:*",
-        "@profullstack/footer": "0.2.5",
+        "@profullstack/footer": "latest",
         "@profullstack/stack": "^0.2.0",
-        "@profullstack/x402-gateway": "^0.7.0",
+        "@profullstack/x402-gateway": "^0.10.1",
         "@supabase/ssr": "^0.5.2",
         "@supabase/supabase-js": "^2.47.10",
         "next": "16.3.8",
@@ -426,7 +426,7 @@
 
     "@profullstack/stack": ["@profullstack/stack@0.2.0", "", { "dependencies": { "@profullstack/emailer": "1.0.1", "@profullstack/form-guard": "0.1.1", "@profullstack/referrals": "0.1.0" }, "peerDependencies": { "@supabase/ssr": ">=0.5.0", "next": ">=13.0.0", "react": ">=18.0.0" }, "optionalPeers": ["@supabase/ssr", "next", "react"] }, "sha512-4o7Bz58qyAOblgoIBpGiRNcAI9mS/JRheOtfdWxwv08iiPyWMdAQVe4Wrv0puiZAmJ9zI+JYjLUNpi0OdGY8yw=="],
 
-    "@profullstack/x402-gateway": ["@profullstack/x402-gateway@0.7.0", "", { "dependencies": { "@profullstack/keys": "0.1.0" } }, "sha512-xsZRWHdOD9Y9EuRS4PsRmykVS2geOu/luY0jBlliOF3SEgxiLhgmx7ks+2jOUtGlq+cIfSonnk5eEObRGCOJ9w=="],
+    "@profullstack/x402-gateway": ["@profullstack/x402-gateway@0.10.1", "", { "dependencies": { "@profullstack/keys": "^0.1.0" } }, "sha512-YF/P3GRbb/8dAHIhDT2R7yHSAK+olrT4/zAWLzf5aF9Na8o1/rJCdP+k6UnGepyQ9RQ2qL9p5diRVwb18Zt4VA=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.0-beta.27", "", {}, "sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA=="],
 
