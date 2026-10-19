@@ -1,10 +1,9 @@
 import Script from 'next/script';
 import './globals.css';
+import PitFooter from '../components/PitFooter';
 
-// Static pages re-render hourly so the footer (@profullstack/footer, which fetches the
-// package's @latest template) picks up a footer release without a redeploy. Without
-// this, only the first page the build renders sees the template fetch; the rest reuse
-// the package's in-memory copy and are baked once.
+// Static pages re-render hourly so the pit.world network footer (PitFooter, fetched
+// on the server) picks up snippet changes without a redeploy.
 export const revalidate = 3600;
 
 export const metadata = {
@@ -203,6 +202,7 @@ export default function RootLayout({ children }) {
         />
               <Script data-site="901e4030-5cdb-4bfc-9e33-4498c5ff1294" src="https://crawlproof.com/stats.js" strategy="afterInteractive" />
       <Script src="https://crawlproof.com/ad.js" strategy="afterInteractive" />
+        <PitFooter />
       </body>
     </html>
   );
