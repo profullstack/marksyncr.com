@@ -17,7 +17,7 @@
     "@marksyncr/types": "workspace:*",
     "@profullstack/footer": "latest",
     "@profullstack/stack": "^0.2.0",
-    "@profullstack/x402-gateway": "^0.10.1",
+    "@profullstack/x402-gateway": "^0.11.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "next": "16.3.8",
