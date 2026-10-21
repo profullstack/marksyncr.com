@@ -18,7 +18,6 @@ export const ANALYTICS_EVENTS = {
   CHECKOUT_COMPLETE: 'checkout_complete',
   SUBSCRIPTION_STARTED: 'subscription_started',
   SUBSCRIPTION_CANCELLED: 'subscription_cancelled',
-  TRIAL_STARTED: 'trial_started',
   UPGRADE_CLICKED: 'upgrade_clicked',
   PLAN_SELECTED: 'plan_selected',
 

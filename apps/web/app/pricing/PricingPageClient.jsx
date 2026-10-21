@@ -54,7 +54,7 @@ const plans = [
       'Version history (30 days)',
       'Priority email support',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Upgrade to Pro',
     ctaLink: '/signup?plan=pro',
     highlighted: true,
   },
@@ -97,12 +97,7 @@ const faqs = [
   {
     question: 'Can I switch between plans?',
     answer:
-      'Yes! You can upgrade or downgrade at any time. When upgrading, you get immediate access to new features. When downgrading, you keep access until the end of your billing period.',
-  },
-  {
-    question: 'Is there a free trial for Pro?',
-    answer:
-      'Yes, Pro comes with a 14-day free trial, and you do not need to enter any payment details to start.',
+      'Yes! You can upgrade or downgrade at any time. When upgrading, you get immediate access to new features. When downgrading, you keep Pro until the end of the month or year you paid for.',
   },
   {
     question: 'How do I pay for Pro or Team?',
