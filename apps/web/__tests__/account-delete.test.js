@@ -11,7 +11,6 @@ const mockUser = { id: 'user-456', email: 'delete-me@example.com' };
 let deleteCalls;
 let mockDeleteUserError;
 let mockSubscriptionResult;
-let mockCancelSubscriptionError;
 
 vi.mock('@/lib/auth-helper', () => ({
   corsHeaders: vi.fn((request, methods) => ({
@@ -21,13 +20,6 @@ vi.mock('@/lib/auth-helper', () => ({
     'Access-Control-Allow-Credentials': 'true',
   })),
   getAuthenticatedUser: vi.fn(),
-}));
-
-vi.mock('@/lib/stripe', () => ({
-  cancelSubscription: vi.fn(async (subId) => {
-    if (mockCancelSubscriptionError) throw mockCancelSubscriptionError;
-    deleteCalls.push({ action: 'cancelSubscription', subId });
-  }),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -78,7 +70,6 @@ describe('POST /api/account/delete', () => {
     deleteCalls = [];
     mockDeleteUserError = null;
     mockSubscriptionResult = { data: null };
-    mockCancelSubscriptionError = null;
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -150,28 +141,6 @@ describe('POST /api/account/delete', () => {
     const authDelete = deleteCalls.find((c) => c.action === 'deleteUser');
     expect(authDelete).toBeDefined();
     expect(authDelete.userId).toBe(mockUser.id);
-  });
-
-  it('cancels Stripe subscription before deleting data', async () => {
-    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: {} });
-    mockSubscriptionResult = { data: { stripe_subscription_id: 'sub_123' } };
-    const req = createMockRequest({ body: { confirm: 'DELETE' } });
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const cancelCall = deleteCalls.find((c) => c.action === 'cancelSubscription');
-    expect(cancelCall).toBeDefined();
-    expect(cancelCall.subId).toBe('sub_123');
-  });
-
-  it('returns 500 when Stripe cancellation fails', async () => {
-    getAuthenticatedUser.mockResolvedValue({ user: mockUser, supabase: {} });
-    mockSubscriptionResult = { data: { stripe_subscription_id: 'sub_123' } };
-    mockCancelSubscriptionError = new Error('Stripe API error');
-    const req = createMockRequest({ body: { confirm: 'DELETE' } });
-    const res = await POST(req);
-    expect(res.status).toBe(500);
-    const data = await res.json();
-    expect(data.error).toContain('cancel');
   });
 
   it('returns 500 when auth user deletion fails', async () => {

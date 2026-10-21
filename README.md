@@ -149,9 +149,8 @@ Copy `.env.example` to `.env.local` in each app directory:
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-STRIPE_SECRET_KEY=your-stripe-secret
-STRIPE_WEBHOOK_SECRET=your-webhook-secret
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-publishable-key
+COINPAY_API_KEY=your-coinpay-business-key
+COINPAY_WEBHOOK_SECRET=your-coinpay-webhook-secret
 ```
 
 ### Supabase Setup
@@ -161,19 +160,21 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-publishable-key
 3. Configure OAuth providers (GitHub, Google) in Supabase Auth settings
 4. Update environment variables with your project credentials
 
-### Stripe Setup
+### CoinPay Setup
 
-1. Create a Stripe account
-2. Create products and prices for Pro and Team plans
-3. Set up webhook endpoint pointing to `/api/webhooks/stripe`
-4. Update environment variables with your Stripe keys
+Pro and Team are sold as prepaid terms (1 month or 1 year) through CoinPay hosted
+checkout: the buyer pays in crypto or with PayPal. Prices live in `apps/web/lib/coinpay.js`.
+
+1. `npx @profullstack/coinpay-onboard site marksyncr.com --webhook https://marksyncr.com/api/webhooks/coinpay`
+2. Put `COINPAY_API_KEY` and `COINPAY_WEBHOOK_SECRET` in the app's environment
+3. Apply `supabase/migrations/20261021120000_coinpay_payments.sql` (payment ledger + hourly expiry job)
 
 ## Tech Stack
 
 - **Frontend**: React 19, Tailwind CSS
 - **Build**: Vite (extension), Next.js 16 (web)
 - **Backend**: Supabase (auth, database, storage)
-- **Payments**: Stripe
+- **Payments**: CoinPay (crypto and PayPal)
 - **Testing**: Vitest
 - **Monorepo**: Bun workspaces, Turborepo
 
@@ -244,13 +245,8 @@ railway up
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- `STRIPE_PRO_MONTHLY_PRICE_ID`
-- `STRIPE_PRO_YEARLY_PRICE_ID`
-- `STRIPE_TEAM_MONTHLY_PRICE_ID`
-- `STRIPE_TEAM_YEARLY_PRICE_ID`
+- `COINPAY_API_KEY`
+- `COINPAY_WEBHOOK_SECRET`
 - `NEXT_PUBLIC_APP_URL` (your Railway domain)
 
 ### Docker Deployment

@@ -62,19 +62,20 @@ export default function TermsPage() {
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.2 Paid Plans</h3>
             <p className="mb-4 text-slate-600">
               Paid plans (Pro and Team) provide access to MarkSyncr Cloud storage and additional
-              features. Subscription fees are billed monthly or annually as selected at signup.
+              features. Paid plans are bought as a prepaid term of one month or one year.
             </p>
 
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.3 Billing</h3>
             <p className="mb-4 text-slate-600">
-              Payments are processed through Stripe. By subscribing to a paid plan, you authorize us
-              to charge your payment method on a recurring basis until you cancel.
+              Payments are processed through CoinPay, in cryptocurrency or with PayPal. Each payment
+              buys one term and nothing is charged again automatically; to keep a paid plan, pay for
+              another term before the current one ends.
             </p>
 
             <h3 className="mb-2 text-xl font-medium text-slate-800">4.4 Cancellation</h3>
             <p className="mb-4 text-slate-600">
-              You may cancel your subscription at any time. Upon cancellation, you will retain
-              access to paid features until the end of your current billing period.
+              Since nothing renews automatically, there is nothing to cancel: you keep access to
+              paid features until the end of the term you paid for, then return to the Free plan.
             </p>
           </section>
 
@@ -109,7 +110,7 @@ export default function TermsPage() {
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">7. Third-Party Services</h2>
             <p className="mb-4 text-slate-600">
               The Service integrates with third-party services (GitHub, Dropbox, Google Drive,
-              Stripe). Your use of these services is subject to their respective terms of service
+              CoinPay). Your use of these services is subject to their respective terms of service
               and privacy policies.
             </p>
           </section>

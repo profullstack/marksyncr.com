@@ -8,7 +8,6 @@
 import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
 import { createAdminClient } from '@/lib/supabase/server';
-import { cancelSubscription } from '@/lib/stripe';
 
 const METHODS = ['POST', 'OPTIONS'];
 
@@ -60,25 +59,8 @@ export async function POST(request) {
     const userId = user.id;
     const adminClient = createAdminClient();
 
-    // Cancel active Stripe subscription before deleting data
-    const { data: subscription } = await adminClient
-      .from('subscriptions')
-      .select('stripe_subscription_id')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .maybeSingle();
-
-    if (subscription?.stripe_subscription_id) {
-      try {
-        await cancelSubscription(subscription.stripe_subscription_id);
-      } catch (stripeError) {
-        console.error('Failed to cancel Stripe subscription:', stripeError.message);
-        return NextResponse.json(
-          { error: 'Failed to cancel your subscription. Please cancel it manually in Stripe before deleting your account, or contact support.' },
-          { status: 500, headers }
-        );
-      }
-    }
+    // Paid plans are prepaid terms with no recurring charge, so there is
+    // nothing to cancel with the payment provider before deleting data.
 
     // Delete all user data from all tables (order matters for foreign keys)
     const tables = [

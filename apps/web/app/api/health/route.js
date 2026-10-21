@@ -35,16 +35,9 @@ export async function GET() {
     health.supabase = 'error';
   }
 
-  // Check Stripe connection
-  try {
-    if (process.env.STRIPE_SECRET_KEY) {
-      health.stripe = 'configured';
-    } else {
-      health.stripe = 'not configured';
-    }
-  } catch {
-    health.stripe = 'error';
-  }
+  // Check CoinPay configuration
+  health.coinpay =
+    process.env.COINPAY_API_KEY && process.env.COINPAY_WEBHOOK_SECRET ? 'configured' : 'not configured';
 
   const isHealthy = health.status === 'healthy';
 

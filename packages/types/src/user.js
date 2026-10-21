@@ -27,8 +27,6 @@
  * @property {string} userId - User UUID
  * @property {SubscriptionPlan} plan - Current plan
  * @property {SubscriptionStatus} status - Subscription status
- * @property {string} [stripeCustomerId] - Stripe customer ID
- * @property {string} [stripeSubscriptionId] - Stripe subscription ID
  * @property {string} currentPeriodStart - ISO 8601 timestamp
  * @property {string} currentPeriodEnd - ISO 8601 timestamp
  * @property {boolean} cancelAtPeriodEnd - Whether subscription will cancel at period end
