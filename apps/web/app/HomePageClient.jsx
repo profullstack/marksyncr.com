@@ -275,15 +275,6 @@ export default function HomePageClient({ footer }) {
         </div>
       </section>
 
-      {/* CrawlProof ad unit */}
-      <div className="flex justify-center px-4 py-8">
-        <div
-          data-cp-ad=""
-          data-slot="a57c46ce-341d-4f8d-ab28-92ea1d31fb7e"
-          data-format="banner_300x250"
-        />
-      </div>
-
       {/* Features Section */}
       <section id="features" className="bg-white py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
