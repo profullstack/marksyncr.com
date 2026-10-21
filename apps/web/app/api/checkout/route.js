@@ -1,195 +1,63 @@
 /**
- * Stripe Checkout API Route
+ * POST /api/checkout
  *
- * Creates checkout sessions for subscription upgrades.
+ * Opens a CoinPay hosted checkout session for Pro or Team (one month or one
+ * year) and hands back its URL; the buyer picks a coin or PayPal there.
+ * JSON callers (the pricing page, the extension) get { sessionId, url };
+ * a plain HTML form post (the dashboard) is redirected straight to it.
  */
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import Stripe from 'stripe';
+import { getAuthenticatedUser } from '@/lib/auth-helper';
+import { INTERVALS, PLANS, createCheckout } from '@/lib/coinpay';
 
-// Stripe price IDs
-const STRIPE_PRICES = {
-  pro: {
-    monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
-    yearly: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
-  },
-  team: {
-    monthly: process.env.STRIPE_TEAM_MONTHLY_PRICE_ID,
-    yearly: process.env.STRIPE_TEAM_YEARLY_PRICE_ID,
-  },
-};
+export const dynamic = 'force-dynamic';
 
-/**
- * Create Supabase server client
- */
-async function createSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore errors in route handlers
-          }
-        },
-      },
-    }
-  );
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
-/**
- * POST /api/checkout
- * Create a Stripe checkout session
- */
+async function readInput(request) {
+  const type = request.headers.get('content-type') || '';
+  if (type.includes('application/json')) {
+    return { form: false, ...(await request.json().catch(() => ({}))) };
+  }
+  const data = await request.formData().catch(() => null);
+  return {
+    form: true,
+    plan: data?.get('plan') || undefined,
+    interval: data?.get('interval') || undefined,
+  };
+}
+
 export async function POST(request) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://marksyncr.com';
+  let input;
   try {
-    const { plan, interval = 'monthly' } = await request.json();
+    input = await readInput(request);
+  } catch {
+    return json({ error: 'Invalid request' }, 400);
+  }
+  const plan = String(input.plan || '').toLowerCase();
+  const interval = String(input.interval || 'monthly').toLowerCase();
 
-    // Validate plan
-    if (!['pro', 'team'].includes(plan)) {
-      return new Response(JSON.stringify({ error: 'Invalid plan' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+  if (!PLANS.includes(plan)) return json({ error: 'Invalid plan' }, 400);
+  if (!INTERVALS.includes(interval)) return json({ error: 'Invalid interval' }, 400);
 
-    // Validate interval
-    if (!['monthly', 'yearly'].includes(interval)) {
-      return new Response(JSON.stringify({ error: 'Invalid interval' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+  const { user } = await getAuthenticatedUser(request);
+  if (!user) {
+    if (input.form) return Response.redirect(`${appUrl}/login`, 303);
+    return json({ error: 'Unauthorized' }, 401);
+  }
 
-    // Get price ID
-    const priceId = STRIPE_PRICES[plan]?.[interval];
-    if (!priceId) {
-      return new Response(JSON.stringify({ error: 'Price not configured' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get authenticated user
-    const supabase = await createSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Initialize Stripe
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16',
-    });
-
-    // Get or create Stripe customer
-    let customerId;
-
-    // Check if user already has a customer ID
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('stripe_customer_id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (subscription?.stripe_customer_id) {
-      customerId = subscription.stripe_customer_id;
-    } else {
-      // Search for existing customer by email
-      const customers = await stripe.customers.list({
-        email: user.email,
-        limit: 1,
-      });
-
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-      } else {
-        // Create new customer
-        const customer = await stripe.customers.create({
-          email: user.email,
-          metadata: {
-            userId: user.id,
-          },
-        });
-        customerId = customer.id;
-      }
-
-      // Save customer ID
-      await supabase
-        .from('subscriptions')
-        .update({ stripe_customer_id: customerId })
-        .eq('user_id', user.id);
-    }
-
-    // Create checkout session
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      customer: customerId,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      client_reference_id: user.id,
-      success_url: `${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/pricing?checkout=canceled`,
-      subscription_data: {
-        metadata: {
-          userId: user.id,
-          plan,
-        },
-      },
-      metadata: {
-        userId: user.id,
-        plan,
-      },
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-    });
-
-    return new Response(
-      JSON.stringify({
-        sessionId: session.id,
-        url: session.url,
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+  try {
+    const session = await createCheckout({ user, plan, interval, appUrl });
+    if (input.form) return Response.redirect(session.url, 303);
+    return json({ sessionId: session.id, url: session.url });
   } catch (error) {
     console.error('Checkout error:', error);
-    return new Response(
-      JSON.stringify({
-        error: error.message || 'Failed to create checkout session',
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    return json({ error: 'Could not start checkout. Please try again.' }, 502);
   }
 }

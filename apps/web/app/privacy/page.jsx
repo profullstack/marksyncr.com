@@ -88,7 +88,7 @@ export default function PrivacyPage() {
                 <strong>Supabase</strong> - Authentication and database
               </li>
               <li className="mb-2">
-                <strong>Stripe</strong> - Payment processing
+                <strong>CoinPay</strong> - Payment processing (crypto and PayPal)
               </li>
               <li className="mb-2">
                 <strong>GitHub, Dropbox, Google Drive</strong> - Optional storage providers

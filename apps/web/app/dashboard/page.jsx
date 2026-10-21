@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getUser, createClient } from '../../lib/supabase/server';
+import { getUser, createClient, createAdminClient } from '../../lib/supabase/server';
+import { reconcileReturn } from '../../lib/coinpay';
 import DashboardClient from './dashboard-client';
 import SyncSourcesClient from './sync-sources-client';
 
@@ -68,14 +69,24 @@ export default async function DashboardPage({ searchParams }) {
     redirect('/login');
   }
 
+  const params = await searchParams;
+  const checkoutStatus = params?.checkout;
+
+  // Back from CoinPay: settle the session now if it is already paid.
+  let sessionStatus = null;
+  if (checkoutStatus === 'success' && params?.session_id) {
+    try {
+      sessionStatus = await reconcileReturn(createAdminClient(), String(params.session_id), user);
+    } catch (err) {
+      console.error('CoinPay return check failed:', err.message);
+    }
+  }
+
   const [subscription, devices, connectedSources] = await Promise.all([
     getUserSubscription(user.id),
     getUserDevices(user.id),
     getConnectedSources(user.id),
   ]);
-
-  const params = await searchParams;
-  const checkoutStatus = params?.checkout;
   const connectedProvider = params?.connected;
   const errorMessage = params?.error;
 
@@ -111,7 +122,11 @@ export default async function DashboardPage({ searchParams }) {
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span>Your subscription has been activated! Thank you for upgrading.</span>
+              <span>
+                {sessionStatus === 'paid'
+                  ? 'Payment received and your plan is active. Thank you for upgrading!'
+                  : 'Thanks! Your plan activates as soon as CoinPay confirms the payment (crypto can take a few minutes). Refresh this page to check.'}
+              </span>
             </div>
           </div>
         )}
@@ -199,7 +214,7 @@ function SubscriptionCard({ subscription }) {
               type="submit"
               className="w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
             >
-              Upgrade to Pro - $5/mo
+              Upgrade to Pro: $5 for 1 month
             </button>
           </form>
           <form action="/api/checkout" method="POST">
@@ -209,7 +224,7 @@ function SubscriptionCard({ subscription }) {
               type="submit"
               className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              Upgrade to Team - $12/mo
+              Upgrade to Team: $12 for 1 month
             </button>
           </form>
         </div>
@@ -218,15 +233,37 @@ function SubscriptionCard({ subscription }) {
           <p>
             Status: <span className="font-medium capitalize">{subscription?.status}</span>
           </p>
-          {subscription?.current_period_end && (
-            <p>Renews: {new Date(subscription.current_period_end).toLocaleDateString()}</p>
+          {subscription?.current_period_end ? (
+            <p>Paid through: {new Date(subscription.current_period_end).toLocaleDateString()}</p>
+          ) : null}
+          <p className="mt-1 text-xs text-slate-500">
+            Plans are prepaid with crypto or PayPal through CoinPay and do not renew on their
+            own. Extend any time to add another term.
+          </p>
+          {(plan === 'pro' || plan === 'team') && (
+            <div className="mt-3 flex gap-2">
+              <form action="/api/checkout" method="POST">
+                <input type="hidden" name="plan" value={plan} />
+                <input type="hidden" name="interval" value="monthly" />
+                <button
+                  type="submit"
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Extend 1 month (${plan === 'team' ? 12 : 5})
+                </button>
+              </form>
+              <form action="/api/checkout" method="POST">
+                <input type="hidden" name="plan" value={plan} />
+                <input type="hidden" name="interval" value="yearly" />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+                >
+                  Extend 1 year (${plan === 'team' ? 36 : 15})
+                </button>
+              </form>
+            </div>
           )}
-          <a
-            href="/api/portal"
-            className="mt-2 inline-block text-primary-600 hover:text-primary-700"
-          >
-            Manage subscription →
-          </a>
         </div>
       )}
     </div>
