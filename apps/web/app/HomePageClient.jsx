@@ -550,7 +550,7 @@ export default function HomePageClient({ footer }) {
                 'Priority support',
               ]}
               highlighted
-              cta="Start Free Trial"
+              cta="Upgrade to Pro"
               isYearly={isYearly}
             />
             <PricingCard
