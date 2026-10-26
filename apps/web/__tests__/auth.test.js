@@ -30,7 +30,11 @@ vi.mock('../lib/supabase/server.js', () => ({
     })
   ),
   createAdminClient: vi.fn(() => ({
-    auth: {},
+    auth: {
+      admin: {
+        getUserById: async (id) => ({ data: { user: { id, email: 'ada@acme.com' } }, error: null }),
+      },
+    },
     from: (table) => ({
       upsert: (row, opts) => {
         mockUpsert(table, row, opts);
