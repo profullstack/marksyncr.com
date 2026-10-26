@@ -17,6 +17,7 @@
     "@marksyncr/types": "workspace:*",
     "@profullstack/coinpay-onboard": "0.2.0",
     "@profullstack/footer": "latest",
+    "@profullstack/profile": "0.1.3",
     "@profullstack/stack": "^0.2.0",
     "@profullstack/x402-gateway": "^0.11.0",
     "@supabase/ssr": "^0.5.2",

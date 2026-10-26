@@ -13,6 +13,7 @@ const mockSignInWithOAuth = vi.fn();
 const mockSignOut = vi.fn();
 const mockResetPasswordForEmail = vi.fn();
 const mockUpdateUser = vi.fn();
+const mockUpsert = vi.fn();
 
 // Mock the Supabase server client factory (wraps @profullstack/stack/supabase)
 vi.mock('../lib/supabase/server.js', () => ({
@@ -28,6 +29,15 @@ vi.mock('../lib/supabase/server.js', () => ({
       },
     })
   ),
+  createAdminClient: vi.fn(() => ({
+    auth: {},
+    from: (table) => ({
+      upsert: (row, opts) => {
+        mockUpsert(table, row, opts);
+        return { select: () => ({ single: async () => ({ data: row, error: null }) }) };
+      },
+    }),
+  })),
 }));
 
 // Mock next/navigation
@@ -97,6 +107,56 @@ describe('Auth Server Actions', () => {
   });
 
   describe('signUpWithEmail', () => {
+    it('should return field errors and not create the user without a name', async () => {
+      const formData = createFormData({ email: 'test@example.com', password: 'password123' });
+
+      const result = await signUpWithEmail(formData);
+
+      expect(result.error).toBe('Some fields need fixing.');
+      expect(Object.keys(result.fieldErrors)).toEqual(['first_name', 'last_name']);
+      expect(mockSignUp).not.toHaveBeenCalled();
+    });
+
+    it('should store the profile fields on public.users after signup', async () => {
+      mockSignUp.mockResolvedValue({
+        data: {
+          user: { id: 'user-123', email: 'ada@acme.com', identities: [{ id: 'identity-1' }] },
+        },
+        error: null,
+      });
+
+      const formData = createFormData({
+        email: 'ada@acme.com',
+        password: 'password123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
+        company_domain: 'https://www.Acme.com/about',
+        job_title: 'CTO',
+        linkedin_url: 'in/ada-lovelace',
+      });
+
+      const result = await signUpWithEmail(formData);
+
+      expect(result.success).toBe(true);
+      expect(mockSignUp.mock.calls[0][0].options.data).toMatchObject({
+        name: 'Ada Lovelace',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
+      });
+      expect(mockUpsert).toHaveBeenCalledTimes(1);
+      const [table, row] = mockUpsert.mock.calls[0];
+      expect(table).toBe('users');
+      expect(row).toMatchObject({
+        id: 'user-123',
+        email: 'ada@acme.com',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
+        company_domain: 'acme.com',
+        job_title: 'CTO',
+        linkedin_url: 'https://www.linkedin.com/in/ada-lovelace',
+      });
+    });
+
     it('should return error when email is missing', async () => {
       const formData = createFormData({ password: 'password123' });
 
@@ -124,6 +184,8 @@ describe('Auth Server Actions', () => {
       const formData = createFormData({
         email: 'test@example.com',
         password: 'password123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
       });
 
       const result = await signUpWithEmail(formData);
@@ -131,9 +193,9 @@ describe('Auth Server Actions', () => {
       expect(mockSignUp).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'password123',
-        options: {
+        options: expect.objectContaining({
           emailRedirectTo: 'https://marksyncr.com/auth/callback',
-        },
+        }),
       });
       expect(result).toEqual({
         success: true,
@@ -151,6 +213,8 @@ describe('Auth Server Actions', () => {
       const formData = createFormData({
         email: 'test@example.com',
         password: 'password123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
       });
 
       await signUpWithEmail(formData);
@@ -158,9 +222,9 @@ describe('Auth Server Actions', () => {
       expect(mockSignUp).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'password123',
-        options: {
+        options: expect.objectContaining({
           emailRedirectTo: 'https://app.marksyncr.com/auth/callback',
-        },
+        }),
       });
     });
 
@@ -178,6 +242,8 @@ describe('Auth Server Actions', () => {
       const formData = createFormData({
         email: 'test@example.com',
         password: 'password123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
       });
 
       await signUpWithEmail(formData);
@@ -185,9 +251,9 @@ describe('Auth Server Actions', () => {
       expect(mockSignUp).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'password123',
-        options: {
+        options: expect.objectContaining({
           emailRedirectTo: 'https://marksyncr.com/auth/callback',
-        },
+        }),
       });
     });
 
@@ -200,6 +266,8 @@ describe('Auth Server Actions', () => {
       const formData = createFormData({
         email: 'test@example.com',
         password: 'password123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
       });
 
       const result = await signUpWithEmail(formData);
@@ -216,6 +284,8 @@ describe('Auth Server Actions', () => {
       const formData = createFormData({
         email: 'existing@example.com',
         password: 'password123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
       });
 
       const result = await signUpWithEmail(formData);
@@ -461,15 +531,17 @@ describe('Origin URL Construction', () => {
     const formData = createFormData({
       email: 'test@example.com',
       password: 'password123',
+      first_name: 'Ada',
+      last_name: 'Lovelace',
     });
 
     await signUpWithEmail(formData);
 
     expect(mockSignUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        options: {
+        options: expect.objectContaining({
           emailRedirectTo: 'https://custom.marksyncr.com/auth/callback',
-        },
+        }),
       })
     );
   });
@@ -488,15 +560,17 @@ describe('Origin URL Construction', () => {
     const formData = createFormData({
       email: 'test@example.com',
       password: 'password123',
+      first_name: 'Ada',
+      last_name: 'Lovelace',
     });
 
     await signUpWithEmail(formData);
 
     expect(mockSignUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        options: {
+        options: expect.objectContaining({
           emailRedirectTo: 'https://origin.marksyncr.com/auth/callback',
-        },
+        }),
       })
     );
   });
@@ -515,15 +589,17 @@ describe('Origin URL Construction', () => {
     const formData = createFormData({
       email: 'test@example.com',
       password: 'password123',
+      first_name: 'Ada',
+      last_name: 'Lovelace',
     });
 
     await signUpWithEmail(formData);
 
     expect(mockSignUp).toHaveBeenCalledWith(
       expect.objectContaining({
-        options: {
+        options: expect.objectContaining({
           emailRedirectTo: 'https://host.marksyncr.com/auth/callback',
-        },
+        }),
       })
     );
   });

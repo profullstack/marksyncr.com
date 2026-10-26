@@ -5,12 +5,17 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { signUpWithEmail, signInWithOAuth } from '../actions/auth';
 import { useOAuthProviders } from '../../lib/use-oauth-providers';
+import { ProfileFields } from '@profullstack/profile/react';
+
+// Email has its own input below; the package renders the other five.
+const PROFILE_FIELDS = ['first_name', 'last_name', 'company_domain', 'job_title', 'linkedin_url'];
 
 function SignupForm() {
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan') || 'free';
 
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -18,13 +23,15 @@ function SignupForm() {
 
   const handleEmailSignup = async (formData) => {
     setError(null);
+    setFieldErrors({});
     const submittedEmail = formData.get('email');
     setEmail(submittedEmail);
 
     startTransition(async () => {
       const result = await signUpWithEmail(formData);
       if (result?.error) {
-        setError(result.error);
+        setFieldErrors(result.fieldErrors ?? {});
+        setError(result.fieldErrors?.email ?? result.error);
       } else if (result?.success) {
         setSuccess(true);
       }
@@ -139,19 +146,6 @@ function SignupForm() {
       {/* Email form */}
       <form action={handleEmailSignup} className="space-y-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-slate-700">
-            Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            placeholder="John Doe"
-          />
-        </div>
-
-        <div>
           <label htmlFor="email" className="block text-sm font-medium text-slate-700">
             Email
           </label>
@@ -164,6 +158,8 @@ function SignupForm() {
             placeholder="you@example.com"
           />
         </div>
+
+        <ProfileFields fields={PROFILE_FIELDS} idPrefix="signup-" errors={fieldErrors} />
 
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-slate-700">
