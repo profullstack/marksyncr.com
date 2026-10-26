@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@marksyncr/types": "workspace:*",
-    "fuse.js": "^7.1.0"
+    "fuse.js": "^7.5.0"
   },
   "devDependencies": {
     "vitest": "^4.1.11"
