@@ -17,6 +17,24 @@ export async function middleware(request) {
   if (answer) return answer;
 
   const { response } = await updateSession(request);
+
+  // ?ref=<affiliate code>: keep the first touch in @profullstack/referrals'
+  // cookie; sign-in records it (lib/credits.js onSignedIn).
+  const ref = request.nextUrl?.searchParams.get('ref');
+  if (
+    ref &&
+    /^[A-Za-z0-9_-]{4,64}$/.test(ref) &&
+    response?.cookies &&
+    !request.cookies?.get('referral_code')
+  ) {
+    response.cookies.set('referral_code', ref, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: 'lax',
+      secure: request.nextUrl.protocol === 'https:',
+      httpOnly: true,
+    });
+  }
   return response;
 }
 

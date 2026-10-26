@@ -7,6 +7,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { INVITE_COOKIE, REF_COOKIE, onSignedIn } from '@/lib/credits';
 
 export async function GET(request) {
   const requestUrl = new URL(request.url);
@@ -53,7 +54,8 @@ export async function GET(request) {
     );
 
     try {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      const { data: exchanged, error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code);
 
       if (exchangeError) {
         console.error('Code exchange error:', exchangeError);
@@ -61,6 +63,13 @@ export async function GET(request) {
           new URL(`/login?error=${encodeURIComponent(exchangeError.message)}`, baseUrl)
         );
       }
+
+      // Confirmed sign-up or OAuth sign-in: accept a pending invite, record a
+      // ?ref=, settle any invite bonus. Never fails the sign-in.
+      await onSignedIn(exchanged?.user, {
+        inviteCode: cookieStore.get(INVITE_COOKIE)?.value || null,
+        refCode: cookieStore.get(REF_COOKIE)?.value || null,
+      });
     } catch (err) {
       console.error('Auth callback error:', err);
       return NextResponse.redirect(

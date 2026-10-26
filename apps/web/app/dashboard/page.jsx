@@ -3,6 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getUser, createClient, createAdminClient } from '../../lib/supabase/server';
 import { reconcileReturn } from '../../lib/coinpay';
+import { cookies } from 'next/headers';
+import { INVITE_COOKIE, REF_COOKIE, onSignedIn } from '../../lib/credits';
 import DashboardClient from './dashboard-client';
 import SyncSourcesClient from './sync-sources-client';
 
@@ -81,6 +83,14 @@ export default async function DashboardPage({ searchParams }) {
       console.error('CoinPay return check failed:', err.message);
     }
   }
+
+  // Accept a pending invite and settle any invite bonus before reading the
+  // plan, so a bonus earned since the last visit shows now. Never throws.
+  const jar = await cookies();
+  await onSignedIn(user, {
+    inviteCode: jar.get(INVITE_COOKIE)?.value || null,
+    refCode: jar.get(REF_COOKIE)?.value || null,
+  });
 
   const [subscription, devices, connectedSources] = await Promise.all([
     getUserSubscription(user.id),
@@ -191,7 +201,18 @@ function SubscriptionCard({ subscription }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">Subscription</h2>
+      <div className="mb-4 flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">Subscription</h2>
+        <span className="text-xs">
+          <Link href="/dashboard/settings#code" className="text-primary-600 hover:text-primary-700">
+            Have a code?
+          </Link>
+          <span className="mx-1 text-slate-300">·</span>
+          <Link href="/invites" className="text-primary-600 hover:text-primary-700">
+            Invites
+          </Link>
+        </span>
+      </div>
       <div className="mb-4">
         <span
           className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${

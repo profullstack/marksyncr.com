@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { createStatelessClient } from '@/lib/supabase/server';
+import { onSignedIn } from '@/lib/credits';
 
 /**
  * Handle CORS preflight requests
@@ -63,6 +64,10 @@ export async function POST(request) {
       }
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
+
+    // An invite stored at signup (user metadata) is accepted on the first
+    // sign-in from any device, and its bonus settled. Never fails the login.
+    await onSignedIn(data.user);
 
     return NextResponse.json({
       user: data.user,
