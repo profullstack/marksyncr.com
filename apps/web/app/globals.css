@@ -116,3 +116,22 @@
     @apply bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900;
   }
 }
+
+/* @profullstack/profile fields: same look as the signup form's own inputs. */
+@layer components {
+  .pfs-profile {
+    @apply m-0 grid min-w-0 gap-4 border-0 p-0;
+  }
+  .pfs-profile__row label {
+    @apply block text-sm font-medium text-slate-700;
+  }
+  .pfs-profile__row input {
+    @apply mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500;
+  }
+  .pfs-profile__optional {
+    @apply font-normal text-slate-500;
+  }
+  .pfs-profile__error {
+    @apply mt-1 text-xs text-red-600;
+  }
+}

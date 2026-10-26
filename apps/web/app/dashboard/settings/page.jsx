@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/supabase/server';
 import DeleteAccountSection from './delete-account';
+import ProfileCard from './profile-card';
 
 export const metadata = {
   title: 'Settings — MarkSyncr',
@@ -22,6 +23,12 @@ export default async function SettingsPage() {
             <p><span className="font-medium text-slate-700">Email:</span> {user.email}</p>
             <p className="mt-1"><span className="font-medium text-slate-700">User ID:</span> {user.id}</p>
           </div>
+        </section>
+
+        {/* Profile */}
+        <section className="bg-white rounded-lg border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Profile</h2>
+          <ProfileCard />
         </section>
 
         {/* Danger Zone */}

@@ -3,6 +3,8 @@
 import { createClient } from '../../lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+import { validateProfile, saveSignupProfile } from '@profullstack/profile';
+import { profileStore } from '../../lib/profile';
 
 /**
  * Sign in with email and password
@@ -42,6 +44,14 @@ export async function signUpWithEmail(formData) {
     return { error: 'Email and password are required' };
   }
 
+  // The @profullstack/profile fields (first/last name required; company
+  // domain, job title, LinkedIn optional) are checked before the user exists.
+  const check = validateProfile(formData);
+  if (!check.ok) {
+    return { error: 'Some fields need fixing.', fieldErrors: check.errors };
+  }
+  const p = check.profile;
+
   const supabase = await createClient();
   const headersList = await headers();
 
@@ -56,6 +66,14 @@ export async function signUpWithEmail(formData) {
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
+      data: {
+        name: [p.first_name, p.last_name].filter(Boolean).join(' '),
+        first_name: p.first_name,
+        last_name: p.last_name,
+        company_domain: p.company_domain ?? null,
+        job_title: p.job_title ?? null,
+        linkedin_url: p.linkedin_url ?? null,
+      },
     },
   });
 
@@ -67,6 +85,16 @@ export async function signUpWithEmail(formData) {
   // Check if user already exists (Supabase returns a user with identities: [] for existing users)
   if (data?.user?.identities?.length === 0) {
     return { error: 'An account with this email already exists. Please sign in instead.' };
+  }
+
+  // The auth trigger has created the public.users row; store the profile on it.
+  // The fields are also in user metadata, so a failed save never fails signup.
+  if (data?.user?.id) {
+    try {
+      await saveSignupProfile(profileStore(), data.user.id, formData, { email: data.user.email });
+    } catch (e) {
+      console.error('[signup] profile save failed', e);
+    }
   }
 
   // Log successful signup for debugging
