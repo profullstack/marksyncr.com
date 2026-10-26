@@ -23,6 +23,7 @@
 
 import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
+import { createAdminClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
 import { syncBookmarksToGitHub } from '@marksyncr/sources/oauth/github-sync';
 import { syncBookmarksToDropbox } from '@marksyncr/sources/oauth/dropbox-sync';
@@ -157,8 +158,11 @@ async function ensureUserExists(supabase, user) {
     return true; // User already exists
   }
 
-  // User doesn't exist, create them
-  const { error: insertError } = await supabase.from('users').insert({
+  // User doesn't exist, create them. public.users and subscriptions are not
+  // writable by the signed-in user (RLS + column grants), so this repair runs
+  // on the service-role client.
+  const admin = createAdminClient();
+  const { error: insertError } = await admin.from('users').insert({
     id: user.id,
     email: user.email,
     name: user.user_metadata?.name || user.user_metadata?.full_name || null,
@@ -173,7 +177,7 @@ async function ensureUserExists(supabase, user) {
   }
 
   // Also create a free subscription for the user
-  const { error: subError } = await supabase.from('subscriptions').insert({
+  const { error: subError } = await admin.from('subscriptions').insert({
     user_id: user.id,
     plan: 'free',
     status: 'active',

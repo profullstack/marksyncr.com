@@ -8,11 +8,13 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { INVITE_COOKIE, REF_COOKIE, onSignedIn } from '@/lib/credits';
+import { safeNextPath } from '@/lib/safe-redirect';
 
 export async function GET(request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const next = requestUrl.searchParams.get('next') || '/dashboard';
+  // Same-origin relative paths only; anything else (open redirect) -> /dashboard.
+  const next = safeNextPath(requestUrl.searchParams.get('next'));
   const error = requestUrl.searchParams.get('error');
   const errorDescription = requestUrl.searchParams.get('error_description');
 
