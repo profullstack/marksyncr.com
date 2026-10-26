@@ -13,6 +13,7 @@ const PROFILE_FIELDS = ['first_name', 'last_name', 'company_domain', 'job_title'
 function SignupForm() {
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan') || 'free';
+  const invite = searchParams.get('invite') || '';
 
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -175,6 +176,22 @@ function SignupForm() {
             placeholder="••••••••"
           />
           <p className="mt-1 text-xs text-slate-500">Must be at least 8 characters</p>
+        </div>
+
+        <div>
+          <label htmlFor="invite_code" className="block text-sm font-medium text-slate-700">
+            Invite code <span className="font-normal text-slate-500">(optional)</span>
+          </label>
+          <input
+            id="invite_code"
+            name="invite_code"
+            type="text"
+            defaultValue={invite}
+            autoComplete="off"
+            maxLength={64}
+            className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="INV-XXXX-XXXX-XXXX"
+          />
         </div>
 
         <button

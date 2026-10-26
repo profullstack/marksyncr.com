@@ -2,6 +2,17 @@ import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/supabase/server';
 import DeleteAccountSection from './delete-account';
 import ProfileCard from './profile-card';
+import RedeemCode from './redeem-code';
+import { getCreditDeps, planView } from '@/lib/credits';
+
+async function currentPlan(userId) {
+  try {
+    return await planView(getCreditDeps().db, userId);
+  } catch (err) {
+    console.error('[settings] plan view failed', err?.message);
+    return null;
+  }
+}
 
 export const metadata = {
   title: 'Settings — MarkSyncr',
@@ -10,6 +21,7 @@ export const metadata = {
 export default async function SettingsPage() {
   const user = await getUser();
   if (!user) redirect('/login');
+  const plan = await currentPlan(user.id);
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
@@ -23,6 +35,12 @@ export default async function SettingsPage() {
             <p><span className="font-medium text-slate-700">Email:</span> {user.email}</p>
             <p className="mt-1"><span className="font-medium text-slate-700">User ID:</span> {user.id}</p>
           </div>
+        </section>
+
+        {/* Plan & codes */}
+        <section id="code" className="bg-white rounded-lg border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Plan &amp; codes</h2>
+          <RedeemCode initialView={plan} />
         </section>
 
         {/* Profile */}

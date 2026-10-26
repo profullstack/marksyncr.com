@@ -2,9 +2,23 @@
 
 import { createClient } from '../../lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { validateProfile, saveSignupProfile } from '@profullstack/profile';
 import { profileStore } from '../../lib/profile';
+import { INVITE_COOKIE, REF_COOKIE, onSignedIn } from '../../lib/credits';
+
+/** The invite (/i/<code> cookie) and ?ref= (referral_code cookie) this browser carries. */
+async function pendingCodes() {
+  try {
+    const jar = await cookies();
+    return {
+      inviteCode: jar.get(INVITE_COOKIE)?.value || null,
+      refCode: jar.get(REF_COOKIE)?.value || null,
+    };
+  } catch {
+    return { inviteCode: null, refCode: null };
+  }
+}
 
 /**
  * Sign in with email and password
@@ -20,7 +34,7 @@ export async function signInWithEmail(formData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -28,6 +42,9 @@ export async function signInWithEmail(formData) {
   if (error) {
     return { error: error.message };
   }
+
+  // Accept a pending invite / record a ?ref= and settle any invite bonus.
+  await onSignedIn(data?.user, await pendingCodes());
 
   redirect('/dashboard');
 }
@@ -61,12 +78,20 @@ export async function signUpWithEmail(formData) {
     headersList.get('origin') ||
     `https://${headersList.get('host')}`;
 
+  // The invite and ?ref= travel in the account's metadata, so they still count
+  // when the confirmation link is opened in another browser or on a phone.
+  const pending = await pendingCodes();
+  const typedInvite = String(formData.get('invite_code') ?? '').trim().slice(0, 64);
+  const inviteCode = typedInvite || pending.inviteCode;
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
       data: {
+        ...(inviteCode ? { invite_code: inviteCode } : {}),
+        ...(pending.refCode ? { ref_code: String(pending.refCode).slice(0, 64) } : {}),
         name: [p.first_name, p.last_name].filter(Boolean).join(' '),
         first_name: p.first_name,
         last_name: p.last_name,

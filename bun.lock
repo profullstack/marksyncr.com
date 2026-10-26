@@ -58,9 +58,11 @@
         "@marksyncr/core": "workspace:*",
         "@marksyncr/sources": "workspace:*",
         "@marksyncr/types": "workspace:*",
+        "@profullstack/affiliates": "0.3.0",
         "@profullstack/coinpay-onboard": "0.2.0",
         "@profullstack/footer": "latest",
         "@profullstack/profile": "0.1.6",
+        "@profullstack/redeem-credits": "0.2.0",
         "@profullstack/stack": "^0.5.0",
         "@profullstack/x402-gateway": "^0.13.1",
         "@supabase/ssr": "^0.12.7",
@@ -423,6 +425,8 @@
 
     "@posthog/types": ["@posthog/types@1.416.1", "", {}, "sha512-PG06HE2axHNyyZ9CKSSHKSW4pWfQwEtPA1dewFqIwggcIgk1BsQ+tHSNqvZz+IvE2WnBZ8OcOkF9SWI55VxQfA=="],
 
+    "@profullstack/affiliates": ["@profullstack/affiliates@0.3.0", "", { "dependencies": { "@profullstack/referrals": "^0.1.0" }, "bin": { "affiliates": "dist/cli.js" } }, "sha512-bp0iREciWetDWrQYOsa6SJRTzviekKwgJQuATT7vql+4equu7pN76q8tb3SP1oBMczydsv6rYUMvPpS6+QT7yQ=="],
+
     "@profullstack/coinpay-onboard": ["@profullstack/coinpay-onboard@0.2.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.17.0", "zod": "^3.25.0" }, "bin": { "coinpay-onboard": "bin/coinpay-onboard" } }, "sha512-FxIiTefcAswyCyEapEcC+vSai3IZcOPPxaBGnT7L/VPGfZJYjH1kHoN6DCRMBQx0l2IbJ2aDLqrYUhqRUaI2cA=="],
 
     "@profullstack/emailer": ["@profullstack/emailer@1.0.3", "", {}, "sha512-VyAtCcfnSI6LOwJvWogCr3ZNmEsaZw+iuWrqnosLsdcKsbRyCrCmXigMNZJZEjlgYlR+lK//PwNPG+xtCFvWAw=="],
@@ -434,6 +438,8 @@
     "@profullstack/keys": ["@profullstack/keys@0.1.0", "", {}, "sha512-Vys47LvS5ivhdZu4SYOxh9Le3DEmWhjP0+CtrU45RhXAbY0ZFG/2Dk9V1bIIUGDp8UWMJqctvUD21JrNjfh04w=="],
 
     "@profullstack/profile": ["@profullstack/profile@0.1.6", "", { "peerDependencies": { "@libsql/client": ">=0.6.0", "postgres": "^3.4.0", "react": ">=18" }, "optionalPeers": ["@libsql/client", "postgres", "react"], "bin": { "profile": "src/cli.js" } }, "sha512-xkn0P3ANz151QJdlBwcBXkHk813qW9qAmuTZKcuvpEZYkyHDC9J9KfvpVSRepfjECzz4ONGHWO5Zwc4BHpfK8g=="],
+
+    "@profullstack/redeem-credits": ["@profullstack/redeem-credits@0.2.0", "", { "bin": { "redeem-credits": "dist/cli.js" } }, "sha512-JLowb7mWYfouIK7O522tuPPhvLjQjhdEfm6g3xEYrlNLGzLhrIADDhrYldBlGHfiVBWUFX7wefLuCSLF9fnyog=="],
 
     "@profullstack/referrals": ["@profullstack/referrals@0.1.0", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"] }, "sha512-u66SdBVpsv3kc0N+NWISPoYD5vjCERyv5wfD07iSkZwQeC2IA+ihX5jNA4e7Xr+Y4AUvxLycG+3b4VaROqzgRg=="],
 
