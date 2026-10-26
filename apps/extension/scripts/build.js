@@ -269,7 +269,9 @@ async function createPackages(targets) {
 
   let archiver;
   try {
-    archiver = (await import('archiver')).default;
+    // archiver 8 is ESM with one class per format instead of a factory.
+    const { ZipArchive } = await import('archiver');
+    archiver = (_format, options) => new ZipArchive(options);
   } catch {
     console.log('⚠️  archiver not installed, skipping ZIP creation');
     console.log('   Run: bun add -d archiver');

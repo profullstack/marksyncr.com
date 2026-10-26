@@ -18,21 +18,21 @@
     "patch:socket": "bunx @socketsecurity/socket-patch apply --silent --ecosystems npm"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "eslint": "^9.17.0",
-    "globals": "^17.0.0",
-    "prettier": "^3.4.2",
-    "tsx": "^4.21.0",
-    "turbo": "^2.3.3"
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "turbo": "^2.11.10"
   },
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.4",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "dependencies": {
-    "@supabase/supabase-js": "^2.47.10",
-    "dotenv": "^17.3.1"
+    "@supabase/supabase-js": "^2.118.0",
+    "dotenv": "^18.0.9"
   },
   "overrides": {
     "shell-quote": "^1.12.0"

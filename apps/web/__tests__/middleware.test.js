@@ -27,6 +27,8 @@ function createMockRequest(path = '/', cookies = []) {
 
   return {
     url: `https://marksyncr.com${path}`,
+    method: 'GET',
+    headers: new Headers({ 'user-agent': 'Mozilla/5.0' }),
     cookies: {
       getAll() {
         return cookies;

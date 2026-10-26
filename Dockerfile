@@ -6,7 +6,7 @@
 # the /api/health check are unchanged from the Node image.
 
 # Stage 1: dependencies
-FROM oven/bun:1.4.0-slim AS deps
+FROM oven/bun:1.4.4-slim AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
@@ -37,7 +37,7 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 RUN bun run --filter @marksyncr/web build
 
 # Stage 3: runtime
-FROM oven/bun:1.4.0-slim AS runner
+FROM oven/bun:1.4.4-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
