@@ -28,6 +28,7 @@ import {
   destroyItem as destroyVaultItem,
   importItems as importVaultItems,
   getImportProgress as getVaultImportProgress,
+  sourceTokensForSync,
 } from './vault-session.js';
 import {
   initAdblock,
@@ -38,11 +39,7 @@ import {
   removeAllowlistDomain,
   syncAdblockFromCloud,
 } from './adblock.js';
-import {
-  initBlockedLog,
-  getBlockedRequests,
-  clearBlockedRequests,
-} from './blocked-log.js';
+import { initBlockedLog, getBlockedRequests, clearBlockedRequests } from './blocked-log.js';
 import {
   initSecurityShield,
   getSecurityStatus,
@@ -979,9 +976,12 @@ async function apiRequest(endpoint, options = {}) {
  */
 async function syncBookmarksToCloud(bookmarks, source = 'browser', tombstones = []) {
   try {
+    // Seal v2: hand this sync the provider tokens, opened with the vault key.
+    // Locked vault = null, and the server skips GitHub/Dropbox until unlock.
+    const sourceTokens = await sourceTokensForSync().catch(() => null);
     const response = await apiRequest('/api/bookmarks', {
       method: 'POST',
-      body: JSON.stringify({ bookmarks, source, tombstones, replace: true }),
+      body: JSON.stringify({ bookmarks, source, tombstones, replace: true, sourceTokens }),
     });
 
     if (!response.ok) {
@@ -1966,10 +1966,7 @@ async function performSync(sourceId) {
       // Step 8: Get final local bookmarks after all merges
       const finalTree = await browser.bookmarks.getTree();
       const mergedFlat = flattenBookmarkTree(finalTree);
-      safeMergedTombstones = pruneTombstonesSupersededByBookmarks(
-        safeMergedTombstones,
-        mergedFlat
-      );
+      safeMergedTombstones = pruneTombstonesSupersededByBookmarks(safeMergedTombstones, mergedFlat);
       await storeTombstones(safeMergedTombstones);
       const mergedData = convertBrowserBookmarks(finalTree);
       // Pass the merged bookmark count as synced count since we're syncing to cloud
@@ -3690,10 +3687,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
       return recoverVault(message.payload?.recoveryKey, message.payload?.newPassword);
 
     case 'VAULT_CHANGE_PASSWORD':
-      return changeMasterPassword(
-        message.payload?.currentPassword,
-        message.payload?.newPassword
-      );
+      return changeMasterPassword(message.payload?.currentPassword, message.payload?.newPassword);
 
     case 'VAULT_LIST':
       return listVaultItems({ trash: Boolean(message.payload?.trash) });

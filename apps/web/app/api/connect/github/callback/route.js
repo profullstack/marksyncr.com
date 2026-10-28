@@ -7,7 +7,12 @@
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getUser, createClient } from '../../../../../lib/supabase/server';
+import { getUser, createClient, createAdminClient } from '../../../../../lib/supabase/server';
+import {
+  sealToPublicKey,
+  syncPublicKey,
+  SEAL_REQUIRED_MESSAGE,
+} from '../../../../../lib/sealed-tokens';
 import { exchangeCodeForToken, validateToken } from '@marksyncr/sources/oauth/github-oauth';
 import { getOrCreateRepository } from '@marksyncr/sources/oauth/github-repo';
 
@@ -53,6 +58,19 @@ export async function GET(request) {
       return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_APP_URL));
     }
 
+    // Seal v2: tokens are sealed to the user's sync key (registered by their
+    // extension's vault) and never stored in plaintext. No key, no connect.
+    const adminForKey = createAdminClient();
+    const sealKey = await syncPublicKey(adminForKey, user.id);
+    if (!sealKey) {
+      return NextResponse.redirect(
+        new URL(
+          `/dashboard?error=${encodeURIComponent(SEAL_REQUIRED_MESSAGE)}`,
+          process.env.NEXT_PUBLIC_APP_URL
+        )
+      );
+    }
+
     // Exchange code for token
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
@@ -90,7 +108,7 @@ export async function GET(request) {
         provider: 'github',
         provider_user_id: String(validation.user.id),
         provider_username: validation.user.login,
-        access_token: tokenData.access_token,
+        access_token: sealToPublicKey(sealKey, tokenData.access_token, user.id, 'access_token'),
         token_type: tokenData.token_type,
         scope: tokenData.scope,
         repository: repoConfig.repository,

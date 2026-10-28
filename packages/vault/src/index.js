@@ -114,3 +114,12 @@ export {
 } from './import.js';
 
 export { parseBitwardenJson, isBitwardenExport } from './bitwarden.js';
+
+export {
+  SEALED_PREFIX,
+  createSyncKey,
+  openSyncPrivateKey,
+  isSealedToken,
+  sealToSyncKey,
+  openSealedToken,
+} from './sync-key.js';
