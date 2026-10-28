@@ -22,6 +22,10 @@ import {
   unlockVault,
   unlockWithRecoveryKey,
   rewrapUserKey,
+  createSyncKey,
+  openSyncPrivateKey,
+  openSealedToken,
+  isSealedToken,
   createItem,
   recordPasswordChange,
   encryptItem,
@@ -31,6 +35,7 @@ import {
   ITEM_TYPE,
   ITEM_TYPE_NAME,
 } from '@marksyncr/vault';
+import { apiRequest } from '../lib/api.js';
 import {
   fetchVaultMeta,
   saveVaultMeta,
@@ -174,6 +179,7 @@ export async function setupVault(password) {
   }
 
   await setSessionKey(userKey);
+  await ensureSyncKey().catch(() => {});
   return { success: true, unlocked: true, recoveryKey };
 }
 
@@ -190,6 +196,7 @@ export async function unlock(password) {
   try {
     const { userKey } = await unlockVault(password, res.meta);
     await setSessionKey(userKey);
+    await ensureSyncKey().catch(() => {});
     return { success: true, unlocked: true };
   } catch (err) {
     // unlockVault throws a deliberately uninformative "Incorrect password" for
@@ -554,3 +561,55 @@ export function initVaultSession() {
 }
 
 export { ITEM_TYPE, ITEM_TYPE_NAME };
+
+/* ---------- sync-source tokens (seal v2) ----------
+   GitHub / Dropbox / Google Drive tokens are sealed on the server to a "sync
+   key" whose private half is encrypted under this vault's user key, so only
+   this unlocked extension can open them. Registering the key also seals any
+   token the server still held in plaintext. */
+
+async function fetchSyncKey() {
+  const res = await apiRequest('/api/sync-key', { method: 'GET' });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/** Vault unlocked: make sure the account has a sync key (creates one once). */
+export async function ensureSyncKey() {
+  const userKey = await getSessionKey();
+  if (!userKey) return { registered: false, reason: 'locked' };
+  const state = await fetchSyncKey();
+  if (!state) return { registered: false, reason: 'offline' };
+  if (state.key) return { registered: true };
+  const record = await createSyncKey(userKey, state.userId);
+  const res = await apiRequest('/api/sync-key', { method: 'POST', body: JSON.stringify(record) });
+  return { registered: res.ok };
+}
+
+/**
+ * The provider tokens for one bookmark sync, opened locally, or null when the
+ * vault is locked (the server then skips the external providers and says so).
+ * Sent only in the sync request body; never stored.
+ */
+export async function sourceTokensForSync() {
+  const userKey = await getSessionKey();
+  if (!userKey) return null;
+  const state = await fetchSyncKey();
+  if (!state?.key) return null;
+  const priv = await openSyncPrivateKey(userKey, state.key, state.userId);
+  const out = {};
+  for (const src of state.sources ?? []) {
+    const entry = {};
+    for (const field of ['access_token', 'refresh_token']) {
+      if (isSealedToken(src[field])) {
+        try {
+          entry[field] = await openSealedToken(priv, src[field], state.userId, field);
+        } catch {
+          // A token sealed to an older key: the provider needs reconnecting.
+        }
+      }
+    }
+    if (entry.access_token) out[src.provider] = entry;
+  }
+  return out;
+}

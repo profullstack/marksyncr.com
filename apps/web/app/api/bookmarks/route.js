@@ -23,6 +23,7 @@
 
 import { NextResponse } from 'next/server';
 import { corsHeaders, getAuthenticatedUser } from '@/lib/auth-helper';
+import { LOCKED_MESSAGE, sealToPublicKey, syncPublicKey, tokenForSync } from '@/lib/sealed-tokens';
 import { createAdminClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
 import { syncBookmarksToGitHub } from '@marksyncr/sources/oauth/github-sync';
@@ -577,7 +578,14 @@ function mergeBookmarks(existingBookmarks, incomingBookmarks) {
  * @param {Array} tombstones - Tombstones for deleted bookmarks
  * @param {string} checksum - Checksum of the bookmark data
  */
-async function syncToExternalSources(supabase, userId, bookmarks, tombstones, checksum) {
+async function syncToExternalSources(
+  supabase,
+  userId,
+  bookmarks,
+  tombstones,
+  checksum,
+  sourceTokens
+) {
   try {
     // Get all connected sync sources for this user
     // A source is considered connected if it has an access_token and connected_at timestamp
@@ -599,8 +607,24 @@ async function syncToExternalSources(supabase, userId, bookmarks, tombstones, ch
 
     console.log(`[External Sync] Found ${sources.length} connected sources`);
 
+    // Seal v2: stored tokens are sealed to the user's sync key; the server
+    // cannot open them. The extension opened them locally and sent them with
+    // this request (sourceTokens), for this request only.
+    const publicKey = await syncPublicKey(supabase, userId);
+
     // Sync to each connected source
-    for (const source of sources) {
+    for (const rawSource of sources) {
+      const source = {
+        ...rawSource,
+        access_token: tokenForSync(rawSource, sourceTokens, 'access_token'),
+        refresh_token: tokenForSync(rawSource, sourceTokens, 'refresh_token'),
+        sealKey: publicKey,
+        userId,
+      };
+      if (!source.access_token) {
+        console.log(`[External Sync] ${rawSource.provider}: ${LOCKED_MESSAGE}`);
+        continue;
+      }
       try {
         // Use 'provider' column (not 'source_type')
         if (source.provider === 'github') {
@@ -691,11 +715,20 @@ async function tryRefreshDropboxToken(supabase, source) {
 
   const tokenData = await refreshAccessToken(source.refresh_token, clientId, clientSecret);
 
+  // Seal v2: store the refreshed token only sealed to the user's sync key.
+  // A legacy user with no key yet keeps using it for this request only.
+  if (!source.sealKey) return tokenData.access_token;
+
   // Update the token in the database
   const { error: updateError } = await supabase
     .from('sync_sources')
     .update({
-      access_token: tokenData.access_token,
+      access_token: sealToPublicKey(
+        source.sealKey,
+        tokenData.access_token,
+        source.userId,
+        'access_token'
+      ),
       expires_at: tokenData.expires_in
         ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
         : null,
@@ -805,6 +838,9 @@ export async function POST(request) {
       tombstones: incomingTombstones = [],
       source = 'browser',
       replace = false,
+      // Seal v2: provider tokens the extension opened with the user's vault
+      // key, for this request's external sync only. Never stored or logged.
+      sourceTokens = null,
     } = await request.json();
 
     if (!Array.isArray(bookmarks)) {
@@ -980,10 +1016,7 @@ export async function POST(request) {
       deleted += beforeTombstoneFilter - finalBookmarks.length;
     }
 
-    const finalTombstones = pruneTombstonesSupersededByBookmarks(
-      mergedTombstones,
-      finalBookmarks
-    );
+    const finalTombstones = pruneTombstonesSupersededByBookmarks(mergedTombstones, finalBookmarks);
     console.log(
       `[Bookmarks API] After ${replace ? 'replace' : 'merge'}: ${finalBookmarks.length + deleted} total, ${added} added, ${updated} updated, ${deleted} removed by tombstones`
     );
@@ -1078,9 +1111,14 @@ export async function POST(request) {
 
     // Sync to external sources (GitHub, Dropbox, etc.) asynchronously
     // This runs in the background and doesn't block the response
-    syncToExternalSources(supabase, user.id, finalBookmarks, finalTombstones, checksum).catch(
-      (err) => console.error('[External Sync] Background sync failed:', err)
-    );
+    syncToExternalSources(
+      supabase,
+      user.id,
+      finalBookmarks,
+      finalTombstones,
+      checksum,
+      sourceTokens
+    ).catch((err) => console.error('[External Sync] Background sync failed:', err));
 
     return NextResponse.json(
       {
