@@ -19,7 +19,7 @@
     },
     "apps/extension": {
       "name": "@marksyncr/extension",
-      "version": "0.8.45",
+      "version": "0.8.46",
       "dependencies": {
         "@marksyncr/core": "workspace:*",
         "@marksyncr/sources": "workspace:*",
@@ -53,13 +53,14 @@
     },
     "apps/web": {
       "name": "@marksyncr/web",
-      "version": "0.8.45",
+      "version": "0.8.46",
       "dependencies": {
         "@marksyncr/core": "workspace:*",
         "@marksyncr/sources": "workspace:*",
         "@marksyncr/types": "workspace:*",
         "@profullstack/affiliates": "0.3.0",
         "@profullstack/coinpay-onboard": "0.2.0",
+        "@profullstack/contact-form": "0.3.0",
         "@profullstack/footer": "latest",
         "@profullstack/profile": "0.1.6",
         "@profullstack/redeem-credits": "0.2.0",
@@ -95,7 +96,7 @@
     },
     "packages/core": {
       "name": "@marksyncr/core",
-      "version": "0.8.45",
+      "version": "0.8.46",
       "dependencies": {
         "@marksyncr/types": "workspace:*",
         "fuse.js": "^7.5.0",
@@ -106,7 +107,7 @@
     },
     "packages/sources": {
       "name": "@marksyncr/sources",
-      "version": "0.8.45",
+      "version": "0.8.46",
       "dependencies": {
         "@marksyncr/core": "workspace:*",
         "@marksyncr/types": "workspace:*",
@@ -118,14 +119,14 @@
     },
     "packages/types": {
       "name": "@marksyncr/types",
-      "version": "0.8.45",
+      "version": "0.8.46",
       "devDependencies": {
         "vitest": "^4.1.11",
       },
     },
     "packages/vault": {
       "name": "@marksyncr/vault",
-      "version": "0.8.45",
+      "version": "0.8.46",
       "devDependencies": {
         "vitest": "^4.1.11",
       },
@@ -429,11 +430,13 @@
 
     "@profullstack/coinpay-onboard": ["@profullstack/coinpay-onboard@0.2.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.17.0", "zod": "^3.25.0" }, "bin": { "coinpay-onboard": "bin/coinpay-onboard" } }, "sha512-FxIiTefcAswyCyEapEcC+vSai3IZcOPPxaBGnT7L/VPGfZJYjH1kHoN6DCRMBQx0l2IbJ2aDLqrYUhqRUaI2cA=="],
 
+    "@profullstack/contact-form": ["@profullstack/contact-form@0.3.0", "", { "dependencies": { "@profullstack/emailer": "^1.0.3", "@profullstack/form-guard": "^0.3.0" }, "peerDependencies": { "react": ">=18.0.0" }, "optionalPeers": ["react"] }, "sha512-62O5dj6tp6y76hfLPkTQG5MALRT1TkNg/T2FhZjU4QviKf7/ft5GULaKSPzgaR938oHk8JSmPC/JiahTfrdiUA=="],
+
     "@profullstack/emailer": ["@profullstack/emailer@1.0.3", "", {}, "sha512-VyAtCcfnSI6LOwJvWogCr3ZNmEsaZw+iuWrqnosLsdcKsbRyCrCmXigMNZJZEjlgYlR+lK//PwNPG+xtCFvWAw=="],
 
     "@profullstack/footer": ["@profullstack/footer@0.4.0", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"], "bin": { "profullstack-footer": "bin/profullstack-footer.js" } }, "sha512-EJZnMUQmWDi9Gzx6BAjogloeaPFFSSCHtHJuC9dsXiOz8M87hfn6Z+Zx9AMYWk8s6xemPrPlkXKGB3PZugkcEA=="],
 
-    "@profullstack/form-guard": ["@profullstack/form-guard@0.1.1", "", {}, "sha512-RGLGfQhjq40f+JqEhSmsJnS0I5sFWjYdrYx4VYtkUqz8xvioN2yyR+6uFK0mnDAStKrYytlngg3meUsrChm/OQ=="],
+    "@profullstack/form-guard": ["@profullstack/form-guard@0.3.0", "", {}, "sha512-/rn5xd4mMG6eXGe85BmPfhz7zz3mmsmNV7U6a1bNhATIpVtKKEUEGF4QPrFx8sg6YDtpFkzmvjNEaFJm3DbFxg=="],
 
     "@profullstack/keys": ["@profullstack/keys@0.1.0", "", {}, "sha512-Vys47LvS5ivhdZu4SYOxh9Le3DEmWhjP0+CtrU45RhXAbY0ZFG/2Dk9V1bIIUGDp8UWMJqctvUD21JrNjfh04w=="],
 
@@ -1976,6 +1979,8 @@
     "@next/eslint-plugin-next/fast-glob": ["fast-glob@3.3.1", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "@nodelib/fs.walk": "1.2.8", "glob-parent": "5.1.2", "merge2": "1.4.1", "micromatch": "4.0.8" } }, "sha512-kNFPyjhh5cKjrUltxs+wFx+ZkbRaxxmZ+X0ZU31SOsxCEtP9VPgtq2teZw1DebupL5GmDaNQ6yKMMVcM41iqDg=="],
 
     "@pnpm/network.ca-file/graceful-fs": ["graceful-fs@4.2.10", "", {}, "sha512-9ByhssR2fPVsNZj478qUUbKfmL0+t5BDVyjShtyZZLiK7ZDAArFFfopyOTj0M05wE2tJPisA4iTnnXl2YoPvOA=="],
+
+    "@profullstack/stack/@profullstack/form-guard": ["@profullstack/form-guard@0.1.1", "", {}, "sha512-RGLGfQhjq40f+JqEhSmsJnS0I5sFWjYdrYx4VYtkUqz8xvioN2yyR+6uFK0mnDAStKrYytlngg3meUsrChm/OQ=="],
 
     "@testing-library/dom/aria-query": ["aria-query@5.3.0", "", { "dependencies": { "dequal": "2.0.3" } }, "sha512-b0P0sZPKtyu8HkeRAfCq0IfURZK+SuwMjY1UXGBU27wpAiTwQAIlq56IbIO+ytk/JjS1fMR14ee5WBBfKi5J6A=="],
 

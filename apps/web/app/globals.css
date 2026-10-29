@@ -135,3 +135,28 @@
     @apply mt-1 text-xs text-red-600;
   }
 }
+
+/* Contact form (@profullstack/contact-form). The honeypot must never be
+   visible: a real person who fills it in is silently dropped. */
+.cf-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.marksyncr-contact-form { margin-top: 3rem; display: grid; gap: 1.5rem; }
+.marksyncr-contact-form .cf-field label { display: block; font-size: 0.875rem; font-weight: 500; color: #334155; }
+.marksyncr-contact-form .cf-field input,
+.marksyncr-contact-form .cf-field select,
+.marksyncr-contact-form .cf-field textarea {
+  margin-top: 0.25rem; display: block; width: 100%; border-radius: 0.5rem;
+  border: 1px solid #cbd5e1; padding: 0.5rem 1rem; color: #0f172a; background: #fff;
+}
+.marksyncr-contact-form .cf-field input::placeholder,
+.marksyncr-contact-form .cf-field textarea::placeholder { color: #94a3b8; }
+.marksyncr-contact-form .cf-field input:focus,
+.marksyncr-contact-form .cf-field select:focus,
+.marksyncr-contact-form .cf-field textarea:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 1px #3b82f6; }
+.marksyncr-contact-form .cf-error { border-radius: 0.5rem; padding: 1rem; background: #fef2f2; color: #991b1b; }
+.marksyncr-contact-form .cf-submit {
+  width: 100%; border-radius: 0.5rem; background: #2563eb; padding: 0.75rem 1rem;
+  font-size: 0.875rem; font-weight: 500; color: #fff;
+}
+.marksyncr-contact-form .cf-submit:hover { background: #1d4ed8; }
+.marksyncr-contact-form .cf-submit:disabled { cursor: not-allowed; opacity: 0.5; }
+main .cf-sent { margin-top: 3rem; border-radius: 0.5rem; padding: 1rem; background: #f0fdf4; color: #166534; }
