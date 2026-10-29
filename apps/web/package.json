@@ -17,7 +17,7 @@
     "@marksyncr/types": "workspace:*",
     "@profullstack/affiliates": "0.3.0",
     "@profullstack/coinpay-onboard": "0.2.0",
-    "@profullstack/contact-form": "0.3.0",
+    "@profullstack/contact-form": "0.3.1",
     "@profullstack/footer": "latest",
     "@profullstack/profile": "0.1.6",
     "@profullstack/redeem-credits": "0.2.0",
