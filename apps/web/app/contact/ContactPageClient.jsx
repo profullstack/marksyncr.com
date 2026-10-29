@@ -1,68 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { ContactForm } from '@profullstack/contact-form/react';
 
-export default function ContactPageClient({ token, tokenName, honeypotName, footer }) {
-  // Honeypot. Nothing visible sets this, so anything in it came from a bot.
-  const [honeypot, setHoneypot] = useState('');
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: '',
-  });
-  const [status, setStatus] = useState({ type: '', message: '' });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setStatus({ type: '', message: '' });
-
-    try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          ...(tokenName && token ? { [tokenName]: token } : {}),
-          ...(honeypotName ? { [honeypotName]: honeypot } : {}),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus({
-          type: 'success',
-          message: 'Thank you! Your message has been sent successfully.',
-        });
-        setFormData({ name: '', email: '', subject: '', message: '' });
-      } else {
-        setStatus({
-          type: 'error',
-          message: data.error || 'Failed to send message. Please try again.',
-        });
-      }
-    } catch (error) {
-      setStatus({
-        type: 'error',
-        message: 'An unexpected error occurred. Please try again later.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
+// The form (questions, token, honeypot) comes from lib/contact.js via
+// contact.props(), minted per render by the page; its look is the
+// .marksyncr-contact-form rules in globals.css.
+export default function ContactPageClient({ form, footer }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Navigation */}
@@ -102,116 +47,7 @@ export default function ContactPageClient({ token, tokenName, honeypotName, foot
           </div>
 
           {/* Contact Form */}
-          <form onSubmit={handleSubmit} className="mt-12 space-y-6">
-            {/* Honeypot. Off-canvas rather than display:none, because some
-                bots skip fields they can tell are not rendered. The route had
-                one configured all along but never rendered it. */}
-            {honeypotName && (
-              <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
-                <label>
-                  Website
-                  <input
-                    type="text"
-                    name={honeypotName}
-                    value={honeypot}
-                    onChange={(e) => setHoneypot(e.target.value)}
-                    tabIndex={-1}
-                    autoComplete="off"
-                  />
-                </label>
-              </div>
-            )}
-            {status.message && (
-              <div
-                className={`rounded-lg p-4 ${
-                  status.type === 'success'
-                    ? 'bg-green-50 text-green-800'
-                    : 'bg-red-50 text-red-800'
-                }`}
-              >
-                {status.message}
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-700">
-                Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 placeholder-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="Your name"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 placeholder-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="subject" className="block text-sm font-medium text-slate-700">
-                Subject
-              </label>
-              <select
-                id="subject"
-                name="subject"
-                value={formData.subject}
-                onChange={handleChange}
-                required
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="">Select a subject</option>
-                <option value="General Inquiry">General Inquiry</option>
-                <option value="Technical Support">Technical Support</option>
-                <option value="Billing Question">Billing Question</option>
-                <option value="Feature Request">Feature Request</option>
-                <option value="Bug Report">Bug Report</option>
-                <option value="Partnership">Partnership</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="message" className="block text-sm font-medium text-slate-700">
-                Message
-              </label>
-              <textarea
-                id="message"
-                name="message"
-                value={formData.message}
-                onChange={handleChange}
-                required
-                rows={6}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 placeholder-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="How can we help you?"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-primary-600 px-4 py-3 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSubmitting ? 'Sending...' : 'Send Message'}
-            </button>
-          </form>
+          <ContactForm {...form} className="marksyncr-contact-form" />
 
           {/* Alternative Contact Methods */}
           <div className="mt-16 border-t border-slate-200 pt-12">

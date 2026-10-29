@@ -1,4 +1,4 @@
-import { contactGuard } from '@/lib/contact-guard';
+import { contact } from '@/lib/contact';
 import ContactPageClient from './ContactPageClient';
 import Footer from '../../components/Footer';
 
@@ -9,19 +9,16 @@ export const dynamic = 'force-dynamic';
 /**
  * Server wrapper around the contact form.
  *
- * The form itself is a client component; this exists only to mint the
- * proof-of-render token, which has to happen on the server so the signing
- * secret never reaches the browser.
+ * The page is a client component; this mints the form's proof-of-render
+ * token (contact.props()) on the server, so the signing secret never
+ * reaches the browser.
  */
 export default async function ContactPage() {
-  const token = contactGuard ? await contactGuard.issue() : null;
-  const guardFields = token ? contactGuard.fields(token) : null;
+  const form = await contact.props();
 
   return (
     <ContactPageClient
-      token={token}
-      tokenName={guardFields?.token.name ?? null}
-      honeypotName={guardFields?.honeypot.name ?? null}
+      form={form}
       footer={<Footer />}
     />
   );
