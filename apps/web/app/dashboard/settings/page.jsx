@@ -3,6 +3,7 @@ import { getUser } from '@/lib/supabase/server';
 import DeleteAccountSection from './delete-account';
 import ProfileCard from './profile-card';
 import RedeemCode from './redeem-code';
+import CoinpayIdentity from '@/components/account/CoinpayIdentity';
 import { getCreditDeps, planView } from '@/lib/credits';
 
 async function currentPlan(userId) {
@@ -48,6 +49,8 @@ export default async function SettingsPage() {
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Profile</h2>
           <ProfileCard />
         </section>
+
+        <CoinpayIdentity />
 
         {/* Danger Zone */}
         <section className="bg-white rounded-lg border border-red-200 p-6">
