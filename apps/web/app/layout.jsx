@@ -180,6 +180,13 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-title" content="MarkSyncr" />
         {/* Android */}
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* WebMCP (@profullstack/webmcp): site_info/open_page for the AI agent in the visitor's browser. */}
+        <script
+          type="module"
+          data-webmcp=""
+          src="https://cdn.jsdelivr.net/npm/@profullstack/webmcp@0/src/embed.js"
+          data-pages={JSON.stringify({ dashboard: '/dashboard', pricing: '/pricing', docs: '/docs', invites: '/invites', contact: '/contact', login: '/login', signup: '/signup' })}
+        />
       </head>
       <body className="min-h-screen bg-white font-sans antialiased">
         <div className="relative flex min-h-screen flex-col">
