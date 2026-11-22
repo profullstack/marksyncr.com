@@ -136,6 +136,25 @@
   }
 }
 
+/* /checkout/<tier> (@profullstack/checkout): its --pfc-* properties set to the
+   site's palette. The site has one light theme, and a plain .pfc rule outranks
+   the package's defaults in both colour schemes, so it stays light. */
+.pfc {
+  --pfc-accent: #2563eb;
+  --pfc-accent-fg: #ffffff;
+  --pfc-fg: #0f172a;
+  --pfc-muted: #64748b;
+  --pfc-card: #ffffff;
+  --pfc-border: #cbd5e1;
+  --pfc-error: #b91c1c;
+  --pfc-save-bg: #dcfce7;
+  --pfc-save-fg: #166534;
+  --pfc-popular-bg: #dbeafe;
+  --pfc-popular-fg: #1d4ed8;
+  --pfc-radius: 0.5rem;
+  --pfc-title-size: 1.5rem;
+}
+
 /* Contact form (@profullstack/contact-form). The honeypot must never be
    visible: a real person who fills it in is silently dropped. */
 .cf-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }

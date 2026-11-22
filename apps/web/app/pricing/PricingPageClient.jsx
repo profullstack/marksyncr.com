@@ -137,7 +137,7 @@ export default function PricingPageClient({ footer }) {
     });
   };
 
-  const handleCheckout = async (plan) => {
+  const handleCheckout = (plan) => {
     // Track plan selection
     trackEvent(ANALYTICS_EVENTS.PLAN_SELECTED, {
       plan: plan.toLowerCase(),
@@ -162,28 +162,9 @@ export default function PricingPageClient({ footer }) {
       interval: billingInterval,
     });
 
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan: plan.toLowerCase(),
-          interval: billingInterval,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error) {
-        // User not logged in, redirect to signup
-        window.location.href = `/signup?plan=${plan.toLowerCase()}`;
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      window.location.href = `/signup?plan=${plan.toLowerCase()}`;
-    }
+    // The checkout page, with the term chosen here already selected. Signed
+    // out, it sends the buyer on to /signup?plan=pro.
+    window.location.href = `/checkout/${plan.toLowerCase()}?plan=${billingInterval}&source=pricing`;
   };
 
   return (

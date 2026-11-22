@@ -228,26 +228,18 @@ function SubscriptionCard({ subscription }) {
       </div>
       {plan === 'free' ? (
         <div className="space-y-2">
-          <form action="/api/checkout" method="POST">
-            <input type="hidden" name="plan" value="pro" />
-            <input type="hidden" name="interval" value="monthly" />
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-            >
-              Upgrade to Pro: $5 for 1 month
-            </button>
-          </form>
-          <form action="/api/checkout" method="POST">
-            <input type="hidden" name="plan" value="team" />
-            <input type="hidden" name="interval" value="monthly" />
-            <button
-              type="submit"
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Upgrade to Team: $12 for 1 month
-            </button>
-          </form>
+          <Link
+            href="/checkout/pro?source=dashboard"
+            className="block w-full rounded-lg bg-primary-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-primary-700"
+          >
+            Upgrade to Pro
+          </Link>
+          <Link
+            href="/checkout/team?source=dashboard"
+            className="block w-full rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Upgrade to Team
+          </Link>
         </div>
       ) : (
         <div className="text-sm text-slate-600">
@@ -263,26 +255,18 @@ function SubscriptionCard({ subscription }) {
           </p>
           {(plan === 'pro' || plan === 'team') && (
             <div className="mt-3 flex gap-2">
-              <form action="/api/checkout" method="POST">
-                <input type="hidden" name="plan" value={plan} />
-                <input type="hidden" name="interval" value="monthly" />
-                <button
-                  type="submit"
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Extend 1 month (${plan === 'team' ? 12 : 5})
-                </button>
-              </form>
-              <form action="/api/checkout" method="POST">
-                <input type="hidden" name="plan" value={plan} />
-                <input type="hidden" name="interval" value="yearly" />
-                <button
-                  type="submit"
-                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
-                >
-                  Extend 1 year (${plan === 'team' ? 36 : 15})
-                </button>
-              </form>
+              <Link
+                href={`/checkout/${plan}?plan=monthly&source=dashboard`}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Extend 1 month (${plan === 'team' ? 12 : 5})
+              </Link>
+              <Link
+                href={`/checkout/${plan}?plan=yearly&source=dashboard`}
+                className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+              >
+                Extend 1 year (${plan === 'team' ? 36 : 15})
+              </Link>
             </div>
           )}
         </div>
