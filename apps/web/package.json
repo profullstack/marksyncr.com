@@ -16,6 +16,7 @@
     "@marksyncr/sources": "workspace:*",
     "@marksyncr/types": "workspace:*",
     "@profullstack/affiliates": "0.3.0",
+    "@profullstack/checkout": "^0.1.2",
     "@profullstack/coinpay-onboard": "0.4.0",
     "@profullstack/contact-form": "0.3.1",
     "@profullstack/footer": "latest",

@@ -59,6 +59,7 @@
         "@marksyncr/sources": "workspace:*",
         "@marksyncr/types": "workspace:*",
         "@profullstack/affiliates": "0.3.0",
+        "@profullstack/checkout": "^0.1.2",
         "@profullstack/coinpay-onboard": "0.4.0",
         "@profullstack/contact-form": "0.3.1",
         "@profullstack/footer": "latest",
@@ -427,6 +428,8 @@
     "@posthog/types": ["@posthog/types@1.416.1", "", {}, "sha512-PG06HE2axHNyyZ9CKSSHKSW4pWfQwEtPA1dewFqIwggcIgk1BsQ+tHSNqvZz+IvE2WnBZ8OcOkF9SWI55VxQfA=="],
 
     "@profullstack/affiliates": ["@profullstack/affiliates@0.3.0", "", { "dependencies": { "@profullstack/referrals": "^0.1.0" }, "bin": { "affiliates": "dist/cli.js" } }, "sha512-bp0iREciWetDWrQYOsa6SJRTzviekKwgJQuATT7vql+4equu7pN76q8tb3SP1oBMczydsv6rYUMvPpS6+QT7yQ=="],
+
+    "@profullstack/checkout": ["@profullstack/checkout@0.1.2", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"] }, "sha512-aukshiCAbdK3fz+dxUrXefqnsVqWC/a2TGFrRVyprdx7HchRHoTi8nzlF/C0yRDtq+DiEfIABBQp4kfycNWRRA=="],
 
     "@profullstack/coinpay-onboard": ["@profullstack/coinpay-onboard@0.4.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.32.2", "zod": "^4.6.7" }, "bin": { "coinpay-onboard": "bin/coinpay-onboard" } }, "sha512-L2P0fxNswZnXt1tvo6t19L/RrJN204vrWnIEY65QI+zriZN7JJPY4Ap6Nv8MLkyA5wDvY88s0+Dgjf9Myw/tUA=="],
 

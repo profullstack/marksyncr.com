@@ -3,8 +3,11 @@
  *
  * Opens a CoinPay hosted checkout session for Pro or Team (one month or one
  * year) and hands back its URL; the buyer picks a coin or PayPal there.
- * JSON callers (the pricing page, the extension) get { sessionId, url };
- * a plain HTML form post (the dashboard) is redirected straight to it.
+ * JSON callers (the extension, scripts) get { sessionId, url }; a plain HTML
+ * form post is redirected straight to it.
+ *
+ * The site's own buy buttons now go through the checkout page instead:
+ * /checkout/<tier>, which posts to /api/checkout/<tier> (lib/checkout.js).
  */
 
 import { getAuthenticatedUser } from '@/lib/auth-helper';
