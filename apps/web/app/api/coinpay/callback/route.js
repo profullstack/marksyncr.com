@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { finishSignIn } from '@profullstack/coinpay-onboard/oauth';
+import { coinpayFetch } from '@/lib/coinpay-ua';
 import { saveOpenProfileContact } from '@profullstack/profile';
 import { profileStore } from '@/lib/profile';
 import { createAdminClient, getUser } from '@/lib/supabase/server';
@@ -47,6 +48,7 @@ export async function GET(request) {
       clientId: config.clientId,
       clientSecret: config.clientSecret,
       redirectUri: config.redirectUri,
+      fetch: coinpayFetch,
     });
     who = {
       sub: result.sub,

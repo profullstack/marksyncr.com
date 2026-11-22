@@ -8,6 +8,7 @@
  */
 
 import { CoinPay, readWebhook, verifyWebhook } from '@profullstack/coinpay-onboard';
+import { coinpayFetch } from './coinpay-ua.js';
 
 export const PROPERTY = 'marksyncr.com';
 
@@ -39,7 +40,7 @@ export function addTerm(from, interval) {
 export function coinpayClient(env = process.env) {
   const token = env.COINPAY_API_KEY;
   if (!token) throw new Error('COINPAY_API_KEY is not configured');
-  return new CoinPay({ token, base: env.COINPAY_API_URL || undefined });
+  return new CoinPay({ token, base: env.COINPAY_API_URL || undefined, fetch: coinpayFetch });
 }
 
 /**
